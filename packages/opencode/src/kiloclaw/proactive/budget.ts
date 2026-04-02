@@ -24,20 +24,20 @@ interface BudgetEntry {
 interface BudgetLimits {
   suggest: number
   notify: number
-  actLowRisk: number
+  act_low_risk: number
 }
 
 // Default budget limits (can be overridden)
 const DEFAULT_LIMITS: BudgetLimits = {
   suggest: 50,
   notify: 30,
-  actLowRisk: 10,
+  act_low_risk: 10,
 }
 
 // Proactivity budget manager
 export class BudgetManager implements ProactiveBudget {
   private readonly log: ReturnType<typeof Log.create>
-  private readonly totalDaily: number
+  readonly totalDaily: number
   private readonly limits: BudgetLimits
   private readonly entries: BudgetEntry[]
   private resetAt: Date
@@ -163,7 +163,7 @@ export const BudgetManager$ = {
       new BudgetManager(config.totalDaily, {
         suggest: config.suggestLimit,
         notify: config.notifyLimit,
-        actLowRisk: config.actLowRiskLimit,
+        act_low_risk: config.actLowRiskLimit,
       }),
   ),
 }

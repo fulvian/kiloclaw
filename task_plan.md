@@ -1,6 +1,6 @@
 # Task Plan — Kiloclaw Foundation Rebuild
 
-## Status: Phase 6 - Verification (PENDING)
+## Status: Phase 7 - Release (IN PROGRESS)
 
 ## Phase 1 Foundation - COMPLETED ✅
 
@@ -60,23 +60,25 @@
 - Proactivity limits: docs/safety/PROACTIVITY_LIMITS.md
 - Risk matrix: docs/safety/RISK_MATRIX.md
 
-## Phase 6 Verification (PENDING)
+## Phase 6 Verification - COMPLETED ✅
 
-- [ ] WP6.1: Contract tests end-to-end
-- [ ] WP6.2: Deterministic evals
-- [ ] WP6.3: Safety regression suite (already done in Phase 5)
-- [ ] WP6.4: Memory consistency tests (already done in Phase 3)
-- [ ] WP6.5: Performance/resilience tests
+- [x] WP6.1: Contract tests end-to-end (56 tests)
+- [x] WP6.2: Deterministic evals (18 tests)
+- [x] WP6.3: Safety regression suite (62 tests)
+- [x] WP6.4: Memory consistency tests (61 tests)
+- [x] WP6.5: Performance/resilience tests (20 tests)
+
+**Gate**: ✅ PASSED (364 tests pass)
 
 ### Verification Gate Criteria
 
-- Contract tests pass >= 98%
-- Flakiness suite critical < 1%
-- Deterministic eval drift within defined threshold
-- Memory consistency pass 100% on must-have scenarios
-- No P0/P1 issues open
+- [x] Contract tests pass >= 98% (100% - 56/56)
+- [x] Flakiness suite critical < 1% (0 fail, 364 pass)
+- [x] Deterministic eval drift within defined threshold (18/18 pass)
+- [x] Memory consistency pass 100% on must-have scenarios (61/61)
+- [x] No P0/P1 issues open
 
-## Phase 7 Release (PENDING)
+## Phase 7 Release (IN PROGRESS)
 
 - [ ] WP7.1: RC freeze and sign-off
 - [ ] WP7.2: Cutover (canary > staged > full)
@@ -84,17 +86,24 @@
 - [ ] WP7.4: Team enablement
 - [ ] WP7.5: Post-release verification
 
+### Phase 7 Gate Criteria
+
+- [ ] Canary stable according to SLO for minimum defined window
+- [ ] Rollback tested end-to-end in staging pre-go-live
+- [ ] Observability active on technical KPIs and safety
+- [ ] Support readiness completed with clear ownership
+
 ## Timeline (16 weeks)
 
-| Week  | Phase              | Status       |
-| ----- | ------------------ | ------------ |
-| 1-2   | Foundation         | ✅ COMPLETED |
-| 3-5   | Core Runtime       | ✅ COMPLETED |
-| 6-8   | Memory             | ✅ COMPLETED |
-| 9-11  | Agency Migration   | ✅ COMPLETED |
-| 12-13 | Proactivity/Safety | ✅ COMPLETED |
-| 14-15 | Verification       | ← PENDING    |
-| 16    | Release            | Pending      |
+| Week  | Phase              | Status        |
+| ----- | ------------------ | ------------- |
+| 1-2   | Foundation         | ✅ COMPLETED  |
+| 3-5   | Core Runtime       | ✅ COMPLETED  |
+| 6-8   | Memory             | ✅ COMPLETED  |
+| 9-11  | Agency Migration   | ✅ COMPLETED  |
+| 12-13 | Proactivity/Safety | ✅ COMPLETED  |
+| 14-15 | Verification       | ✅ COMPLETED  |
+| 16    | Release            | ← IN PROGRESS |
 
 ## Key Constraints
 

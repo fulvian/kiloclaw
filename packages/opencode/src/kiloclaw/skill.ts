@@ -3,6 +3,8 @@ import { fn } from "@/util/fn"
 import z from "zod"
 import { type SkillId, type SemanticVersion } from "./types"
 import type { SkillContext } from "./agency"
+export type { SkillContext }
+export { SkillContext as SkillContextType } from "./agency"
 
 // JsonSchema type
 interface JsonSchema {
@@ -15,6 +17,8 @@ interface JsonSchema {
   readonly additionalProperties?: boolean | JsonSchema
   readonly $ref?: string
   readonly description?: string
+  readonly minimum?: number
+  readonly maximum?: number
 }
 
 // Skill interface

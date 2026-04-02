@@ -1,6 +1,7 @@
 import { Log } from "@/util/log"
-import { Skill, SkillContext } from "../skill"
-import { SkillId } from "../types"
+import { Skill } from "../../skill"
+import type { SkillContext } from "../../skill"
+import { SkillId } from "../../types"
 
 // Search result item
 export interface Result {
@@ -12,13 +13,13 @@ export interface Result {
 }
 
 // Web research input schema
-interface WebResearchInput {
+export interface WebResearchInput {
   query: string
   sources: number
 }
 
 // Web research output schema
-interface WebResearchOutput {
+export interface WebResearchOutput {
   results: Result[]
   summary: string
   query: string
@@ -39,7 +40,7 @@ function extractDomain(url: string): string {
 function performWebSearch(query: string, maxResults: number): Result[] {
   // This is a mock implementation that returns placeholder results
   // In production, this would call actual web search APIs
-  
+
   const mockResults: Result[] = [
     {
       title: `Results for: ${query}`,
@@ -74,7 +75,7 @@ function performWebSearch(query: string, maxResults: number): Result[] {
       domain: "stackoverflow.com",
     },
   ]
-  
+
   return mockResults.slice(0, maxResults)
 }
 
@@ -83,17 +84,19 @@ function generateSummary(results: Result[], query: string): string {
   if (results.length === 0) {
     return `No search results found for "${query}".`
   }
-  
-  const domains = [...new Set(results.map(r => r.domain))]
+
+  const domains = [...new Set(results.map((r) => r.domain))]
   const domainsStr = domains.slice(0, 3).join(", ")
-  
-  return `Found ${results.length} sources for "${query}" from ${domains.length} unique domains (${domainsStr}${domains.length > 3 ? ", and more" : ""}). ` +
+
+  return (
+    `Found ${results.length} sources for "${query}" from ${domains.length} unique domains (${domainsStr}${domains.length > 3 ? ", and more" : ""}). ` +
     `Results cover ${results[0].domain} and other authoritative sources.`
+  )
 }
 
 export const WebResearchSkill: Skill = {
   id: "web-research" as SkillId,
-  version: { major: 1, minor: 0, patch: 0 },
+  version: "1.0.0",
   name: "Web Research",
   inputSchema: {
     type: "object",
@@ -126,13 +129,13 @@ export const WebResearchSkill: Skill = {
   },
   capabilities: ["search", "synthesis", "web_scraping", "information_gathering"],
   tags: ["knowledge", "research", "search", "web"],
-  
+
   async execute(input: unknown, context: SkillContext): Promise<WebResearchOutput> {
     const log = Log.create({ service: "kiloclaw.skill.web-research" })
     log.info("executing web research", { correlationId: context.correlationId })
-    
+
     const { query, sources } = input as WebResearchInput
-    
+
     if (!query) {
       log.warn("empty query provided for web research")
       return {
@@ -142,17 +145,17 @@ export const WebResearchSkill: Skill = {
         sourcesCount: 0,
       }
     }
-    
+
     const maxSources = Math.min(Math.max(sources || 5, 1), 20)
     const results = performWebSearch(query, maxSources)
     const summary = generateSummary(results, query)
-    
+
     log.info("web research completed", {
       correlationId: context.correlationId,
       query,
       resultCount: results.length,
     })
-    
+
     return {
       results,
       summary,

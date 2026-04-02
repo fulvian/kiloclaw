@@ -36,7 +36,7 @@ describe("WP4.3 Wave 1: Development Agency Skills", () => {
   describe("code-review skill", () => {
     it("should have correct metadata", () => {
       expect(CodeReviewSkill.id).toBe("code-review")
-      expect(CodeReviewSkill.version).toEqual({ major: 1, minor: 0, patch: 0 })
+      expect(CodeReviewSkill.version).toEqual("1.0.0")
       expect(CodeReviewSkill.name).toBe("Code Review")
       expect(CodeReviewSkill.capabilities).toContain("code_analysis")
       expect(CodeReviewSkill.capabilities).toContain("style_check")
@@ -79,7 +79,7 @@ describe("WP4.3 Wave 1: Development Agency Skills", () => {
   describe("debugging skill", () => {
     it("should have correct metadata", () => {
       expect(DebuggingSkill.id).toBe("debugging")
-      expect(DebuggingSkill.version).toEqual({ major: 1, minor: 0, patch: 0 })
+      expect(DebuggingSkill.version).toEqual("1.0.0")
       expect(DebuggingSkill.name).toBe("Debugging")
       expect(DebuggingSkill.capabilities).toContain("bug_detection")
       expect(DebuggingSkill.capabilities).toContain("root_cause")
@@ -124,7 +124,7 @@ describe("WP4.3 Wave 1: Development Agency Skills", () => {
   describe("tdd skill", () => {
     it("should have correct metadata", () => {
       expect(TddSkill.id).toBe("tdd")
-      expect(TddSkill.version).toEqual({ major: 1, minor: 0, patch: 0 })
+      expect(TddSkill.version).toEqual("1.0.0")
       expect(TddSkill.name).toBe("Test-Driven Development")
       expect(TddSkill.capabilities).toContain("test_generation")
       expect(TddSkill.capabilities).toContain("test_execution")
@@ -165,7 +165,7 @@ describe("WP4.3 Wave 1: Development Agency Skills", () => {
   describe("comparison skill", () => {
     it("should have correct metadata", () => {
       expect(ComparisonSkill.id).toBe("comparison")
-      expect(ComparisonSkill.version).toEqual({ major: 1, minor: 0, patch: 0 })
+      expect(ComparisonSkill.version).toEqual("1.0.0")
       expect(ComparisonSkill.name).toBe("Code Comparison")
       expect(ComparisonSkill.capabilities).toContain("diff_analysis")
       expect(ComparisonSkill.capabilities).toContain("conflict_resolution")
@@ -209,7 +209,7 @@ describe("WP4.3 Wave 1: Development Agency Skills", () => {
   describe("document-analysis skill", () => {
     it("should have correct metadata", () => {
       expect(DocumentAnalysisSkill.id).toBe("document-analysis")
-      expect(DocumentAnalysisSkill.version).toEqual({ major: 1, minor: 0, patch: 0 })
+      expect(DocumentAnalysisSkill.version).toEqual("1.0.0")
       expect(DocumentAnalysisSkill.name).toBe("Document Analysis")
       expect(DocumentAnalysisSkill.capabilities).toContain("parsing")
       expect(DocumentAnalysisSkill.capabilities).toContain("extraction")
@@ -258,7 +258,7 @@ describe("WP4.3 Wave 1: Development Agency Skills", () => {
   describe("simplification skill", () => {
     it("should have correct metadata", () => {
       expect(SimplificationSkill.id).toBe("simplification")
-      expect(SimplificationSkill.version).toEqual({ major: 1, minor: 0, patch: 0 })
+      expect(SimplificationSkill.version).toEqual("1.0.0")
       expect(SimplificationSkill.name).toBe("Code Simplification")
       expect(SimplificationSkill.capabilities).toContain("complexity_analysis")
       expect(SimplificationSkill.capabilities).toContain("refactoring")
@@ -303,7 +303,7 @@ describe("WP4.3 Wave 1: Knowledge Agency Skills", () => {
   describe("web-research skill", () => {
     it("should have correct metadata", () => {
       expect(WebResearchSkill.id).toBe("web-research")
-      expect(WebResearchSkill.version).toEqual({ major: 1, minor: 0, patch: 0 })
+      expect(WebResearchSkill.version).toEqual("1.0.0")
       expect(WebResearchSkill.name).toBe("Web Research")
       expect(WebResearchSkill.capabilities).toContain("search")
       expect(WebResearchSkill.capabilities).toContain("synthesis")
@@ -337,7 +337,7 @@ describe("WP4.3 Wave 1: Knowledge Agency Skills", () => {
   describe("literature-review skill", () => {
     it("should have correct metadata", () => {
       expect(LiteratureReviewSkill.id).toBe("literature-review")
-      expect(LiteratureReviewSkill.version).toEqual({ major: 1, minor: 0, patch: 0 })
+      expect(LiteratureReviewSkill.version).toEqual("1.0.0")
       expect(LiteratureReviewSkill.name).toBe("Literature Review")
       expect(LiteratureReviewSkill.capabilities).toContain("paper_search")
       expect(LiteratureReviewSkill.capabilities).toContain("summarization")
@@ -375,7 +375,7 @@ describe("WP4.3 Wave 1: Knowledge Agency Skills", () => {
   describe("fact-check skill", () => {
     it("should have correct metadata", () => {
       expect(FactCheckSkill.id).toBe("fact-check")
-      expect(FactCheckSkill.version).toEqual({ major: 1, minor: 0, patch: 0 })
+      expect(FactCheckSkill.version).toEqual("1.0.0")
       expect(FactCheckSkill.name).toBe("Fact Check")
       expect(FactCheckSkill.capabilities).toContain("verification")
       expect(FactCheckSkill.capabilities).toContain("cross_reference")
@@ -416,7 +416,7 @@ describe("WP4.3 Wave 1: Knowledge Agency Skills", () => {
   describe("synthesis skill", () => {
     it("should have correct metadata", () => {
       expect(SynthesisSkill.id).toBe("synthesis")
-      expect(SynthesisSkill.version).toEqual({ major: 1, minor: 0, patch: 0 })
+      expect(SynthesisSkill.version).toEqual("1.0.0")
       expect(SynthesisSkill.name).toBe("Knowledge Synthesis")
       expect(SynthesisSkill.capabilities).toContain("multi_doc")
       expect(SynthesisSkill.capabilities).toContain("insight_extraction")
@@ -487,7 +487,7 @@ describe("WP4.3 Wave 1: Knowledge Agency Skills", () => {
   describe("critical-analysis skill", () => {
     it("should have correct metadata", () => {
       expect(CriticalAnalysisSkill.id).toBe("critical-analysis")
-      expect(CriticalAnalysisSkill.version).toEqual({ major: 1, minor: 0, patch: 0 })
+      expect(CriticalAnalysisSkill.version).toEqual("1.0.0")
       expect(CriticalAnalysisSkill.name).toBe("Critical Analysis")
       expect(CriticalAnalysisSkill.capabilities).toContain("reasoning")
       expect(CriticalAnalysisSkill.capabilities).toContain("counter_arguments")
@@ -579,12 +579,8 @@ describe("WP4.3 Wave 1: Skill Registry Integration", () => {
 
   it("should have semantic version format", () => {
     for (const skill of allWave1Skills) {
-      expect(skill.version).toHaveProperty("major")
-      expect(skill.version).toHaveProperty("minor")
-      expect(skill.version).toHaveProperty("patch")
-      expect(typeof skill.version.major).toBe("number")
-      expect(typeof skill.version.minor).toBe("number")
-      expect(typeof skill.version.patch).toBe("number")
+      expect(typeof skill.version).toBe("string")
+      expect(skill.version).toMatch(/^\d+\.\d+\.\d+$/)
     }
   })
 })

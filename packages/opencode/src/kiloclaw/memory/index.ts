@@ -1,14 +1,14 @@
 // Kiloclaw Memory 4-Layer - Barrel exports
 
-// Types
+// Types - use export * to allow merging with namespaces of same name
 export * from "./types.js"
 
-// Memory layers
-export { WorkingMemory, workingMemory } from "./working.js"
-export { EpisodicMemory, episodicMemory } from "./episodic.js"
-export { SemanticMemory, semanticMemory } from "./semantic.js"
-export { ProceduralMemory, proceduralMemory } from "./procedural.js"
+// Memory layers - export both namespaces (for module methods) and instances
+export { workingMemory, WorkingMemory } from "./working.js"
+export { episodicMemory, EpisodicMemory } from "./episodic.js"
+export { semanticMemory, SemanticMemory } from "./semantic.js"
+export { proceduralMemory, ProceduralMemory } from "./procedural.js"
 
-// Broker and lifecycle
-export { MemoryBroker, memoryBroker } from "./broker.js"
-export { MemoryLifecycle, memoryLifecycle } from "./lifecycle.js"
+// Broker and lifecycle - export both namespaces and instances
+export { memoryBroker, MemoryBroker } from "./broker.js"
+export { memoryLifecycle, MemoryLifecycle } from "./lifecycle.js"

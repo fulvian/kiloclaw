@@ -1,6 +1,7 @@
 import { Log } from "@/util/log"
-import { Skill, SkillContext } from "../skill"
-import { SkillId } from "../types"
+import { Skill } from "../../skill"
+import type { SkillContext } from "../../skill"
+import { SkillId } from "../../types"
 
 // Macros nutrient data
 export interface Macros {
@@ -136,7 +137,7 @@ function calculateNutritionScore(macros: Macros, calories: number): number {
 
 export const NutritionAnalysisSkill: Skill = {
   id: "nutrition-analysis" as SkillId,
-  version: { major: 1, minor: 0, patch: 0 },
+  version: "1.0.0",
   name: "Nutrition Analysis",
   inputSchema: {
     type: "object",

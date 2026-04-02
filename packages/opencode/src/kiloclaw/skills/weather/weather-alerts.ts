@@ -1,6 +1,7 @@
 import { Log } from "@/util/log"
-import { Skill, SkillContext } from "../skill"
-import { SkillId } from "../types"
+import { Skill } from "../../skill"
+import type { SkillContext } from "../../skill"
+import { SkillId } from "../../types"
 
 // Weather alert
 export interface Alert {
@@ -131,7 +132,7 @@ function determineOverallSeverity(alerts: Alert[]): "none" | "low" | "medium" | 
 
 export const WeatherAlertsSkill: Skill = {
   id: "weather-alerts" as SkillId,
-  version: { major: 1, minor: 0, patch: 0 },
+  version: "1.0.0",
   name: "Weather Alerts",
   inputSchema: {
     type: "object",

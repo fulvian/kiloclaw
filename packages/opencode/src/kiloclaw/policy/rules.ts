@@ -56,6 +56,14 @@ export interface RiskFactor {
 export const GuardrailType = z.enum(["static", "dynamic"])
 export type GuardrailType = z.infer<typeof GuardrailType>
 
+// Guardrail interface
+export interface Guardrail {
+  readonly id: string
+  readonly name: string
+  readonly type: GuardrailType
+  evaluate(context: ActionContext, action: Action): GuardrailResult
+}
+
 // Guardrail result
 export interface GuardrailResult {
   readonly allowed: boolean

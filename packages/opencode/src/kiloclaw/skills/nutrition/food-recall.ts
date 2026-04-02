@@ -1,6 +1,7 @@
 import { Log } from "@/util/log"
-import { Skill, SkillContext } from "../skill"
-import { SkillId } from "../types"
+import { Skill } from "../../skill"
+import type { SkillContext } from "../../skill"
+import { SkillId } from "../../types"
 
 // Food recall item
 export interface Recall {
@@ -119,7 +120,7 @@ function determineSeverity(recalls: Recall[]): "none" | "low" | "medium" | "high
 
 export const FoodRecallSkill: Skill = {
   id: "food-recall" as SkillId,
-  version: { major: 1, minor: 0, patch: 0 },
+  version: "1.0.0",
   name: "Food Recall Monitoring",
   inputSchema: {
     type: "object",

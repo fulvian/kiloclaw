@@ -1,6 +1,7 @@
 import { Log } from "@/util/log"
-import { Skill, SkillContext } from "../skill"
-import { SkillId } from "../types"
+import { Skill } from "../../skill"
+import type { SkillContext } from "../../skill"
+import { SkillId } from "../../types"
 
 // Document type for synthesis
 export interface Document {
@@ -12,13 +13,13 @@ export interface Document {
 }
 
 // Synthesis input schema
-interface SynthesisInput {
+export interface SynthesisInput {
   documents: Document[]
   focus?: string
 }
 
 // Synthesis output schema
-interface SynthesisOutput {
+export interface SynthesisOutput {
   synthesis: string
   insights: string[]
   sourceReferences: { id: string; title: string }[]
@@ -170,7 +171,7 @@ function calculateConfidence(documents: Document[]): number {
 
 export const SynthesisSkill: Skill = {
   id: "synthesis" as SkillId,
-  version: { major: 1, minor: 0, patch: 0 },
+  version: "1.0.0",
   name: "Knowledge Synthesis",
   inputSchema: {
     type: "object",

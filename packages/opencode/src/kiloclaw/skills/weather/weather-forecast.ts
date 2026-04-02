@@ -1,6 +1,7 @@
 import { Log } from "@/util/log"
-import { Skill, SkillContext } from "../skill"
-import { SkillId } from "../types"
+import { Skill } from "../../skill"
+import type { SkillContext } from "../../skill"
+import { SkillId } from "../../types"
 
 // Day forecast output
 export interface DayForecast {
@@ -73,7 +74,7 @@ function generateMockForecast(location: string, days: number): DayForecast[] {
 
 export const WeatherForecastSkill: Skill = {
   id: "weather-forecast" as SkillId,
-  version: { major: 1, minor: 0, patch: 0 },
+  version: "1.0.0",
   name: "Weather Forecast",
   inputSchema: {
     type: "object",

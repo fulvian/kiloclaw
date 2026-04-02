@@ -33,5 +33,4 @@ export {
   ConfirmationMode,
   DEFAULT_PROACTIVITY_LIMITS,
   type ProactivityPolicy,
-  type ProactivityLimits,
 } from "./limits"

@@ -115,7 +115,7 @@ import { RecipeSearchSkill } from "./nutrition/recipe-search"
 import { WeatherForecastSkill } from "./weather/weather-forecast"
 import { WeatherAlertsSkill } from "./weather/weather-alerts"
 import { WeatherCurrentSkill } from "./weather/weather-current"
-import type { Skill } from "./skill"
+import type { Skill } from "../skill"
 
 // Development agency skills
 export const developmentSkills: Skill[] = [

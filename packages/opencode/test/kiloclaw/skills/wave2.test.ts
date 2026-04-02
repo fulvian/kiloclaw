@@ -32,7 +32,7 @@ describe("WP4.3 Wave 2: Nutrition Agency Skills", () => {
   describe("diet-plan skill", () => {
     it("should have correct metadata", () => {
       expect(DietPlanSkill.id).toBe("diet-plan")
-      expect(DietPlanSkill.version).toEqual({ major: 1, minor: 0, patch: 0 })
+      expect(DietPlanSkill.version).toEqual("1.0.0")
       expect(DietPlanSkill.name).toBe("Diet Plan Generation")
       expect(DietPlanSkill.capabilities).toContain("plan_generation")
       expect(DietPlanSkill.capabilities).toContain("personalization")
@@ -95,7 +95,7 @@ describe("WP4.3 Wave 2: Nutrition Agency Skills", () => {
   describe("nutrition-analysis skill", () => {
     it("should have correct metadata", () => {
       expect(NutritionAnalysisSkill.id).toBe("nutrition-analysis")
-      expect(NutritionAnalysisSkill.version).toEqual({ major: 1, minor: 0, patch: 0 })
+      expect(NutritionAnalysisSkill.version).toEqual("1.0.0")
       expect(NutritionAnalysisSkill.name).toBe("Nutrition Analysis")
       expect(NutritionAnalysisSkill.capabilities).toContain("food_analysis")
       expect(NutritionAnalysisSkill.capabilities).toContain("macro_calculation")
@@ -146,7 +146,7 @@ describe("WP4.3 Wave 2: Nutrition Agency Skills", () => {
   describe("food-recall skill", () => {
     it("should have correct metadata", () => {
       expect(FoodRecallSkill.id).toBe("food-recall")
-      expect(FoodRecallSkill.version).toEqual({ major: 1, minor: 0, patch: 0 })
+      expect(FoodRecallSkill.version).toEqual("1.0.0")
       expect(FoodRecallSkill.name).toBe("Food Recall Monitoring")
       expect(FoodRecallSkill.capabilities).toContain("monitoring")
       expect(FoodRecallSkill.capabilities).toContain("alerting")
@@ -178,7 +178,7 @@ describe("WP4.3 Wave 2: Nutrition Agency Skills", () => {
   describe("recipe-search skill", () => {
     it("should have correct metadata", () => {
       expect(RecipeSearchSkill.id).toBe("recipe-search")
-      expect(RecipeSearchSkill.version).toEqual({ major: 1, minor: 0, patch: 0 })
+      expect(RecipeSearchSkill.version).toEqual("1.0.0")
       expect(RecipeSearchSkill.name).toBe("Recipe Search")
       expect(RecipeSearchSkill.capabilities).toContain("search")
       expect(RecipeSearchSkill.capabilities).toContain("nutrition_data")
@@ -237,7 +237,7 @@ describe("WP4.3 Wave 2: Weather Agency Skills", () => {
   describe("weather-forecast skill", () => {
     it("should have correct metadata", () => {
       expect(WeatherForecastSkill.id).toBe("weather-forecast")
-      expect(WeatherForecastSkill.version).toEqual({ major: 1, minor: 0, patch: 0 })
+      expect(WeatherForecastSkill.version).toEqual("1.0.0")
       expect(WeatherForecastSkill.name).toBe("Weather Forecast")
       expect(WeatherForecastSkill.capabilities).toContain("prediction")
       expect(WeatherForecastSkill.capabilities).toContain("multi_day")
@@ -284,7 +284,7 @@ describe("WP4.3 Wave 2: Weather Agency Skills", () => {
   describe("weather-alerts skill", () => {
     it("should have correct metadata", () => {
       expect(WeatherAlertsSkill.id).toBe("weather-alerts")
-      expect(WeatherAlertsSkill.version).toEqual({ major: 1, minor: 0, patch: 0 })
+      expect(WeatherAlertsSkill.version).toEqual("1.0.0")
       expect(WeatherAlertsSkill.name).toBe("Weather Alerts")
       expect(WeatherAlertsSkill.capabilities).toContain("warning_detection")
       expect(WeatherAlertsSkill.capabilities).toContain("notification")
@@ -324,7 +324,7 @@ describe("WP4.3 Wave 2: Weather Agency Skills", () => {
   describe("weather-current skill", () => {
     it("should have correct metadata", () => {
       expect(WeatherCurrentSkill.id).toBe("weather-current")
-      expect(WeatherCurrentSkill.version).toEqual({ major: 1, minor: 0, patch: 0 })
+      expect(WeatherCurrentSkill.version).toEqual("1.0.0")
       expect(WeatherCurrentSkill.name).toBe("Current Weather Conditions")
       expect(WeatherCurrentSkill.capabilities).toContain("current_conditions")
       expect(WeatherCurrentSkill.tags).toContain("weather")
@@ -411,12 +411,8 @@ describe("WP4.3 Wave 2: Skill Registry Integration", () => {
 
   it("should have semantic version format for all wave 2 skills", () => {
     for (const skill of allWave2Skills) {
-      expect(skill.version).toHaveProperty("major")
-      expect(skill.version).toHaveProperty("minor")
-      expect(skill.version).toHaveProperty("patch")
-      expect(typeof skill.version.major).toBe("number")
-      expect(typeof skill.version.minor).toBe("number")
-      expect(typeof skill.version.patch).toBe("number")
+      expect(typeof skill.version).toBe("string")
+      expect(skill.version).toMatch(/^\d+\.\d+\.\d+$/)
     }
   })
 

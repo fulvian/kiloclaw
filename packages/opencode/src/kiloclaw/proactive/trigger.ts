@@ -15,7 +15,7 @@ export interface TriggerCondition {
   readonly signal: TriggerSignal
   readonly name: string
   readonly description: string
-  readonly enabled: boolean
+  enabled: boolean
   readonly config: TriggerConfig
 }
 
@@ -135,7 +135,6 @@ export interface MatchingResult {
 // Namespace exports
 export namespace Trigger {
   export const Signal = TriggerSignal
-  export const ProactionType = ProactionType
 
   export function createCondition(input: {
     signal: TriggerSignal

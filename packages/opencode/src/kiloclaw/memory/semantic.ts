@@ -1,21 +1,18 @@
 import { Log } from "@/util/log"
-import {
-  SemanticMemory,
+import type {
   Fact,
-  FactSchema,
   FactId,
-  FactIdFactory,
   EntityId,
   EmbeddingId,
   EmbeddingMetadata,
-  EmbeddingMetadataSchema,
   SimilarFact,
-  SimilarFactSchema,
   Relation,
-  RelationSchema,
   ConsolidationResult,
   EpisodeId,
+  MemoryId,
 } from "./types.js"
+import { FactSchema, FactIdFactory, EmbeddingMetadataSchema, SimilarFactSchema, RelationSchema } from "./types.js"
+import type { SemanticMemory as ISemanticMemory } from "./types.js"
 
 const log = Log.create({ service: "kiloclaw.memory.semantic" })
 
@@ -174,7 +171,7 @@ export namespace SemanticMemory {
       resultIds = subjectIds.filter((id) => predicateIds.includes(id))
     } else if (subject) {
       resultIds = subjectIndex.get(subject) || []
-    } else {
+    } else if (predicate) {
       resultIds = predicateIndex.get(predicate) || []
     }
 
@@ -317,7 +314,7 @@ export namespace SemanticMemory {
     return {
       sourceEpisodes: episodeIds,
       targetEntry: {
-        id: `mem_${crypto.randomUUID()}` as FactId,
+        id: `mem_${crypto.randomUUID()}` as MemoryId,
         layer: "semantic",
         key: "consolidated",
         value: { episodeIds },
@@ -346,7 +343,7 @@ export namespace SemanticMemory {
 }
 
 // Export as interface implementation
-export const semanticMemory: SemanticMemory = {
+export const semanticMemory: ISemanticMemory = {
   assert: SemanticMemory.assert,
   retract: SemanticMemory.retract,
   update: SemanticMemory.update,
@@ -357,4 +354,5 @@ export const semanticMemory: SemanticMemory = {
   getRelations: SemanticMemory.getRelations,
   getConnected: SemanticMemory.getConnected,
   consolidate: SemanticMemory.consolidate,
+  clear: SemanticMemory.clear,
 }

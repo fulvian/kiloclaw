@@ -1,6 +1,7 @@
 import { Log } from "@/util/log"
-import { Skill, SkillContext } from "../skill"
-import { SkillId } from "../types"
+import { Skill } from "../../skill"
+import type { SkillContext } from "../../skill"
+import { SkillId } from "../../types"
 
 // Source reference
 export interface Source {
@@ -11,12 +12,12 @@ export interface Source {
 }
 
 // Fact check input schema
-interface FactCheckInput {
+export interface FactCheckInput {
   claim: string
 }
 
 // Fact check output schema
-interface FactCheckOutput {
+export interface FactCheckOutput {
   verified: boolean
   confidence: number
   sources: Source[]
@@ -29,15 +30,30 @@ const KNOWN_FACTS: Record<string, { verified: boolean; sources: Source[]; explan
   "the earth is round": {
     verified: true,
     sources: [
-      { name: "NASA", url: "https://www.nasa.gov/", credibility: "high", snippet: "Earth is the third planet from the Sun and is approximately spherical in shape." },
-      { name: "National Geographic", url: "https://www.nationalgeographic.com/", credibility: "high", snippet: "Earth is an oblate spheroid, flattened at the poles and bulging at the equator." },
+      {
+        name: "NASA",
+        url: "https://www.nasa.gov/",
+        credibility: "high",
+        snippet: "Earth is the third planet from the Sun and is approximately spherical in shape.",
+      },
+      {
+        name: "National Geographic",
+        url: "https://www.nationalgeographic.com/",
+        credibility: "high",
+        snippet: "Earth is an oblate spheroid, flattened at the poles and bulging at the equator.",
+      },
     ],
     explanation: "Scientific consensus confirms Earth is approximately spherical (oblate spheroid).",
   },
   "the earth is flat": {
     verified: false,
     sources: [
-      { name: "NASA", url: "https://www.nasa.gov/", credibility: "high", snippet: "Earth is the third planet from the Sun and is approximately spherical in shape." },
+      {
+        name: "NASA",
+        url: "https://www.nasa.gov/",
+        credibility: "high",
+        snippet: "Earth is the third planet from the Sun and is approximately spherical in shape.",
+      },
     ],
     explanation: "The claim that Earth is flat contradicts overwhelming scientific evidence.",
   },
@@ -45,11 +61,14 @@ const KNOWN_FACTS: Record<string, { verified: boolean; sources: Source[]; explan
 
 // Extract key claim for matching
 function normalizeClaim(claim: string): string {
-  return claim.toLowerCase().replace(/[^\w\s]/g, "").trim()
+  return claim
+    .toLowerCase()
+    .replace(/[^\w\s]/g, "")
+    .trim()
 }
 
 // Find matching known fact
-function findKnownFact(normalized: string): typeof KNOWN_FACTS[string] | null {
+function findKnownFact(normalized: string): (typeof KNOWN_FACTS)[string] | null {
   for (const [key, value] of Object.entries(KNOWN_FACTS)) {
     if (normalized.includes(key) || key.includes(normalized)) {
       return value
@@ -61,7 +80,7 @@ function findKnownFact(normalized: string): typeof KNOWN_FACTS[string] | null {
 // Generate credibility assessment
 function assessCredibility(claim: string): { verified: boolean; confidence: number } {
   const normalized = normalizeClaim(claim)
-  
+
   // Check against known facts
   const knownFact = findKnownFact(normalized)
   if (knownFact) {
@@ -70,7 +89,7 @@ function assessCredibility(claim: string): { verified: boolean; confidence: numb
       confidence: 0.95,
     }
   }
-  
+
   // Check for factual patterns
   const factualIndicators = [
     /according to/i,
@@ -79,31 +98,24 @@ function assessCredibility(claim: string): { verified: boolean; confidence: numb
     /scientific (evidence|consensus)/i,
     /\d+%? (of|annual|monthly|daily|weekly)/i,
   ]
-  
-  const nonFactualIndicators = [
-    /i think/i,
-    /in my opinion/i,
-    /probably/i,
-    /maybe/i,
-    /might be/i,
-    /could be/i,
-  ]
-  
+
+  const nonFactualIndicators = [/i think/i, /in my opinion/i, /probably/i, /maybe/i, /might be/i, /could be/i]
+
   let factualScore = 0
   let nonFactualScore = 0
-  
+
   for (const pattern of factualIndicators) {
     if (pattern.test(claim)) factualScore++
   }
-  
+
   for (const pattern of nonFactualIndicators) {
     if (pattern.test(claim)) nonFactualScore++
   }
-  
+
   // Determine verification based on patterns
   const verified = factualScore > nonFactualScore
   const confidence = Math.min(0.7, Math.max(0.3, 0.5 + (factualScore - nonFactualScore) * 0.1))
-  
+
   return { verified, confidence }
 }
 
@@ -136,7 +148,7 @@ function generateVerdict(verified: boolean, confidence: number): string {
 
 export const FactCheckSkill: Skill = {
   id: "fact-check" as SkillId,
-  version: { major: 1, minor: 0, patch: 0 },
+  version: "1.0.0",
   name: "Fact Check",
   inputSchema: {
     type: "object",
@@ -168,13 +180,13 @@ export const FactCheckSkill: Skill = {
   },
   capabilities: ["verification", "cross_reference", "claim_analysis", "source_grounding"],
   tags: ["knowledge", "fact-checking", "verification", "research"],
-  
+
   async execute(input: unknown, context: SkillContext): Promise<FactCheckOutput> {
     const log = Log.create({ service: "kiloclaw.skill.fact-check" })
     log.info("executing fact check", { correlationId: context.correlationId })
-    
+
     const { claim } = input as FactCheckInput
-    
+
     if (!claim) {
       log.warn("empty claim provided for fact check")
       return {
@@ -185,15 +197,15 @@ export const FactCheckSkill: Skill = {
         explanation: "Please provide a claim to verify.",
       }
     }
-    
+
     const normalized = normalizeClaim(claim)
     const knownFact = findKnownFact(normalized)
-    
+
     let verified: boolean
     let confidence: number
     let sources: Source[]
     let explanation: string
-    
+
     if (knownFact) {
       verified = knownFact.verified
       confidence = 0.95
@@ -204,19 +216,20 @@ export const FactCheckSkill: Skill = {
       verified = assessment.verified
       confidence = assessment.confidence
       sources = generateDefaultSources()
-      explanation = `Based on analysis of claim patterns and available sources. ` +
+      explanation =
+        `Based on analysis of claim patterns and available sources. ` +
         `Claim appears to be ${verified ? "factual" : "questionable"} based on language indicators.`
     }
-    
+
     const verdict = generateVerdict(verified, confidence)
-    
+
     log.info("fact check completed", {
       correlationId: context.correlationId,
       verified,
       confidence,
       verdict,
     })
-    
+
     return {
       verified,
       confidence,

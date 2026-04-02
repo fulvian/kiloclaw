@@ -1,26 +1,26 @@
 import { Log } from "@/util/log"
-import {
-  MemoryLifecycle,
+import type {
   RunArtifacts,
-  RunArtifactsSchema,
   MemoryEntry,
-  MemoryEntrySchema,
   Classification,
-  ClassificationSchema,
   RetentionPolicy,
-  RetentionPolicySchema,
   ConsolidationResult,
   EpisodeId,
   Layer,
   MemoryId,
   PurgeReason,
   PurgeResult,
-  PurgeResultSchema,
   SensitivityLevel,
-  AgencyId,
-  AgentId,
-  CorrelationId,
 } from "./types.js"
+import {
+  RunArtifactsSchema,
+  MemoryEntrySchema,
+  ClassificationSchema,
+  RetentionPolicySchema,
+  PurgeResultSchema,
+} from "./types.js"
+import { AgencyId, AgentId, CorrelationId } from "../types.js"
+import type { MemoryLifecycle as IMemoryLifecycle } from "./types.js"
 import { memoryBroker } from "./broker.js"
 import { semanticMemory } from "./semantic.js"
 import { episodicMemory } from "./episodic.js"
@@ -219,8 +219,7 @@ export namespace MemoryLifecycle {
     log.debug("running retention enforcement")
 
     // Clean up working memory expired entries
-    const { working } = memoryBroker
-    working.cleanup()
+    memoryBroker.working().cleanup()
 
     // In production, would also:
     // - Check episodic memory for expired episodes
@@ -259,11 +258,12 @@ export namespace MemoryLifecycle {
 }
 
 // Export as MemoryLifecycle interface
-export const memoryLifecycle: MemoryLifecycle = {
+export const memoryLifecycle: IMemoryLifecycle = {
   capture: MemoryLifecycle.capture,
   classify: MemoryLifecycle.classify,
   applyRetentionPolicy: MemoryLifecycle.applyRetentionPolicy,
   consolidate: MemoryLifecycle.consolidate,
   purge: MemoryLifecycle.purge,
   purgeBatch: MemoryLifecycle.purgeBatch,
+  getStats: MemoryLifecycle.getStats,
 }

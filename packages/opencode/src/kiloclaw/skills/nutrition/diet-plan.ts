@@ -1,6 +1,7 @@
 import { Log } from "@/util/log"
-import { Skill, SkillContext } from "../skill"
-import { SkillId } from "../types"
+import { Skill } from "../../skill"
+import type { SkillContext } from "../../skill"
+import { SkillId } from "../../types"
 
 // User profile for diet planning
 export interface Profile {
@@ -165,7 +166,7 @@ function calculateMacros(dailyCalories: number): Macros {
 
 export const DietPlanSkill: Skill = {
   id: "diet-plan" as SkillId,
-  version: { major: 1, minor: 0, patch: 0 },
+  version: "1.0.0",
   name: "Diet Plan Generation",
   inputSchema: {
     type: "object",

@@ -1,6 +1,7 @@
 import { Log } from "@/util/log"
-import { Skill, SkillContext } from "../skill"
-import { SkillId } from "../types"
+import { Skill } from "../../skill"
+import type { SkillContext } from "../../skill"
+import { SkillId } from "../../types"
 
 // Current weather conditions
 export interface Current {
@@ -78,7 +79,7 @@ function generateMockCurrentWeather(location: string): { conditions: Current; te
 
 export const WeatherCurrentSkill: Skill = {
   id: "weather-current" as SkillId,
-  version: { major: 1, minor: 0, patch: 0 },
+  version: "1.0.0",
   name: "Current Weather Conditions",
   inputSchema: {
     type: "object",

@@ -1,15 +1,16 @@
 import { Log } from "@/util/log"
-import { Skill, SkillContext } from "../skill"
-import { SkillId } from "../types"
+import { Skill } from "../../skill"
+import type { SkillContext } from "../../skill"
+import { SkillId } from "../../types"
 
 // Debugging input schema
-interface DebuggingInput {
+export interface DebuggingInput {
   code: string
   error: string
 }
 
 // Debugging output schema
-interface DebuggingOutput {
+export interface DebuggingOutput {
   diagnosis: string
   steps: string[]
   likelyCause?: string
@@ -119,27 +120,27 @@ const ERROR_PATTERNS = [
 // Analyze code for potential issues
 function analyzeCode(code: string, error: string): { likelyCause: string; codeIssues: string[] } {
   const codeIssues: string[] = []
-  
+
   // Check for common code issues that might cause errors
   if (/undefined/.test(code) && !/\?\.?/.test(code)) {
     codeIssues.push("Code contains undefined references without optional chaining")
   }
-  
+
   if (/async\s+function.*await(?!\s*\.)/.test(code)) {
     codeIssues.push("Async function may be missing await or .catch()")
   }
-  
+
   if (/addEventListener.*addEventListener/s.test(code)) {
     codeIssues.push("Potential duplicate event listener registration")
   }
-  
+
   if (/for\s*\(\s*let\s+\w+\s*=\s*0.*\.push/.test(code)) {
     codeIssues.push("Array modification during iteration can cause issues")
   }
-  
+
   // Analyze error message for clues
   let likelyCause = "Unknown error cause - requires manual investigation"
-  
+
   if (error) {
     for (const pattern of ERROR_PATTERNS) {
       if (pattern.pattern.test(error)) {
@@ -148,13 +149,13 @@ function analyzeCode(code: string, error: string): { likelyCause: string; codeIs
       }
     }
   }
-  
+
   return { likelyCause, codeIssues }
 }
 
 export const DebuggingSkill: Skill = {
   id: "debugging" as SkillId,
-  version: { major: 1, minor: 0, patch: 0 },
+  version: "1.0.0",
   name: "Debugging",
   inputSchema: {
     type: "object",
@@ -179,13 +180,13 @@ export const DebuggingSkill: Skill = {
   },
   capabilities: ["bug_detection", "root_cause", "error_analysis"],
   tags: ["development", "debugging", "troubleshooting"],
-  
+
   async execute(input: unknown, context: SkillContext): Promise<DebuggingOutput> {
     const log = Log.create({ service: "kiloclaw.skill.debugging" })
     log.info("executing debugging analysis", { correlationId: context.correlationId })
-    
+
     const { code, error } = input as DebuggingInput
-    
+
     if (!code) {
       log.warn("empty code provided for debugging")
       return {
@@ -195,12 +196,12 @@ export const DebuggingSkill: Skill = {
         suggestedFix: "Include the problematic code",
       }
     }
-    
+
     // Find matching error pattern
     let diagnosis = "Unable to determine specific error type"
     let steps: string[] = ["Review code manually", "Check error stack trace"]
     let suggestedFix = "Please provide more context"
-    
+
     for (const errorPattern of ERROR_PATTERNS) {
       if (error && errorPattern.pattern.test(error)) {
         diagnosis = errorPattern.diagnosis
@@ -209,7 +210,7 @@ export const DebuggingSkill: Skill = {
         break
       }
     }
-    
+
     // If no error pattern matched but we have error text, provide general guidance
     if (!error && diagnosis === "Unable to determine specific error type") {
       diagnosis = "Analyzing code for potential issues"
@@ -220,10 +221,10 @@ export const DebuggingSkill: Skill = {
         "Look for race conditions in async code",
       ]
     }
-    
+
     // Analyze code for additional context
     const { likelyCause, codeIssues } = analyzeCode(code, error || "")
-    
+
     // Build final response
     const output: DebuggingOutput = {
       diagnosis,
@@ -231,13 +232,13 @@ export const DebuggingSkill: Skill = {
       likelyCause,
       suggestedFix,
     }
-    
+
     log.info("debugging analysis completed", {
       correlationId: context.correlationId,
       diagnosis,
       codeIssueCount: codeIssues.length,
     })
-    
+
     return output
   },
 }

@@ -1,19 +1,7 @@
 import { Log } from "@/util/log"
-import {
-  EpisodicMemory,
-  MemoryEvent,
-  MemoryEventSchema,
-  EventId,
-  EventIdFactory,
-  Episode,
-  EpisodeSchema,
-  EpisodeId,
-  EpisodeIdFactory,
-  EventType,
-  Outcome,
-  TimelineFilter,
-  TimelineFilterSchema,
-} from "./types.js"
+import type { MemoryEvent, EventId, Episode, EpisodeId, EventType, Outcome, TimelineFilter } from "./types.js"
+import { MemoryEventSchema, EventIdFactory, EpisodeSchema, EpisodeIdFactory, TimelineFilterSchema } from "./types.js"
+import type { EpisodicMemory as IEpisodicMemory } from "./types.js"
 
 const log = Log.create({ service: "kiloclaw.memory.episodic" })
 
@@ -243,7 +231,7 @@ export namespace EpisodicMemory {
 }
 
 // Export as interface implementation
-export const episodicMemory: EpisodicMemory = {
+export const episodicMemory: IEpisodicMemory = {
   record: EpisodicMemory.record,
   recordTask: EpisodicMemory.recordTask,
   getEpisode: EpisodicMemory.getEpisode,
@@ -251,4 +239,5 @@ export const episodicMemory: EpisodicMemory = {
   getEventsByType: EpisodicMemory.getEventsByType,
   getTimeline: EpisodicMemory.getTimeline,
   getStats: EpisodicMemory.getStats,
+  clear: EpisodicMemory.clear,
 }

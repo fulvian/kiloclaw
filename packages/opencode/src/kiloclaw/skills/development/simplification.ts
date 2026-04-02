@@ -1,6 +1,7 @@
 import { Log } from "@/util/log"
-import { Skill, SkillContext } from "../skill"
-import { SkillId } from "../types"
+import { Skill } from "../../skill"
+import type { SkillContext } from "../../skill"
+import { SkillId } from "../../types"
 
 // Complexity metrics
 export interface Metrics {
@@ -12,12 +13,12 @@ export interface Metrics {
 }
 
 // Simplification input schema
-interface SimplificationInput {
+export interface SimplificationInput {
   code: string
 }
 
 // Simplification output schema
-interface SimplificationOutput {
+export interface SimplificationOutput {
   simplified: string
   metrics: Metrics
   suggestions: string[]
@@ -177,7 +178,7 @@ function simplifyCode(code: string): { simplified: string; suggestions: string[]
 
 export const SimplificationSkill: Skill = {
   id: "simplification" as SkillId,
-  version: { major: 1, minor: 0, patch: 0 },
+  version: "1.0.0",
   name: "Code Simplification",
   inputSchema: {
     type: "object",

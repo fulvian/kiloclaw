@@ -1,15 +1,16 @@
 import { Log } from "@/util/log"
-import { Skill, SkillContext } from "../skill"
-import { SkillId } from "../types"
+import { Skill } from "../../skill"
+import type { SkillContext } from "../../skill"
+import { SkillId } from "../../types"
 
 // Critical analysis input schema
-interface CriticalAnalysisInput {
+export interface CriticalAnalysisInput {
   claim: string
   context?: string
 }
 
 // Critical analysis output schema
-interface CriticalAnalysisOutput {
+export interface CriticalAnalysisOutput {
   analysis: string
   counterArgs: string[]
   strengths: string[]
@@ -206,7 +207,7 @@ function calculateConfidence(claim: string, fallacies: string[]): number {
 
 export const CriticalAnalysisSkill: Skill = {
   id: "critical-analysis" as SkillId,
-  version: { major: 1, minor: 0, patch: 0 },
+  version: "1.0.0",
   name: "Critical Analysis",
   inputSchema: {
     type: "object",

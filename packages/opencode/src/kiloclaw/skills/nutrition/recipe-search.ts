@@ -1,6 +1,7 @@
 import { Log } from "@/util/log"
-import { Skill, SkillContext } from "../skill"
-import { SkillId } from "../types"
+import { Skill } from "../../skill"
+import type { SkillContext } from "../../skill"
+import { SkillId } from "../../types"
 
 // Filter options for recipe search
 export interface Filter {
@@ -233,7 +234,7 @@ function searchRecipes(ingredients: string[], filters?: Filter[]): Recipe[] {
 
 export const RecipeSearchSkill: Skill = {
   id: "recipe-search" as SkillId,
-  version: { major: 1, minor: 0, patch: 0 },
+  version: "1.0.0",
   name: "Recipe Search",
   inputSchema: {
     type: "object",

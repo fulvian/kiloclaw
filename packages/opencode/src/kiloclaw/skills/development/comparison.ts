@@ -1,6 +1,7 @@
 import { Log } from "@/util/log"
-import { Skill, SkillContext } from "../skill"
-import { SkillId } from "../types"
+import { Skill } from "../../skill"
+import type { SkillContext } from "../../skill"
+import { SkillId } from "../../types"
 
 // Diff change types
 export type DiffType = "added" | "removed" | "modified" | "unchanged"
@@ -23,13 +24,13 @@ export interface Conflict {
 }
 
 // Comparison input schema
-interface ComparisonInput {
+export interface ComparisonInput {
   before: string
   after: string
 }
 
 // Comparison output schema
-interface ComparisonOutput {
+export interface ComparisonOutput {
   diff: Diff[]
   conflicts: Conflict[]
   summary: {
@@ -169,7 +170,7 @@ function calculateSimilarity(before: string, after: string): number {
 
 export const ComparisonSkill: Skill = {
   id: "comparison" as SkillId,
-  version: { major: 1, minor: 0, patch: 0 },
+  version: "1.0.0",
   name: "Code Comparison",
   inputSchema: {
     type: "object",

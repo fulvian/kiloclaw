@@ -161,6 +161,6 @@ export namespace PolicyValidator {
   export function getErrors(data: unknown, schema: z.ZodSchema): string[] {
     const result = schema.safeParse(data)
     if (result.success) return []
-    return result.error.errors.map((e) => `${e.path.join(".")}: ${e.message}`)
+    return result.error.issues.map((e: z.ZodIssue) => `${e.path.join(".")}: ${e.message}`)
   }
 }

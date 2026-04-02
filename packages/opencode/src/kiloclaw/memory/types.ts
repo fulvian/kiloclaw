@@ -1,6 +1,6 @@
 import z from "zod"
-import { fn } from "../util/fn.js"
-import { AgencyId, AgentId, SkillId, CorrelationId, Duration } from "../types.js"
+import { fn } from "@/util/fn"
+import { AgencyId, AgentId, SkillId, CorrelationId, Duration } from "../types"
 
 // =============================================================================
 // Base Memory Types
@@ -180,7 +180,7 @@ export type MemoryEvent = z.infer<typeof MemoryEventSchema>
 
 // Task outcome
 export const OutcomeSchema = z.enum(["success", "failure", "partial", "cancelled"])
-export type Outcome = z.infer<typeof Outcome>
+export type Outcome = z.infer<typeof OutcomeSchema>
 
 // Episode (completed task)
 export const EpisodeSchema = z.object({
@@ -372,6 +372,25 @@ export interface MemoryBroker {
 }
 
 // =============================================================================
+// Memory Lifecycle Interface
+// =============================================================================
+
+export interface MemoryLifecycle {
+  capture(run: RunArtifacts): MemoryEntry[]
+  classify(artifacts: MemoryEntry[]): Classification[]
+  applyRetentionPolicy(layer: Layer, domain?: string): RetentionPolicy
+  consolidate(sourceEpisodes: EpisodeId[]): Promise<ConsolidationResult>
+  purge(entryId: MemoryId, reason: PurgeReason): Promise<void>
+  purgeBatch(entryIds: MemoryId[], reason: PurgeReason): Promise<PurgeResult>
+  getStats(): Promise<{
+    working: { size: number; keys: string[] }
+    episodic: { totalEpisodes: number; totalEvents: number }
+    semantic: { totalFacts: number }
+    procedural: { totalProcedures: number; totalPatterns: number }
+  }>
+}
+
+// =============================================================================
 // Layer Interfaces
 // =============================================================================
 
@@ -380,7 +399,9 @@ export interface WorkingMemory {
   set(key: string, value: unknown, ttlMs?: number): void
   get(key: string): unknown
   remove(key: string): void
+  delete(key: string): void
   clear(): void
+  cleanup(): void
 
   // Session continuity
   snapshot(): Map<string, unknown>
@@ -420,6 +441,9 @@ export interface EpisodicMemory {
   // Timeline
   getTimeline(filter?: TimelineFilter): Promise<Episode[]>
 
+  // Maintenance
+  clear(): void
+
   // Statistics
   getStats(): Promise<{
     totalEpisodes: number
@@ -452,6 +476,7 @@ export interface SemanticMemory {
   getConnected(entityId: EntityId, relation?: string): Promise<EntityId[]>
 
   // Maintenance
+  clear(): void
   consolidate(episodeIds: EpisodeId[]): Promise<ConsolidationResult>
 }
 
@@ -474,6 +499,9 @@ export interface ProceduralMemory {
   registerPattern(pattern: Omit<SkillPattern, "id">): Promise<PatternId>
   findPattern(skillId: SkillId): Promise<SkillPattern | null>
   updatePatternStats(patternId: PatternId, success: boolean): Promise<void>
+
+  // Maintenance
+  clear(): void
 }
 
 // =============================================================================

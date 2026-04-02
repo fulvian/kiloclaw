@@ -1,6 +1,7 @@
 import { Log } from "@/util/log"
-import { Skill, SkillContext } from "../skill"
-import { SkillId } from "../types"
+import { Skill } from "../../skill"
+import type { SkillContext } from "../../skill"
+import { SkillId } from "../../types"
 
 // Academic paper type
 export interface Paper {
@@ -15,13 +16,13 @@ export interface Paper {
 }
 
 // Literature review input schema
-interface LiteratureReviewInput {
+export interface LiteratureReviewInput {
   topic: string
   count: number
 }
 
 // Literature review output schema
-interface LiteratureReviewOutput {
+export interface LiteratureReviewOutput {
   papers: Paper[]
   summary: string
   totalFound: number
@@ -31,7 +32,7 @@ interface LiteratureReviewOutput {
 function searchAcademicPapers(topic: string, maxCount: number): Paper[] {
   // This is a mock implementation that returns placeholder results
   // In production, this would call actual academic APIs (arXiv, PubMed, Google Scholar)
-  
+
   const mockPapers: Paper[] = [
     {
       title: `Advances in ${topic}: A Comprehensive Survey`,
@@ -84,7 +85,7 @@ function searchAcademicPapers(topic: string, maxCount: number): Paper[] {
       url: "https://ieeexplore.ieee.org/document/9876543",
     },
   ]
-  
+
   return mockPapers.slice(0, maxCount)
 }
 
@@ -93,22 +94,24 @@ function generateSummary(papers: Paper[], topic: string): string {
   if (papers.length === 0) {
     return `No academic papers found for "${topic}".`
   }
-  
-  const years = papers.map(p => p.year)
+
+  const years = papers.map((p) => p.year)
   const yearRange = `${Math.min(...years)}-${Math.max(...years)}`
   const totalCitations = papers.reduce((sum, p) => sum + (p.citations || 0), 0)
   const avgCitations = Math.round(totalCitations / papers.length)
-  
-  const journals = [...new Set(papers.map(p => p.journal || "Unknown"))]
-  
-  return `Found ${papers.length} academic papers on "${topic}" published between ${yearRange}. ` +
+
+  const journals = [...new Set(papers.map((p) => p.journal || "Unknown"))]
+
+  return (
+    `Found ${papers.length} academic papers on "${topic}" published between ${yearRange}. ` +
     `Papers from ${journals.length} journals with average ${avgCitations} citations per paper. ` +
     `Most cited: "${papers.sort((a, b) => (b.citations || 0) - (a.citations || 0))[0].title}"`
+  )
 }
 
 export const LiteratureReviewSkill: Skill = {
   id: "literature-review" as SkillId,
-  version: { major: 1, minor: 0, patch: 0 },
+  version: "1.0.0",
   name: "Literature Review",
   inputSchema: {
     type: "object",
@@ -143,13 +146,13 @@ export const LiteratureReviewSkill: Skill = {
   },
   capabilities: ["paper_search", "summarization", "academic_research", "citation_analysis"],
   tags: ["knowledge", "research", "academic", "literature"],
-  
+
   async execute(input: unknown, context: SkillContext): Promise<LiteratureReviewOutput> {
     const log = Log.create({ service: "kiloclaw.skill.literature-review" })
     log.info("executing literature review", { correlationId: context.correlationId })
-    
+
     const { topic, count } = input as LiteratureReviewInput
-    
+
     if (!topic) {
       log.warn("empty topic provided for literature review")
       return {
@@ -158,17 +161,17 @@ export const LiteratureReviewSkill: Skill = {
         totalFound: 0,
       }
     }
-    
+
     const maxCount = Math.min(Math.max(count || 5, 1), 20)
     const papers = searchAcademicPapers(topic, maxCount)
     const summary = generateSummary(papers, topic)
-    
+
     log.info("literature review completed", {
       correlationId: context.correlationId,
       topic,
       paperCount: papers.length,
     })
-    
+
     return {
       papers,
       summary,

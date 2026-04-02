@@ -1,28 +1,34 @@
 import { Log } from "@/util/log"
 import { fn } from "@/util/fn"
 import z from "zod"
-import {
-  MemoryBroker,
+import type {
   MemoryEntry,
-  MemoryEntrySchema,
   MemoryQuery,
-  MemoryQuerySchema,
   SemanticQuery,
-  SemanticQuerySchema,
   Classification,
-  ClassificationSchema,
   RetentionPolicy,
-  RetentionPolicySchema,
   PurgeReason,
   RankedResult,
-  RankedResultSchema,
   Layer,
   MemoryId,
+  WorkingMemory,
+  EpisodicMemory,
+  SemanticMemory,
+  ProceduralMemory,
 } from "./types.js"
-import { workingMemory, WorkingMemory } from "./working.js"
-import { episodicMemory, EpisodicMemory } from "./episodic.js"
-import { semanticMemory, SemanticMemory } from "./semantic.js"
-import { proceduralMemory, ProceduralMemory } from "./procedural.js"
+import {
+  MemoryEntrySchema,
+  MemoryQuerySchema,
+  SemanticQuerySchema,
+  ClassificationSchema,
+  RetentionPolicySchema,
+  RankedResultSchema,
+} from "./types.js"
+import type { MemoryBroker as IMemoryBroker } from "./types.js"
+import { workingMemory } from "./working.js"
+import { episodicMemory } from "./episodic.js"
+import { semanticMemory } from "./semantic.js"
+import { proceduralMemory } from "./procedural.js"
 
 const log = Log.create({ service: "kiloclaw.memory.broker" })
 
@@ -350,7 +356,7 @@ function textToEmbedding(text: string): number[] {
 }
 
 // Export as MemoryBroker interface
-export const memoryBroker: MemoryBroker = {
+export const memoryBroker: IMemoryBroker = {
   working: MemoryBroker.working,
   episodic: MemoryBroker.episodic,
   semantic: MemoryBroker.semantic,

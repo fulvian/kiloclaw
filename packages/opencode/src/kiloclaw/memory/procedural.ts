@@ -1,21 +1,15 @@
 import { Log } from "@/util/log"
+import type { Procedure, ProcedureId, Version, VersionId, SkillPattern, PatternId, ProcedureFilter } from "./types.js"
+import { SkillId } from "../types.js"
 import {
-  ProceduralMemory,
-  Procedure,
   ProcedureSchema,
-  ProcedureId,
   ProcedureIdFactory,
-  Version,
   VersionSchema,
-  VersionId,
   VersionIdFactory,
-  SkillPattern,
   SkillPatternSchema,
-  PatternId,
-  ProcedureFilter,
   ProcedureFilterSchema,
-  SkillId,
 } from "./types.js"
+import type { ProceduralMemory as IProceduralMemory } from "./types.js"
 
 const log = Log.create({ service: "kiloclaw.memory.procedural" })
 
@@ -272,7 +266,7 @@ export namespace ProceduralMemory {
 }
 
 // Export as interface implementation
-export const proceduralMemory: ProceduralMemory = {
+export const proceduralMemory: IProceduralMemory = {
   register: ProceduralMemory.register,
   get: ProceduralMemory.get,
   list: ProceduralMemory.list,
@@ -282,4 +276,5 @@ export const proceduralMemory: ProceduralMemory = {
   registerPattern: ProceduralMemory.registerPattern,
   findPattern: ProceduralMemory.findPattern,
   updatePatternStats: ProceduralMemory.updatePatternStats,
+  clear: ProceduralMemory.clear,
 }

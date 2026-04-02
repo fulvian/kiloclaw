@@ -1,24 +1,25 @@
 import { Log } from "@/util/log"
-import { Skill, SkillContext } from "../skill"
-import { SkillId } from "../types"
+import { Skill } from "../../skill"
+import type { SkillContext } from "../../skill"
+import { SkillId } from "../../types"
 
 // Section type for parsed documents
 export interface Section {
-  readonly title: string
-  readonly content: string
-  readonly level: number
-  readonly lineStart: number
-  readonly lineEnd: number
+  title: string
+  content: string
+  level: number
+  lineStart: number
+  lineEnd: number
 }
 
 // Document analysis input schema
-interface DocumentAnalysisInput {
+export interface DocumentAnalysisInput {
   content: string
   format: string
 }
 
 // Document analysis output schema
-interface DocumentAnalysisOutput {
+export interface DocumentAnalysisOutput {
   sections: Section[]
   summary: string
   metadata?: {
@@ -48,22 +49,22 @@ const MARKDOWN_PATTERNS = {
 function extractMarkdownSections(content: string): Section[] {
   const sections: Section[] = []
   const lines = content.split("\n")
-  
+
   let currentSection: Section | null = null
   let currentContent: string[] = []
   let lineStart = 1
-  
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
     const headingMatch = line.match(/^(#{1,6})\s+(.+)$/)
-    
+
     if (headingMatch) {
       // Save previous section
       if (currentSection) {
         currentSection.content = currentContent.join("\n").trim()
         currentSection.lineEnd = i
       }
-      
+
       // New section
       const level = headingMatch[1].length
       const title = headingMatch[2].trim()
@@ -94,13 +95,13 @@ function extractMarkdownSections(content: string): Section[] {
       }
     }
   }
-  
+
   // Close last section
   if (currentSection && currentContent.length > 0) {
     currentSection.content = currentContent.join("\n").trim()
     currentSection.lineEnd = lines.length
   }
-  
+
   return sections
 }
 
@@ -108,17 +109,17 @@ function extractMarkdownSections(content: string): Section[] {
 function extractPlainTextSections(content: string): Section[] {
   const sections: Section[] = []
   const lines = content.split("\n")
-  
+
   let currentSection: Section | null = null
   let currentContent: string[] = []
-  
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
     const trimmed = line.trim()
-    
+
     // Detect section breaks (all caps line, or line with just dashes)
     const isSectionBreak = /^[A-Z][A-Z\s]+$/.test(trimmed) || /^-+$/.test(trimmed)
-    
+
     if (isSectionBreak && trimmed.length > 0) {
       // Save previous section
       if (currentSection && currentContent.length > 0) {
@@ -126,7 +127,7 @@ function extractPlainTextSections(content: string): Section[] {
         currentSection.lineEnd = i
         sections.push(currentSection)
       }
-      
+
       // New section
       currentSection = {
         title: trimmed.replace(/-+/g, "").trim() || `Section ${sections.length + 1}`,
@@ -141,7 +142,7 @@ function extractPlainTextSections(content: string): Section[] {
     } else {
       currentContent.push(line)
       // Create initial section if we have content
-      if (currentContent.some(l => l.trim().length > 0)) {
+      if (currentContent.some((l) => l.trim().length > 0)) {
         currentSection = {
           title: "Document",
           content: "",
@@ -152,44 +153,47 @@ function extractPlainTextSections(content: string): Section[] {
       }
     }
   }
-  
+
   // Close last section
   if (currentSection && currentContent.length > 0) {
     currentSection.content = currentContent.join("\n").trim()
     currentSection.lineEnd = lines.length
     sections.push(currentSection)
   }
-  
+
   return sections
 }
 
 // Generate summary from content
 function generateSummary(content: string, sections: Section[]): string {
-  const wordCount = content.split(/\s+/).filter(w => w.length > 0).length
+  const wordCount = content.split(/\s+/).filter((w) => w.length > 0).length
   const lineCount = content.split("\n").length
-  
+
   let summary = `Document with ${sections.length} section(s), ${wordCount} words, ${lineCount} lines.`
-  
+
   if (sections.length > 0) {
-    const sectionTitles = sections.slice(0, 5).map(s => s.title).join(", ")
+    const sectionTitles = sections
+      .slice(0, 5)
+      .map((s) => s.title)
+      .join(", ")
     summary += ` Main sections: ${sectionTitles}${sections.length > 5 ? "..." : ""}`
   }
-  
+
   return summary
 }
 
 // Extract metadata from content
 function extractMetadata(content: string): DocumentAnalysisOutput["metadata"] {
-  const wordCount = content.split(/\s+/).filter(w => w.length > 0).length
+  const wordCount = content.split(/\s+/).filter((w) => w.length > 0).length
   const lineCount = content.split("\n").length
   const hasCodeBlocks = /```/.test(content)
-  
+
   let language: string | undefined
   const langMatch = content.match(/```(\w+)/)
   if (langMatch) {
     language = langMatch[1]
   }
-  
+
   return {
     wordCount,
     lineCount,
@@ -200,7 +204,7 @@ function extractMetadata(content: string): DocumentAnalysisOutput["metadata"] {
 
 export const DocumentAnalysisSkill: Skill = {
   id: "document-analysis" as SkillId,
-  version: { major: 1, minor: 0, patch: 0 },
+  version: "1.0.0",
   name: "Document Analysis",
   inputSchema: {
     type: "object",
@@ -240,13 +244,13 @@ export const DocumentAnalysisSkill: Skill = {
   },
   capabilities: ["parsing", "extraction", "summarization", "structure_analysis"],
   tags: ["development", "documentation", "analysis", "markdown"],
-  
+
   async execute(input: unknown, context: SkillContext): Promise<DocumentAnalysisOutput> {
     const log = Log.create({ service: "kiloclaw.skill.document-analysis" })
     log.info("executing document analysis", { correlationId: context.correlationId })
-    
+
     const { content, format } = input as DocumentAnalysisInput
-    
+
     if (!content) {
       log.warn("empty content provided for document analysis")
       return {
@@ -254,25 +258,25 @@ export const DocumentAnalysisSkill: Skill = {
         summary: "No content provided",
       }
     }
-    
+
     const formatLower = (format || "markdown").toLowerCase()
     let sections: Section[]
-    
+
     if (MARKDOWN_PATTERNS.heading.test(content) || formatLower === "markdown" || formatLower === "md") {
       sections = extractMarkdownSections(content)
     } else {
       sections = extractPlainTextSections(content)
     }
-    
+
     const summary = generateSummary(content, sections)
     const metadata = extractMetadata(content)
-    
+
     log.info("document analysis completed", {
       correlationId: context.correlationId,
       sectionCount: sections.length,
       wordCount: metadata?.wordCount,
     })
-    
+
     return {
       sections,
       summary,

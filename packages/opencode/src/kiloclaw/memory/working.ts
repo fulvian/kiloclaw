@@ -1,5 +1,7 @@
 import { Log } from "@/util/log"
-import { WorkingMemory, MemoryId, MemoryIdFactory, SensitivityLevel, DataCategory } from "./types.js"
+import type { MemoryId, SensitivityLevel, DataCategory } from "./types.js"
+import { MemoryIdFactory } from "./types.js"
+import type { WorkingMemory as IWorkingMemory } from "./types.js"
 
 // Working memory using simple Map-based storage
 const log = Log.create({ service: "kiloclaw.memory.working" })
@@ -164,11 +166,13 @@ export namespace WorkingMemory {
 }
 
 // Export as interface implementation for type compatibility
-export const workingMemory: WorkingMemory = {
+export const workingMemory: IWorkingMemory = {
   set: WorkingMemory.set,
   get: WorkingMemory.get,
+  remove: WorkingMemory.remove,
   delete: WorkingMemory.remove,
   clear: WorkingMemory.clear,
+  cleanup: WorkingMemory.cleanup,
   snapshot: WorkingMemory.snapshot,
   restore: WorkingMemory.restore,
   setMany: WorkingMemory.setMany,
