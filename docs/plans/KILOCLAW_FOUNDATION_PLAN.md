@@ -50,15 +50,15 @@ Rifondare Kiloclaw come prodotto autonomo, mantenendo continuità funzionale ARI
 
 > Ultimo aggiornamento: 2026-04-02
 
-| Milestone            | Stato         | Commit    | Note                                                    |
-| -------------------- | ------------- | --------- | ------------------------------------------------------- |
-| **Foundation**       | ✅ Completata | `99e15dc` | Repo isolato, ADR, inventory ARIA                       |
-| **Core Runtime**     | ✅ Completata | `a0cb4b0` | 56 test pass, TypeScript OK, docs complete              |
-| **Memory**           | ✅ Completata | `ee4bfa5` | 61 test pass, 4-layer implemented, docs complete        |
-| **Agency Migration** | ✅ Completata | -         | 18 skills, 264 tests, config adapter, decommission plan |
-| Proactivity/Safety   | ⏳ Pending    | -         | -                                                       |
-| Verification         | ⏳ Pending    | -         | -                                                       |
-| Release              | ⏳ Pending    | -         | -                                                       |
+| Milestone              | Stato         | Commit    | Note                                                    |
+| ---------------------- | ------------- | --------- | ------------------------------------------------------- |
+| **Foundation**         | ✅ Completata | `99e15dc` | Repo isolato, ADR, inventory ARIA                       |
+| **Core Runtime**       | ✅ Completata | `a0cb4b0` | 56 test pass, TypeScript OK, docs complete              |
+| **Memory**             | ✅ Completata | `ee4bfa5` | 61 test pass, 4-layer implemented, docs complete        |
+| **Agency Migration**   | ✅ Completata | `6f4074e` | 18 skills, 264 tests, config adapter, decommission plan |
+| **Proactivity/Safety** | ✅ Completata | `9e06f20` | 62 safety tests, policy engine, guardrails, proactivity |
+| Verification           | ⏳ Pending    | -         | -                                                       |
+| Release                | ⏳ Pending    | -         | -                                                       |
 
 ### Note Tech Debt
 
