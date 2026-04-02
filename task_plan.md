@@ -1,6 +1,6 @@
 # Task Plan — Kiloclaw Foundation Rebuild
 
-## Status: Phase 4 - Agency Migration (IN PROGRESS)
+## Status: Phase 6 - Verification (PENDING)
 
 ## Phase 1 Foundation - COMPLETED ✅
 
@@ -33,58 +33,48 @@
 
 **Gate**: ✅ PASSED (commit ee4bfa5)
 
-## Phase 4 Agency Migration (IN PROGRESS)
+## Phase 4 Agency Migration - COMPLETED ✅
 
-### WP4.1: Feature ARIA → agency capability mapping (NEXT)
+- [x] WP4.1: ARIA_TO_KILOCLAW_MAPPING.md (680 lines)
+- [x] WP4.2: config-legacy-adapter.ts (backward compatibility layer)
+- [x] WP4.3: 18 skills across 4 agencies implemented
+- [x] WP4.4: Dual-read strategy for ARIA*\* → KILOCLAW*\* env vars
+- [x] WP4.5: LEGACY_DECOMMISSION_PLAN.md (670 lines)
 
-- [ ] Create ARIA_TO_KILOCLAW_MAPPING.md
-- [ ] Map Development agency features to capabilities
-- [ ] Map Knowledge agency features to capabilities
-- [ ] Map Nutrition agency features to capabilities (wave 2)
-- [ ] Map Weather agency features to capabilities (wave 2)
-- [ ] Document skill registry mapping
+**Gate**: ✅ PASSED (commit 6f4074e)
 
-### WP4.2: Config legacy adapter layer
+- 264 tests pass
+- 875 assertions verified
 
-- [ ] Implement adapter for .opencode.json.aria → kiloclaw.config.json
-- [ ] Implement ARIA*\* → KILOCLAW*\* env var mapping
-- [ ] Implement ARIA.md → KILOCLAW_MEMORY.md conventions adapter
-- [ ] Create config validation schema
+## Phase 5 Proactivity/Safety - COMPLETED ✅
 
-### WP4.3: Wave migration (tier-1, tier-2)
+- [x] WP5.1: Policy engine (policy/engine.ts, policy/rules.ts, policy/dynamic.ts, policy/validator.ts)
+- [x] WP5.2: Guardrails (guardrail/tool-guard.ts, guardrail/data-exfiltration.ts, guardrail/escalation.ts, guardrail/risk-scorer.ts)
+- [x] WP5.3: Proactivity framework (proactive/trigger.ts, proactive/budget.ts, proactive/scheduler.ts, proactive/limits.ts)
+- [x] WP5.4: Human-in-the-loop checkpoints (hitl/checkpoint.ts, hitl/approval.ts, hitl/irreversible.ts)
+- [x] WP5.5: Safety regression suite (safety.test.ts, policy.test.ts, guardrail.test.ts)
 
-- [ ] Wave 1: Development agency (code review, debugging, TDD assist)
-- [ ] Wave 1: Knowledge agency (web research, fact checking, literature review)
-- [ ] Wave 2: Nutrition agency (diet plan, nutrition analysis)
-- [ ] Wave 2: Weather agency (forecast, alerts)
+**Gate**: ✅ PASSED (62 tests pass)
 
-### WP4.4: Backward compatibility window
-
-- [ ] Dual-read strategy for legacy configs
-- [ ] Telemetry comparativa (ARIA vs Kiloclaw metrics)
-- [ ] Rollback mechanism
-
-### WP4.5: Legacy decommission path
-
-- [ ] Identify components to decommission
-- [ ] Define timeline per componente
-- [ ] Create migration scripts
-
-## Phase 5 Proactivity/Safety (PENDING)
-
-- [ ] WP5.1: Policy engine (static + dynamic rules)
-- [ ] WP5.2: Guardrails (tool calls, data exfiltration, escalation)
-- [ ] WP5.3: Proactivity framework
-- [ ] WP5.4: Human-in-the-loop checkpoints
-- [ ] WP5.5: Safety regression suite
+- Safety policy documentation: docs/safety/SAFETY_POLICY.md
+- Proactivity limits: docs/safety/PROACTIVITY_LIMITS.md
+- Risk matrix: docs/safety/RISK_MATRIX.md
 
 ## Phase 6 Verification (PENDING)
 
 - [ ] WP6.1: Contract tests end-to-end
 - [ ] WP6.2: Deterministic evals
-- [ ] WP6.3: Safety regression suite
-- [ ] WP6.4: Memory consistency tests
+- [ ] WP6.3: Safety regression suite (already done in Phase 5)
+- [ ] WP6.4: Memory consistency tests (already done in Phase 3)
 - [ ] WP6.5: Performance/resilience tests
+
+### Verification Gate Criteria
+
+- Contract tests pass >= 98%
+- Flakiness suite critical < 1%
+- Deterministic eval drift within defined threshold
+- Memory consistency pass 100% on must-have scenarios
+- No P0/P1 issues open
 
 ## Phase 7 Release (PENDING)
 
@@ -96,15 +86,15 @@
 
 ## Timeline (16 weeks)
 
-| Week  | Phase              | Status        |
-| ----- | ------------------ | ------------- |
-| 1-2   | Foundation         | ✅ COMPLETED  |
-| 3-5   | Core Runtime       | ✅ COMPLETED  |
-| 6-8   | Memory             | ✅ COMPLETED  |
-| 9-11  | Agency Migration   | ← IN PROGRESS |
-| 12-13 | Proactivity/Safety | Pending       |
-| 14-15 | Verification       | Pending       |
-| 16    | Release            | Pending       |
+| Week  | Phase              | Status       |
+| ----- | ------------------ | ------------ |
+| 1-2   | Foundation         | ✅ COMPLETED |
+| 3-5   | Core Runtime       | ✅ COMPLETED |
+| 6-8   | Memory             | ✅ COMPLETED |
+| 9-11  | Agency Migration   | ✅ COMPLETED |
+| 12-13 | Proactivity/Safety | ✅ COMPLETED |
+| 14-15 | Verification       | ← PENDING    |
+| 16    | Release            | Pending      |
 
 ## Key Constraints
 
@@ -118,6 +108,11 @@
 
 - ADR-001: Runtime Hierarchy
 - ADR-002: Memory 4-Layer
-- ADR-003: Safety, Guardrails, Proactivity
+- ADR-003: Safety, Guardrails, Proactivity (APPROVED)
 - ADR-004: Isolation from KiloCode
 - ARIA_FEATURE_INVENTORY.md
+- ARIA_TO_KILOCLAW_MAPPING.md
+- LEGACY_DECOMMISSION_PLAN.md
+- SAFETY_POLICY.md
+- PROACTIVITY_LIMITS.md
+- RISK_MATRIX.md

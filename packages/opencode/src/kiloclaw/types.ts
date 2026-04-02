@@ -72,6 +72,10 @@ export type PermissionScope = z.infer<typeof PermissionScope>
 export const PermissionSet = z.array(PermissionScope)
 export type PermissionSet = z.infer<typeof PermissionSet>
 
+// Data classification levels
+export const DataClassification = z.enum(["P0_Critical", "P1_High", "P2_Medium", "P3_Low"])
+export type DataClassification = z.infer<typeof DataClassification>
+
 // Intent and action types for policy engine
 export const Intent = z.object({
   id: z.string(),
