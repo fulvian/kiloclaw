@@ -9,19 +9,30 @@ import { useTheme, tint } from "@tui/context/theme"
 // ~ = shadow top only (▀ with fg=shadow)
 const SHADOW_MARKER = /[_^~]/
 
+// Green gradient colors (dark to bright green)
+const GREEN_COLORS = [
+  "#164a16", // dark green
+  "#1e5c1e", // darker green
+  "#286e28", // dark-medium green
+  "#328032", // medium green
+  "#3c923c", // medium-bright green
+  "#46a446", // bright green
+  "#50b650", // very bright green
+  "#5ac85a", // extremely bright green
+]
+
 const ASCII_LOGO = [
-  `██ ▄█▀ ██ ██     ▄████▄   ▄█████ ██     ██ `,
-  `████   ██ ██     ██~~██   ██~~~~ ██     ██ `,
-  `██ ▀█▄ ██ ██████ ▀████▀   ▀█████ ██████ ██ `,
-  `~~  ~~ ~~ ~~~~~~  ~~~~     ~~~~~ ~~~~~~ ~~ `,
+  `██ ██▄ ▄█▀ ██▀ █  █ █▀▀▀ █▀▀█ █▀▀▀ █▀▀█ █▀▀▀ █▀▀▀`,
+  `██ █ █▄ █ ▄█▄ █▀▀█ █ ▀▄ █▄▄▀ █▀▀▀ █▄▄█ █▀▀▀ █▀▀▀`,
+  `██ █ ▀▀ █▀ ▀█▀ ▀ ▀▀ ▀▀▀▀ ▀  ▀ ▀▀▀▀ ▀  ▀ ▀▀▀▀ ▀▀▀▀`,
 ]
 
 export function KiloLogo() {
   const { theme } = useTheme()
-  const yellow = RGBA.fromHex("#F8F675")
 
-  const renderLine = (line: string): JSX.Element[] => {
-    const shadow = tint(theme.background, yellow, 0.25)
+  const renderLine = (line: string, colorIndex: number): JSX.Element[] => {
+    const green = RGBA.fromHex(GREEN_COLORS[colorIndex % GREEN_COLORS.length]!)
+    const shadow = tint(theme.background, green, 0.4)
     const elements: JSX.Element[] = []
     let i = 0
 
@@ -31,7 +42,7 @@ export function KiloLogo() {
 
       if (markerIndex === -1) {
         elements.push(
-          <text fg={yellow} selectable={false}>
+          <text fg={green} selectable={false}>
             {rest}
           </text>,
         )
@@ -40,7 +51,7 @@ export function KiloLogo() {
 
       if (markerIndex > 0) {
         elements.push(
-          <text fg={yellow} selectable={false}>
+          <text fg={green} selectable={false}>
             {rest.slice(0, markerIndex)}
           </text>,
         )
@@ -50,14 +61,14 @@ export function KiloLogo() {
       switch (marker) {
         case "_":
           elements.push(
-            <text fg={yellow} bg={shadow} selectable={false}>
+            <text fg={green} bg={shadow} selectable={false}>
               {" "}
             </text>,
           )
           break
         case "^":
           elements.push(
-            <text fg={yellow} bg={shadow} selectable={false}>
+            <text fg={green} bg={shadow} selectable={false}>
               ▀
             </text>,
           )
@@ -79,7 +90,7 @@ export function KiloLogo() {
 
   return (
     <box>
-      <For each={ASCII_LOGO}>{(line) => <box flexDirection="row">{renderLine(line)}</box>}</For>
+      <For each={ASCII_LOGO}>{(line, index) => <box flexDirection="row">{renderLine(line, index())}</box>}</For>
     </box>
   )
 }
