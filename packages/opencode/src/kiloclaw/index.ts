@@ -14,3 +14,6 @@ export { CorrelationId } from "./dispatcher"
 export * from "./router"
 export * from "./registry"
 export * from "./config"
+
+// Memory 4-layer
+export * from "./memory"
