@@ -1,6 +1,6 @@
 # Task Plan — Kiloclaw Foundation Rebuild
 
-## Status: Phase 3 - Memory (PENDING START)
+## Status: Phase 4 - Agency Migration (IN PROGRESS)
 
 ## Phase 1 Foundation - COMPLETED ✅
 
@@ -20,46 +20,55 @@
 - [x] WP2.4: Config loader with isolation
 - [x] WP2.5: Contract tests
 
-**Gate**: Contract >= 95% (pending execution)
+**Gate**: ✅ PASSED (commit a0cb4b0)
 
-## Phase 3 Memory (NEXT)
+## Phase 3 Memory - COMPLETED ✅
 
-### WP3.1: Layer Definitions
+- [x] WP3.1: Layer Definitions (types.ts - 502 lines)
+- [x] WP3.2: Memory Service API (working, episodic, semantic, procedural)
+- [x] WP3.3: Memory Consistency Engine (broker.ts)
+- [x] WP3.4: Retention, Privacy, Lifecycle (lifecycle.ts)
+- [x] WP3.5: Architecture documentation (MEMORY_4_LAYER.md)
+- [x] WP3.6: Memory contract tests (61 tests)
 
-- [ ] Define 4 memory layers: ephemeral, session, project, knowledge
-- [ ] Create layer interfaces with TTL/retention
-- [ ] Document storage targets
+**Gate**: ✅ PASSED (commit ee4bfa5)
 
-### WP3.2: Memory Service API
+## Phase 4 Agency Migration (IN PROGRESS)
 
-- [ ] CRUD operations per layer
-- [ ] Search and linking
-- [ ] Versioning support
+### WP4.1: Feature ARIA → agency capability mapping (NEXT)
 
-### WP3.3: Memory Consistency Engine
+- [ ] Create ARIA_TO_KILOCLAW_MAPPING.md
+- [ ] Map Development agency features to capabilities
+- [ ] Map Knowledge agency features to capabilities
+- [ ] Map Nutrition agency features to capabilities (wave 2)
+- [ ] Map Weather agency features to capabilities (wave 2)
+- [ ] Document skill registry mapping
 
-- [ ] Invariant validation
-- [ ] Deduplication
-- [ ] Conflict resolution
+### WP4.2: Config legacy adapter layer
 
-### WP3.4: Retention, Privacy, Encryption
+- [ ] Implement adapter for .opencode.json.aria → kiloclaw.config.json
+- [ ] Implement ARIA*\* → KILOCLAW*\* env var mapping
+- [ ] Implement ARIA.md → KILOCLAW_MEMORY.md conventions adapter
+- [ ] Create config validation schema
 
-- [ ] Retention policy enforcement
-- [ ] Data classification (P0-P3)
-- [ ] Encryption at rest
+### WP4.3: Wave migration (tier-1, tier-2)
 
-### WP3.5: ARIA Memory Conventions Adapter
+- [ ] Wave 1: Development agency (code review, debugging, TDD assist)
+- [ ] Wave 1: Knowledge agency (web research, fact checking, literature review)
+- [ ] Wave 2: Nutrition agency (diet plan, nutrition analysis)
+- [ ] Wave 2: Weather agency (forecast, alerts)
 
-- [ ] Parse ARIA.md conventions
-- [ ] Export to KILOCLAW_MEMORY.md format
+### WP4.4: Backward compatibility window
 
-## Phase 4 Agency Migration (PENDING)
+- [ ] Dual-read strategy for legacy configs
+- [ ] Telemetry comparativa (ARIA vs Kiloclaw metrics)
+- [ ] Rollback mechanism
 
-- [ ] WP4.1: Feature ARIA → agency capability mapping
-- [ ] WP4.2: Config legacy adapter layer
-- [ ] WP4.3: Wave migration (tier-1, tier-2)
-- [ ] WP4.4: Backward compatibility window
-- [ ] WP4.5: Legacy decommission path
+### WP4.5: Legacy decommission path
+
+- [ ] Identify components to decommission
+- [ ] Define timeline per componente
+- [ ] Create migration scripts
 
 ## Phase 5 Proactivity/Safety (PENDING)
 
@@ -87,15 +96,15 @@
 
 ## Timeline (16 weeks)
 
-| Week  | Phase              | Status       |
-| ----- | ------------------ | ------------ |
-| 1-2   | Foundation         | ✅ COMPLETED |
-| 3-5   | Core Runtime       | ✅ COMPLETED |
-| 6-8   | Memory             | ← NEXT       |
-| 9-11  | Agency Migration   | Pending      |
-| 12-13 | Proactivity/Safety | Pending      |
-| 14-15 | Verification       | Pending      |
-| 16    | Release            | Pending      |
+| Week  | Phase              | Status        |
+| ----- | ------------------ | ------------- |
+| 1-2   | Foundation         | ✅ COMPLETED  |
+| 3-5   | Core Runtime       | ✅ COMPLETED  |
+| 6-8   | Memory             | ✅ COMPLETED  |
+| 9-11  | Agency Migration   | ← IN PROGRESS |
+| 12-13 | Proactivity/Safety | Pending       |
+| 14-15 | Verification       | Pending       |
+| 16    | Release            | Pending       |
 
 ## Key Constraints
 

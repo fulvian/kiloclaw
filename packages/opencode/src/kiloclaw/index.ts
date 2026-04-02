@@ -17,3 +17,6 @@ export * from "./config"
 
 // Memory 4-layer
 export * from "./memory"
+
+// Skills (Wave 1 - Development and Knowledge agencies)
+export * from "./skills"
