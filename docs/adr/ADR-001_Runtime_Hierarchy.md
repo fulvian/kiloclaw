@@ -1,7 +1,8 @@
 # ADR-001: Runtime Hierarchy
 
-> **Status**: Draft  
+> **Status**: Accepted  
 > **Date**: 2026-04-02  
+> **Accepted**: 2026-04-02  
 > **Deciders**: Architect, Orchestrator
 
 ## Context

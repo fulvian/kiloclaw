@@ -1,7 +1,8 @@
 import z from "zod"
 import { Log } from "@/util/log"
 import { fn } from "@/util/fn"
-import { AgencyId, Domain, AgencyStatus, AgentId, CapabilitySet, LimitSet, TaskStatus } from "./types"
+import { AgencyId, Domain, AgencyStatus, AgentId } from "./types"
+import type { Agent } from "./agent"
 
 // Task and result types
 export const Task = z.object({
@@ -17,7 +18,7 @@ export type Task = z.infer<typeof Task>
 
 export const TaskResult = z.object({
   taskId: z.string(),
-  status: TaskStatus,
+  status: z.enum(["pending", "running", "completed", "failed", "cancelled", "timeout"]),
   output: z.unknown().optional(),
   error: z.string().optional(),
   duration: z.number().int().nonnegative().optional(),
@@ -25,9 +26,9 @@ export const TaskResult = z.object({
 export type TaskResult = z.infer<typeof TaskResult>
 
 export const AgentResult = z.object({
-  agentId: AgentId,
+  agentId: z.string(),
   taskId: z.string(),
-  status: TaskStatus,
+  status: z.enum(["pending", "running", "completed", "failed", "cancelled", "timeout"]),
   output: z.unknown().optional(),
   evidence: z.array(z.record(z.string(), z.unknown())).optional(),
 })
@@ -44,7 +45,7 @@ export type Synthesis = z.infer<typeof Synthesis>
 // Execution context for agents
 export const ExecutionContext = z.object({
   correlationId: z.string(),
-  agencyId: AgencyId,
+  agencyId: z.string(),
   taskId: z.string(),
   deadline: z.number().int().positive().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
@@ -69,8 +70,8 @@ export type ExecutionResult = z.infer<typeof ExecutionResult>
 // Skill context for skill execution
 export const SkillContext = z.object({
   correlationId: z.string(),
-  agencyId: AgencyId,
-  agentId: AgentId.optional(),
+  agencyId: z.string(),
+  agentId: z.string().optional(),
   skillId: z.string(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 })
@@ -95,9 +96,9 @@ export type ToolHealth = z.infer<typeof ToolHealth>
 
 // Agency Info for registry
 export const AgencyInfo = z.object({
-  id: z.string() as z.ZodType<AgencyId>,
-  domain: Domain,
-  status: AgencyStatus,
+  id: z.string(),
+  domain: z.enum(["development", "knowledge", "nutrition", "weather", "custom"]),
+  status: z.enum(["idle", "running", "paused", "stopped", "error"]),
 })
 export type AgencyInfo = z.infer<typeof AgencyInfo>
 
@@ -116,21 +117,11 @@ export interface Agency {
   synthesizeResults(results: AgentResult[]): Synthesis
 }
 
-// Agent interface
-export interface Agent {
-  readonly id: AgentId
-  readonly agency: AgencyId
-  readonly capabilities: CapabilitySet
-  readonly limits: LimitSet
-  execute(task: Task, context: ExecutionContext): Promise<ExecutionResult>
-  getStatus(): AgentStatus
-}
-
 // Agency factory
 export const createAgency = fn(
   z.object({
-    id: z.string() as z.ZodType<AgencyId>,
-    domain: Domain,
+    id: z.string(),
+    domain: z.enum(["development", "knowledge", "nutrition", "weather", "custom"]),
   }),
   (input) => {
     const log = Log.create({ service: "kiloclaw.agency" })
@@ -138,8 +129,8 @@ export const createAgency = fn(
     let status: AgencyStatus = "idle"
 
     const agency: Agency = {
-      id: input.id,
-      domain: input.domain,
+      id: input.id as AgencyId,
+      domain: input.domain as Domain,
       get status() {
         return status
       },

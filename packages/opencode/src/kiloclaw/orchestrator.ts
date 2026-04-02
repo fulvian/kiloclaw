@@ -3,14 +3,6 @@ import { fn } from "@/util/fn"
 import z from "zod"
 import { type Intent, type Action, type PolicyContext, type PolicyResult, type AgencyAssignment } from "./types"
 
-export namespace CoreOrchestrator {
-  const log = Log.create({ service: "kiloclaw.orchestrator" })
-
-  export interface Info {
-    readonly startedAt: number
-  }
-}
-
 // Memory broker interface
 export interface MemoryBroker {
   read(key: string): Promise<unknown>
@@ -33,6 +25,7 @@ export interface AuditLogger {
   correlation(correlationId: string): AuditLogger
 }
 
+// Core orchestrator interface
 export interface CoreOrchestrator {
   routeIntent(intent: Intent): Promise<AgencyAssignment>
   enforcePolicy(action: Action, context: PolicyContext): PolicyResult
@@ -41,15 +34,17 @@ export interface CoreOrchestrator {
   audit(): AuditLogger
 }
 
-export namespace CoreOrchestrator {
-  export const create = fn(z.object({}), () => {
+// Orchestrator factory
+export const CoreOrchestrator = {
+  create: fn(z.object({}), () => {
+    const log = Log.create({ service: "kiloclaw.orchestrator" })
     const auditLogs: Array<{ event: string; data: Record<string, unknown>; timestamp: number }> = []
 
-    return {
+    const orchestrator: CoreOrchestrator = {
       async routeIntent(intent: Intent): Promise<AgencyAssignment> {
         log.info("routing intent", { intentId: intent.id, type: intent.type })
         return {
-          agencyId: "agency-default" as any,
+          agencyId: "agency-default" as AgencyAssignment["agencyId"],
           confidence: 0.9,
           reason: "Default routing",
         }
@@ -106,7 +101,7 @@ export namespace CoreOrchestrator {
           correlation(correlationId: string): AuditLogger {
             return {
               log(event: string, data: Record<string, unknown>) {
-                auditLogs.push({ event, data: { ...data, correlationId }, timestamp: Date.now() })
+                auditLogs.push({ event, data, timestamp: Date.now() })
                 log.debug("audit event with correlation", { event, correlationId, data })
               },
               correlation() {
@@ -116,6 +111,8 @@ export namespace CoreOrchestrator {
           },
         }
       },
-    } satisfies CoreOrchestrator
-  })
+    }
+
+    return orchestrator
+  }),
 }

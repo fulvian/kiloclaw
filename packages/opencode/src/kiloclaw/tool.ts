@@ -1,46 +1,41 @@
 import { Log } from "@/util/log"
 import { fn } from "@/util/fn"
 import z from "zod"
-import { type ToolId, type PermissionScope, type PermissionSet, PermissionScope } from "./types"
-import { type ToolResult, type ToolHealth } from "./agency"
+import { type ToolId, PermissionScope } from "./types"
+import type { ToolResult, ToolHealth } from "./agency"
 
-export namespace Tool {
-  const log = Log.create({ service: "kiloclaw.tool" })
-
-  export interface Info {
-    readonly id: ToolId
-    readonly name: string
-    readonly permissionScope: PermissionScope[]
-  }
-
-  export const Info = z.object({
-    id: z.string() as z.ZodType<ToolId>,
-    name: z.string(),
-    permissionScope: z.array(PermissionScope),
-  })
-  export type Info = z.infer<typeof Info>
-}
-
+// Tool interface
 export interface Tool {
   readonly id: ToolId
   readonly name: string
   readonly permissionScope: PermissionScope[]
-  execute(input: unknown, permissions: PermissionSet): Promise<ToolResult>
+  execute(input: unknown, permissions: PermissionScope[]): Promise<ToolResult>
   health(): Promise<ToolHealth>
 }
 
-export namespace Tool {
-  export const create = fn(Info, (input) => {
-    return {
-      id: input.id,
-      name: input.name,
-      permissionScope: input.permissionScope,
-      async execute(input: unknown, permissions: PermissionSet): Promise<ToolResult> {
-        log.info("tool executing", { toolId: input.id, toolName: input.name })
+// Tool factory
+export const createTool = fn(
+  z.object({
+    id: z.string(),
+    name: z.string(),
+    permissionScope: z.array(PermissionScope),
+  }),
+  (input) => {
+    const log = Log.create({ service: "kiloclaw.tool" })
+    const toolId = input.id as ToolId
+    const toolName = input.name
+    const toolPermissions = input.permissionScope as PermissionScope[]
+
+    const tool: Tool = {
+      id: toolId,
+      name: toolName,
+      permissionScope: toolPermissions,
+      async execute(input: unknown, permissions: PermissionScope[]): Promise<ToolResult> {
+        log.info("tool executing", { toolId, toolName })
         const start = Date.now()
 
-        // Check permissions
-        const hasPermission = input.permissionScope.every((scope) => permissions.includes(scope))
+        // Check permissions against tool's declared permissions
+        const hasPermission = toolPermissions.every((scope: PermissionScope) => permissions.includes(scope))
         if (!hasPermission) {
           return {
             success: false,
@@ -61,6 +56,7 @@ export namespace Tool {
           latencyMs: 0,
         }
       },
-    } satisfies Tool
-  })
-}
+    }
+    return tool
+  },
+)

@@ -1,51 +1,32 @@
 import { Log } from "@/util/log"
 import { fn } from "@/util/fn"
 import z from "zod"
-import { type Intent, type AgencyAssignment, type AgencyId, type Domain, Domain } from "./types"
+import { type Intent, type AgencyAssignment, Domain } from "./types"
 
-export namespace Router {
-  const log = Log.create({ service: "kiloclaw.router" })
+// Domain scoring for intent classification
+interface DomainScore {
+  domain: string
+  score: number
+  reasons: string[]
+}
 
-  // Domain scoring for intent classification
-  interface DomainScore {
-    domain: Domain
-    score: number
-    reasons: string[]
-  }
-
-  // Intent classification result with detailed scoring
-  export interface RoutingResult {
-    agencyId: AgencyAssignment["agencyId"]
-    confidence: number
-    matchedDomain: Domain
-    scores: DomainScore[]
-    reasoning: string
-  }
-
-  export const RoutingResult = z.object({
-    agencyId: z.string() as z.ZodType<AgencyId>,
-    confidence: z.number().min(0).max(1),
-    matchedDomain: Domain,
-    scores: z.array(
-      z.object({
-        domain: Domain,
-        score: z.number(),
-        reasons: z.array(z.string()),
-      }),
-    ),
-    reasoning: z.string(),
-  })
-  export type RoutingResult = z.infer<typeof RoutingResult>
+// Intent classification result with detailed scoring
+interface RoutingResult {
+  agencyId: AgencyAssignment["agencyId"]
+  confidence: number
+  matchedDomain: string
+  scores: DomainScore[]
+  reasoning: string
 }
 
 // Intent routing interface
 export interface IntentRouter {
-  route(intent: Intent): Promise<Router.RoutingResult>
-  registerDomainHandler(domain: Domain, handler: (intent: Intent) => Promise<AgencyId>): void
-  unregisterDomainHandler(domain: Domain): void
+  route(intent: Intent): Promise<RoutingResult>
+  registerDomainHandler(domain: string, handler: (intent: Intent) => Promise<AgencyAssignment["agencyId"]>): void
+  unregisterDomainHandler(domain: string): void
 }
 
-const DOMAIN_KEYWORDS: Record<Domain, string[]> = {
+const DOMAIN_KEYWORDS: Record<string, string[]> = {
   development: [
     "code",
     "debug",
@@ -66,12 +47,13 @@ const DOMAIN_KEYWORDS: Record<Domain, string[]> = {
   custom: [],
 }
 
-export namespace Router {
-  export const create = fn(z.object({}), () => {
-    const domainHandlers = new Map<Domain, (intent: Intent) => Promise<AgencyId>>()
+export const Router = {
+  create: fn(z.object({}), () => {
+    const log = Log.create({ service: "kiloclaw.router" })
+    const domainHandlers = new Map<string, (intent: Intent) => Promise<AgencyAssignment["agencyId"]>>()
 
     // Calculate keyword match score
-    function keywordScore(intent: Intent, domain: Domain): number {
+    function keywordScore(intent: Intent, domain: string): number {
       const keywords = DOMAIN_KEYWORDS[domain]
       if (!keywords || keywords.length === 0) return 0
 
@@ -94,12 +76,12 @@ export namespace Router {
       return score * (riskMultiplier[intent.risk] ?? 1.0)
     }
 
-    return {
-      async route(intent: Intent): Promise<Router.RoutingResult> {
+    const router: IntentRouter = {
+      async route(intent: Intent): Promise<RoutingResult> {
         log.info("routing intent", { intentId: intent.id, type: intent.type })
 
         // Calculate scores for each domain
-        const scores: DomainScore[] = (["development", "knowledge", "nutrition", "weather", "custom"] as Domain[]).map(
+        const scores: DomainScore[] = (["development", "knowledge", "nutrition", "weather", "custom"] as string[]).map(
           (domain) => {
             const keywordScoreValue = keywordScore(intent, domain)
             const reasons: string[] = []
@@ -123,7 +105,7 @@ export namespace Router {
         const matchedDomain = bestMatch.score > 0 ? bestMatch.domain : "custom"
 
         // Use custom handler if registered
-        let agencyId: AgencyId = `agency-${matchedDomain}` as AgencyId
+        let agencyId: AgencyAssignment["agencyId"] = `agency-${matchedDomain}` as AgencyAssignment["agencyId"]
         const handler = domainHandlers.get(matchedDomain)
         if (handler) {
           agencyId = await handler(intent)
@@ -147,15 +129,17 @@ export namespace Router {
         }
       },
 
-      registerDomainHandler(domain: Domain, handler: (intent: Intent) => Promise<AgencyId>): void {
+      registerDomainHandler(domain: string, handler: (intent: Intent) => Promise<AgencyAssignment["agencyId"]>): void {
         domainHandlers.set(domain, handler)
         log.info("domain handler registered", { domain })
       },
 
-      unregisterDomainHandler(domain: Domain): void {
+      unregisterDomainHandler(domain: string): void {
         domainHandlers.delete(domain)
         log.info("domain handler unregistered", { domain })
       },
-    } satisfies IntentRouter
-  })
+    }
+
+    return router
+  }),
 }

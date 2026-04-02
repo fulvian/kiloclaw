@@ -1,37 +1,23 @@
 import { Log } from "@/util/log"
 import { fn } from "@/util/fn"
 import z from "zod"
-import { type SkillId, type SemanticVersion, type JsonSchema, SemanticVersion } from "./types"
-import { type SkillContext } from "./agency"
+import { type SkillId, type SemanticVersion } from "./types"
+import type { SkillContext } from "./agency"
 
-export namespace Skill {
-  const log = Log.create({ service: "kiloclaw.skill" })
-
-  export interface Info {
-    readonly id: SkillId
-    readonly version: SemanticVersion
-    readonly name: string
-    readonly capabilities: string[]
-    readonly tags: string[]
-  }
-
-  export const Info = z.object({
-    id: z.string() as z.ZodType<SkillId>,
-    version: SemanticVersion,
-    name: z.string(),
-    capabilities: z.array(z.string()),
-    tags: z.array(z.string()),
-  })
-  export type Info = z.infer<typeof Info>
-
-  // JSON Schema as Zod schema for input/output validation
-  export const InputSchema = z.record(z.string(), z.unknown())
-  export type InputSchema = z.infer<typeof InputSchema>
-
-  export const OutputSchema = z.record(z.string(), z.unknown())
-  export type OutputSchema = z.infer<typeof OutputSchema>
+// JsonSchema type
+interface JsonSchema {
+  readonly type: string
+  readonly properties?: Record<string, JsonSchema>
+  readonly required?: readonly string[]
+  readonly items?: JsonSchema
+  readonly enum?: unknown[]
+  readonly const?: unknown
+  readonly additionalProperties?: boolean | JsonSchema
+  readonly $ref?: string
+  readonly description?: string
 }
 
+// Skill interface
 export interface Skill {
   readonly id: SkillId
   readonly version: SemanticVersion
@@ -43,30 +29,41 @@ export interface Skill {
   readonly tags: string[]
 }
 
-export namespace Skill {
-  export const create = fn(
-    Info.extend({
-      inputSchema: z.record(z.string(), z.unknown()),
-      outputSchema: z.record(z.string(), z.unknown()),
-    }),
-    (input) => {
-      return {
-        id: input.id,
-        version: input.version,
-        name: input.name,
-        inputSchema: input.inputSchema,
-        outputSchema: input.outputSchema,
-        capabilities: input.capabilities,
-        tags: input.tags,
-        async execute(input: unknown, context: SkillContext): Promise<unknown> {
-          log.info("skill executing", {
-            skillId: input.id,
-            skillName: input.name,
-            correlationId: context.correlationId,
-          })
-          return { result: "skill executed", input }
-        },
-      } satisfies Skill
-    },
-  )
-}
+// Skill factory
+export const createSkill = fn(
+  z.object({
+    id: z.string(),
+    version: z.string(),
+    name: z.string(),
+    capabilities: z.array(z.string()),
+    tags: z.array(z.string()),
+    inputSchema: z.record(z.string(), z.unknown()),
+    outputSchema: z.record(z.string(), z.unknown()),
+  }),
+  (input) => {
+    const log = Log.create({ service: "kiloclaw.skill" })
+    const skillId = input.id
+    const skillName = input.name
+    const skillInputSchema = input.inputSchema
+    const skillOutputSchema = input.outputSchema
+
+    const skill: Skill = {
+      id: skillId as SkillId,
+      version: input.version as SemanticVersion,
+      name: skillName,
+      inputSchema: skillInputSchema as unknown as JsonSchema,
+      outputSchema: skillOutputSchema as unknown as JsonSchema,
+      capabilities: input.capabilities,
+      tags: input.tags,
+      async execute(input: unknown, context: SkillContext): Promise<unknown> {
+        log.info("skill executing", {
+          skillId,
+          skillName,
+          correlationId: context.correlationId,
+        })
+        return { result: "skill executed", input }
+      },
+    }
+    return skill
+  },
+)
