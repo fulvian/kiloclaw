@@ -2,6 +2,14 @@
 
 > AI Assistant with 4-layer memory, multi-agency orchestration, and policy-first execution.
 
+## CLI Branding
+
+The CLI displays a green gradient ASCII art logo "KILOCLAW" on startup:
+
+- **Location**: `packages/opencode/src/cli/logo.ts` (ASCII art definition)
+- **Rendering**: `packages/opencode/src/cli/ui.ts` (gradient color application)
+- **Colors**: Green gradient from dark (`#164a16`) to bright (`#82ff82`)
+
 ## Credits
 
 **Kiloclaw** is a fork of **[KiloCode](https://github.com/Kilo-Org/kilocode)** (formerly OpenCode). The base code and architecture draws heavily from KiloCode's agent/tool system, session management, and CLI infrastructure.
