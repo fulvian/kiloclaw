@@ -106,11 +106,11 @@ export namespace McpMigrator {
     }
 
     // 2. Project-level MCP settings (if projectDir provided)
-    // Check .kilo/mcp.json and .kilocode/mcp.json for project-level settings
+    // Check .kiloclaw/mcp.json for project-level settings
     // (not "mcp_settings.json" which is only used for global settings)
-    // .kilocode is loaded first (lower precedence), .kilo second (higher precedence)
+    // Fully isolated from KiloCode
     if (options?.projectDir) {
-      for (const dir of [".kilocode", ".kilo"]) {
+      for (const dir of [".kiloclaw"]) {
         const projectSettingsPath = path.join(options.projectDir, dir, "mcp.json")
         const projectSettings = await readMcpSettings(projectSettingsPath)
         if (projectSettings?.mcpServers) {

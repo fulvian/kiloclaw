@@ -163,11 +163,11 @@ export namespace ModesMigrator {
       allModes.push(...(await readModesFile(vscodeGlobalPath)))
 
       // 2. CLI global settings (fallback/alternative location)
-      const cliGlobalPath = path.join(os.homedir(), ".kilocode", "cli", "global", "settings", "custom_modes.yaml")
+      const cliGlobalPath = path.join(os.homedir(), ".kiloclaw", "cli", "global", "settings", "custom_modes.yaml")
       allModes.push(...(await readModesFile(cliGlobalPath)))
 
-      // 3. Home directory .kilocodemodes
-      const homeModesPath = path.join(os.homedir(), ".kilocodemodes")
+      // 3. Home directory .kiloclawmodes
+      const homeModesPath = path.join(os.homedir(), ".kiloclawmodes")
       if (homeModesPath !== options.projectDir) {
         allModes.push(...(await readModesFile(homeModesPath)))
       }
@@ -179,8 +179,8 @@ export namespace ModesMigrator {
       allModes.push(...(await readModesFile(legacyPath)))
     }
 
-    // 5. Project .kilocodemodes
-    const projectModesPath = path.join(options.projectDir, ".kilocodemodes")
+    // 5. Project .kiloclawmodes
+    const projectModesPath = path.join(options.projectDir, ".kiloclawmodes")
     allModes.push(...(await readModesFile(projectModesPath)))
 
     // Deduplicate by slug (later entries win)

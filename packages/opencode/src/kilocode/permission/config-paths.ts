@@ -5,9 +5,9 @@ import { KilocodePaths } from "@/kilocode/paths"
 export namespace ConfigProtection {
   /**
    * Config directory prefixes (relative paths, forward-slash normalized).
-   * Matches .kilo/, .kilocode/, .opencode/ at any depth within the project.
+   * Matches .kiloclaw/ at any depth within the project.
    */
-  const CONFIG_DIRS = [".kilo/", ".kilocode/", ".opencode/"]
+  const CONFIG_DIRS = [".kiloclaw/"]
 
   /**
    * Subdirectories under CONFIG_DIRS that are NOT config files (e.g. plan files).
@@ -65,7 +65,7 @@ export namespace ConfigProtection {
     // ~/.config/kilo/ (XDG config)
     if (within(resolved, path.resolve(Global.Path.config))) return true
 
-    // ~/.kilo/ and ~/.kilocode/ (legacy global dirs)
+    // ~/.kiloclaw/ (isolated from KiloCode)
     for (const dir of KilocodePaths.globalDirs()) {
       if (within(resolved, path.resolve(dir))) return true
     }

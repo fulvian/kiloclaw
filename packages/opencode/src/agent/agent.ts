@@ -637,7 +637,7 @@ export namespace Agent {
     const home = os.default.homedir()
     const modesFiles = [
       path.join(KilocodePaths.vscodeGlobalStorage(), "settings", "custom_modes.yaml"),
-      path.join(home, ".kilocode", "cli", "global", "settings", "custom_modes.yaml"),
+      path.join(home, ".kiloclaw", "cli", "global", "settings", "custom_modes.yaml"),
       path.join(home, ".kilocodemodes"),
       path.join(Instance.directory, ".kilocodemodes"),
     ]

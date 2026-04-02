@@ -258,12 +258,7 @@ export namespace Config {
 
     for (const dir of unique(directories)) {
       // kilocode_change start
-      if (
-        dir.endsWith(".kilo") ||
-        dir.endsWith(".kilocode") ||
-        dir.endsWith(".opencode") ||
-        dir === Flag.KILO_CONFIG_DIR
-      ) {
+      if (dir.endsWith(".kiloclaw") || dir === Flag.KILO_CONFIG_DIR) {
         for (const file of ["kilo.jsonc", "kilo.json", "opencode.jsonc", "opencode.json"]) {
           // kilocode_change end
           log.debug(`loading config from ${path.join(dir, file)}`)
@@ -482,16 +477,7 @@ export namespace Config {
       })
       if (!md) continue
 
-      const patterns = [
-        "/.kilo/command/",
-        "/.kilo/commands/",
-        "/.kilocode/command/",
-        "/.kilocode/commands/",
-        "/.opencode/command/",
-        "/.opencode/commands/",
-        "/command/",
-        "/commands/",
-      ]
+      const patterns = ["/.kiloclaw/command/", "/.kiloclaw/commands/", "/command/", "/commands/"]
       const file = rel(item, patterns) ?? path.basename(item)
       const name = trim(file)
 
@@ -531,16 +517,7 @@ export namespace Config {
       if (!md) continue
 
       // kilocode_change start
-      const patterns = [
-        "/.kilo/agent/",
-        "/.kilo/agents/",
-        "/.kilocode/agent/",
-        "/.kilocode/agents/",
-        "/.opencode/agent/",
-        "/.opencode/agents/",
-        "/agent/",
-        "/agents/",
-      ]
+      const patterns = ["/.kiloclaw/agent/", "/.kiloclaw/agents/", "/agent/", "/agents/"]
       // kilocode_change end
       const file = rel(item, patterns) ?? path.basename(item)
       const agentName = trim(file)

@@ -35,13 +35,13 @@ function normalizeProjectId(input: string): string {
 }
 
 /**
- * Read project ID from .kilo/config.json, falling back to .kilocode/config.json
+ * Read project ID from .kiloclaw/config.json
  * @param directory - Project directory
  * @returns Normalized project ID or undefined
  */
 async function getProjectIdFromConfig(directory: string): Promise<string | undefined> {
-  // Check .kilo first, then legacy .kilocode
-  for (const dir of [".kilo", ".kilocode"]) {
+  // Check .kiloclaw only (fully isolated from KiloCode)
+  for (const dir of [".kiloclaw"]) {
     const file = Bun.file(path.join(directory, dir, "config.json"))
     const text = await file.text().catch(() => undefined)
     if (!text) continue
@@ -77,13 +77,13 @@ async function getProjectIdFromGit(directory: string): Promise<string | undefine
 }
 
 /**
- * Resolve project ID with priority: .kilo/config.json -> .kilocode/config.json -> git origin URL
+ * Resolve project ID with priority: .kiloclaw/config.json -> git origin URL
  * @returns Normalized project ID or undefined
  */
 async function resolveProjectId(): Promise<string | undefined> {
   const dir = Instance.directory
 
-  // Priority 1: .kilo/config.json (falls back to .kilocode/config.json)
+  // Priority 1: .kiloclaw/config.json (isolated from KiloCode)
   const id = await getProjectIdFromConfig(dir)
   if (id) return id
 

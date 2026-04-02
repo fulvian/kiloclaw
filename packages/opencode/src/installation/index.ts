@@ -106,9 +106,9 @@ export namespace Installation {
 
     for (const check of checks) {
       const output = await check.command()
-      // kilocode_change start - check for @kilocode/cli instead of opencode-ai for JS package managers
+      // kilocode_change start - check for @kiloclaw/cli instead of opencode-ai for JS package managers
       const installedName =
-        check.name === "brew" || check.name === "choco" || check.name === "scoop" ? "opencode" : "@kilocode/cli"
+        check.name === "brew" || check.name === "choco" || check.name === "scoop" ? "opencode" : "@kiloclaw/cli"
       // kilocode_change end
       if (output.includes(installedName)) {
         return check.name
@@ -143,13 +143,13 @@ export namespace Installation {
         })
         break
       case "npm":
-        cmd = $`npm install -g @kilocode/cli@${target}` // kilocode_change
+        cmd = $`npm install -g @kiloclaw/cli@${target}` // kilocode_change
         break
       case "pnpm":
-        cmd = $`pnpm install -g @kilocode/cli@${target}` // kilocode_change
+        cmd = $`pnpm install -g @kiloclaw/cli@${target}` // kilocode_change
         break
       case "bun":
-        cmd = $`bun install -g @kilocode/cli@${target}` // kilocode_change
+        cmd = $`bun install -g @kiloclaw/cli@${target}` // kilocode_change
         break
       case "brew": {
         const formula = await getBrewFormula()
@@ -218,7 +218,7 @@ export namespace Installation {
         .then((data: any) => data.versions.stable)
     }
 
-    // kilocode_change start - support npm/pnpm/bun for kilocode, fetch from @kilocode/cli on npm registry
+    // kilocode_change start - support npm/pnpm/bun for kilocode, fetch from @kiloclaw/cli on npm registry
     if (detectedMethod === "npm" || detectedMethod === "pnpm" || detectedMethod === "bun") {
       const registry = await iife(async () => {
         const r = (await $`npm config get registry`.quiet().nothrow().text()).trim()
@@ -226,7 +226,7 @@ export namespace Installation {
         return reg.endsWith("/") ? reg.slice(0, -1) : reg
       })
       const channel = CHANNEL
-      return fetch(`${registry}/@kilocode/cli/${channel}`)
+      return fetch(`${registry}/@kiloclaw/cli/${channel}`)
         .then((res) => {
           if (!res.ok) throw new Error(res.statusText)
           return res.json()

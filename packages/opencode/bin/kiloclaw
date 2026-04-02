@@ -55,7 +55,7 @@ let arch = archMap[os.arch()]
 if (!arch) {
   arch = os.arch()
 }
-const base = "@kilocode/cli-" + platform + "-" + arch
+const base = "@kiloclaw/cli-" + platform + "-" + arch
 const binary = platform === "windows" ? "kiloclaw.exe" : "kiloclaw"
 
 function supportsAvx2() {

@@ -24,7 +24,7 @@ interface RemovalTargets {
 
 export const UninstallCommand = {
   command: "uninstall",
-  describe: "uninstall kilo and remove all related files", // kilocode_change
+  describe: "uninstall kiloclaw and remove all related files", // kilocode_change
   builder: (yargs: Argv) =>
     yargs
       .option("keep-config", {
@@ -55,7 +55,7 @@ export const UninstallCommand = {
     UI.empty()
     UI.println(UI.logo("  "))
     UI.empty()
-    prompts.intro("Uninstall Kilo") // kilocode_change
+    prompts.intro("Uninstall Kiloclaw") // kilocode_change
 
     const method = await Installation.method()
     prompts.log.info(`Installation method: ${method}`)
@@ -129,13 +129,13 @@ async function showRemovalSummary(targets: RemovalTargets, method: Installation.
 
   if (method !== "curl" && method !== "unknown") {
     const cmds: Record<string, string> = {
-      npm: "npm uninstall -g @kilocode/cli", // kilocode_change
-      pnpm: "pnpm uninstall -g @kilocode/cli", // kilocode_change
-      bun: "bun remove -g @kilocode/cli", // kilocode_change
-      yarn: "yarn global remove @kilocode/cli", // kilocode_change
+      npm: "npm uninstall -g @kiloclaw/cli", // kilocode_change
+      pnpm: "pnpm uninstall -g @kiloclaw/cli", // kilocode_change
+      bun: "bun remove -g @kiloclaw/cli", // kilocode_change
+      yarn: "yarn global remove @kiloclaw/cli", // kilocode_change
       brew: "brew uninstall opencode",
-      choco: "choco uninstall kilo", // kilocode_change
-      scoop: "scoop uninstall kilo", // kilocode_change
+      choco: "choco uninstall kiloclaw", // kilocode_change
+      scoop: "scoop uninstall kiloclaw", // kilocode_change
     }
     prompts.log.info(`  ✓ Package: ${cmds[method] || method}`)
   }
@@ -180,13 +180,13 @@ async function executeUninstall(method: Installation.Method, targets: RemovalTar
 
   if (method !== "curl" && method !== "unknown") {
     const cmds: Record<string, string[]> = {
-      npm: ["npm", "uninstall", "-g", "@kilocode/cli"], // kilocode_change
-      pnpm: ["pnpm", "uninstall", "-g", "@kilocode/cli"], // kilocode_change
-      bun: ["bun", "remove", "-g", "@kilocode/cli"], // kilocode_change
-      yarn: ["yarn", "global", "remove", "@kilocode/cli"], // kilocode_change
+      npm: ["npm", "uninstall", "-g", "@kiloclaw/cli"], // kilocode_change
+      pnpm: ["pnpm", "uninstall", "-g", "@kiloclaw/cli"], // kilocode_change
+      bun: ["bun", "remove", "-g", "@kiloclaw/cli"], // kilocode_change
+      yarn: ["yarn", "global", "remove", "@kiloclaw/cli"], // kilocode_change
       brew: ["brew", "uninstall", "opencode"],
-      choco: ["choco", "uninstall", "kilo"], // kilocode_change
-      scoop: ["scoop", "uninstall", "kilo"], // kilocode_change
+      choco: ["choco", "uninstall", "kiloclaw"], // kilocode_change
+      scoop: ["scoop", "uninstall", "kiloclaw"], // kilocode_change
     }
 
     const cmd = cmds[method]
@@ -194,7 +194,7 @@ async function executeUninstall(method: Installation.Method, targets: RemovalTar
       spinner.start(`Running ${cmd.join(" ")}...`)
       const result =
         method === "choco"
-          ? await $`echo Y | choco uninstall kilo -y -r`.quiet().nothrow() // kilocode_change
+          ? await $`echo Y | choco uninstall kiloclaw -y -r`.quiet().nothrow() // kilocode_change
           : await $`${cmd}`.quiet().nothrow()
       if (result.exitCode !== 0) {
         spinner.stop(`Package manager uninstall failed: exit code ${result.exitCode}`, 1)
@@ -233,7 +233,7 @@ async function executeUninstall(method: Installation.Method, targets: RemovalTar
   }
 
   UI.empty()
-  prompts.log.success("Thank you for using Kilo!") // kilocode_change
+  prompts.log.success("Thank you for using Kiloclaw!") // kilocode_change
 }
 
 async function getShellConfigFile(): Promise<string | null> {

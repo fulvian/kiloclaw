@@ -29,22 +29,24 @@ export namespace KilocodePaths {
     }
   }
 
-  /** Global Kilo directories in user home: ~/.kilocode and ~/.kilo (legacy first, .kilo wins later) */
+  /** Global Kiloclaw directories in user home: ~/.kiloclaw only (fully isolated from KiloCode) */
   export function globalDirs(): string[] {
-    return [path.join(home(), ".kilocode"), path.join(home(), ".kilo")]
+    return [path.join(home(), ".kiloclaw")]
   }
 
   /**
-   * Discover Kilo directories containing skills.
-   * Returns parent directories (.kilocode/ and .kilo/) for glob pattern "skills/[*]/SKILL.md".
+   * Discover Kiloclaw directories containing skills.
+   * Returns parent directories (.kiloclaw/) for glob pattern "skills/[*]/SKILL.md".
    *
-   * - Walks up from projectDir to worktreeRoot for .kilocode/ and .kilo/
-   * - Includes global ~/.kilocode/ and ~/.kilo/
+   * - Walks up from projectDir to worktreeRoot for .kiloclaw/
+   * - Includes global ~/.kiloclaw/
    * - Includes VSCode extension global storage
+   *
+   * Fully isolated from KiloCode - does NOT read .kilocode/ or .kilo/ directories.
    *
    * Does NOT copy/migrate skills - just provides paths for discovery.
    * Skills remain in their original locations and can be managed independently
-   * by the Kilo VSCode extension.
+   * by the Kiloclaw VSCode extension.
    */
   export async function skillDirectories(opts: {
     projectDir: string
@@ -69,11 +71,11 @@ export namespace KilocodePaths {
       }
     }
 
-    // 3. Walk up from project dir to worktree root for .kilocode/ and .kilo/
+    // 3. Walk up from project dir to worktree root for .kiloclaw/
     // Returns parent directories (not skills/) because
     // the glob pattern "skills/[*]/SKILL.md" is applied from the parent
     // Loaded last so project-level skills take precedence over global
-    for (const target of [".kilocode", ".kilo"] as const) {
+    for (const target of [".kiloclaw"] as const) {
       const projectDirs = await Array.fromAsync(
         Filesystem.up({
           targets: [target],

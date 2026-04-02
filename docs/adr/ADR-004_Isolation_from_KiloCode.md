@@ -1,7 +1,8 @@
 # ADR-004: Isolation from KiloCode
 
-> **Status**: Draft  
+> **Status**: Accepted  
 > **Date**: 2026-04-02  
+> **Last Updated**: 2026-04-03
 > **Deciders**: Architect, Orchestrator
 
 ## Context
@@ -19,14 +20,14 @@ Kiloclaw is a fork of KiloCode but must operate as a fully isolated system. Ther
 
 ### Namespace Isolation
 
-| Domain            | KiloCode (Legacy)              | Kiloclaw (Target) |
-| ----------------- | ------------------------------ | ----------------- |
-| Runtime namespace | `kilocode` / `opencode`        | `kiloclaw`        |
-| Package namespace | `@kilocode/*`                  | `@kilocaw/*`      |
-| Binary name       | `kilo`                         | `kiloclaw`        |
-| Config prefix env | `KILO_*`, `OPENCODE_*`         | `KILOCLAW_*`      |
-| Data directory    | `~/.kilocode/`, `~/.opencode/` | `~/.kiloclaw/`    |
-| Config file       | `.opencode.json`               | `kiloclaw.json`   |
+| Domain            | KiloCode (Legacy)          | Kiloclaw (Target) |
+| ----------------- | -------------------------- | ----------------- |
+| Runtime namespace | `kilocode` / `opencode`    | `kiloclaw`        |
+| Package namespace | `@kilocode/*`              | `@kiloclaw/cli`   |
+| Binary name       | `kilo`                     | `kiloclaw`        |
+| Config prefix env | `KILO_*`, `OPENCODE_*`     | `KILOCLAW_*`      |
+| Data directory    | `~/.kilo/`, `~/.kilocode/` | `~/.kiloclaw/`    |
+| Config file       | `.opencode.json`           | `kiloclaw.json`   |
 
 ### Environment Variables
 
@@ -134,7 +135,7 @@ These rules are **enforced at runtime** and cannot be bypassed:
 const ISOLATION_INVARIANTS = {
   // NO reading of KiloCode data directories
   noKilocodeDataRead: {
-    paths: ["~/.kilocode/", "~/.opencode/"],
+    paths: ["~/.kilo/", "~/.kilocode/", "~/.opencode/"],
     action: "block",
   },
 
