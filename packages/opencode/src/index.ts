@@ -75,7 +75,7 @@ process.on("SIGHUP", () => process.exit())
 
 let cli = yargs(hideBin(process.argv))
   .parserConfiguration({ "populate--": true })
-  .scriptName("kilo") // kilocode_change
+  .scriptName("kiloclaw")
   .wrap(100)
   .help("help", "show help")
   .alias("help", "h")

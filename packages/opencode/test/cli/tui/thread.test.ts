@@ -88,7 +88,7 @@ describe("tui thread", () => {
     const { TuiThreadCommand } = await import("../../../src/cli/cmd/tui/thread")
     const args: Parameters<NonNullable<typeof TuiThreadCommand.handler>>[0] = {
       _: [],
-      $0: "kilo", // kilocode_change
+      $0: "kiloclaw",
       project,
       prompt: "hi",
       model: undefined,

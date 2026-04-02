@@ -16,4 +16,4 @@ const dir = "src-tauri/target/kilo-binaries"
 await $`mkdir -p ${dir}`
 await $`gh run download ${Bun.env.GITHUB_RUN_ID} -n kilo-cli`.cwd(dir)
 
-await copyBinaryToSidecarFolder(windowsify(`${dir}/${sidecarConfig.ocBinary}/bin/kilo`))
+await copyBinaryToSidecarFolder(windowsify(`${dir}/${sidecarConfig.ocBinary}/bin/kiloclaw`))

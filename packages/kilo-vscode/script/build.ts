@@ -23,14 +23,14 @@ if (!existsSync(cliDistDir)) {
 }
 
 const targets = [
-  { target: "linux-x64", cliDir: "@kilocode/cli-linux-x64", binary: "kilo" },
-  { target: "linux-arm64", cliDir: "@kilocode/cli-linux-arm64", binary: "kilo" },
-  { target: "alpine-x64", cliDir: "@kilocode/cli-linux-x64-musl", binary: "kilo" },
-  { target: "alpine-arm64", cliDir: "@kilocode/cli-linux-arm64-musl", binary: "kilo" },
-  { target: "darwin-x64", cliDir: "@kilocode/cli-darwin-x64", binary: "kilo" },
-  { target: "darwin-arm64", cliDir: "@kilocode/cli-darwin-arm64", binary: "kilo" },
-  { target: "win32-x64", cliDir: "@kilocode/cli-windows-x64", binary: "kilo.exe" },
-  { target: "win32-arm64", cliDir: "@kilocode/cli-windows-arm64", binary: "kilo.exe" },
+  { target: "linux-x64", cliDir: "@kilocode/cli-linux-x64", binary: "kiloclaw" },
+  { target: "linux-arm64", cliDir: "@kilocode/cli-linux-arm64", binary: "kiloclaw" },
+  { target: "alpine-x64", cliDir: "@kilocode/cli-linux-x64-musl", binary: "kiloclaw" },
+  { target: "alpine-arm64", cliDir: "@kilocode/cli-linux-arm64-musl", binary: "kiloclaw" },
+  { target: "darwin-x64", cliDir: "@kilocode/cli-darwin-x64", binary: "kiloclaw" },
+  { target: "darwin-arm64", cliDir: "@kilocode/cli-darwin-arm64", binary: "kiloclaw" },
+  { target: "win32-x64", cliDir: "@kilocode/cli-windows-x64", binary: "kiloclaw.exe" },
+  { target: "win32-arm64", cliDir: "@kilocode/cli-windows-arm64", binary: "kiloclaw.exe" },
 ]
 
 const binDir = join(import.meta.dir, "..", "bin")
@@ -74,7 +74,7 @@ for (const config of targets) {
   console.log(`  📥 Copying binary from ${config.cliDir}/bin/${config.binary}...`)
   await $`cp ${sourceBinary} ${targetBinary}`
 
-  if (config.binary !== "kilo.exe") {
+  if (config.binary !== "kiloclaw.exe") {
     chmodSync(targetBinary, 0o755)
   }
 
