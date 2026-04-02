@@ -1,6 +1,19 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test"
+import type {
+  // Memory types (used as type annotations only)
+  MemoryEntry,
+  Classification,
+  RetentionPolicy,
+  MemoryQuery,
+  Outcome,
+  TimelineFilter,
+  Fact,
+  Procedure,
+  SkillPattern,
+  RankedResult,
+} from "@/kiloclaw/memory"
 import {
-  // Memory types
+  // Memory types (used as values - Zod schemas and factories)
   MemoryId,
   EpisodeId,
   EventId,
@@ -9,19 +22,9 @@ import {
   Layer,
   SensitivityLevel,
   DataCategory,
-  MemoryEntry,
   MemoryEntrySchema,
-  Classification,
-  RetentionPolicy,
   PurgeReason,
-  MemoryQuery,
   EventType,
-  Outcome,
-  TimelineFilter,
-  Fact,
-  Procedure,
-  SkillPattern,
-  RankedResult,
   // Factories
   MemoryIdFactory,
   EpisodeIdFactory,
@@ -29,6 +32,9 @@ import {
   FactIdFactory,
   ProcedureIdFactory,
 } from "@/kiloclaw/memory"
+import type { AgencyId, SkillId, CorrelationId } from "@/kiloclaw/types"
+import type { EntityId } from "@/kiloclaw/memory"
+import { CorrelationId as CorrIdSchema } from "@/kiloclaw"
 
 // Import memory implementations
 import {
@@ -193,8 +199,8 @@ describe("Kiloclaw Memory 4-Layer", () => {
         id: EventIdFactory.create(),
         type: "task_start",
         timestamp: new Date().toISOString(),
-        correlationId: "corr_123",
-        agencyId: "agency_dev",
+        correlationId: "corr_123" as CorrelationId,
+        agencyId: "agency_dev" as AgencyId,
         data: { task: "test" },
       })
 
@@ -253,7 +259,7 @@ describe("Kiloclaw Memory 4-Layer", () => {
         id: EventIdFactory.create(),
         type: "tool_call",
         timestamp: new Date().toISOString(),
-        correlationId: "corr_abc",
+        correlationId: "corr_abc" as CorrelationId,
         data: {},
       })
 
@@ -379,20 +385,20 @@ describe("Kiloclaw Memory 4-Layer", () => {
     })
 
     it("should link entities", async () => {
-      await SemanticMemory.link("entity_a", "related_to", "entity_b", 0.8)
+      await SemanticMemory.link("entity_a" as EntityId, "related_to", "entity_b" as EntityId, 0.8)
 
-      const relations = await SemanticMemory.getRelations("entity_a")
+      const relations = await SemanticMemory.getRelations("entity_a" as EntityId)
       expect(relations.length).toBeGreaterThan(0)
-      expect(relations[0].targetId).toBe("entity_b")
+      expect(relations[0].targetId).toBe("entity_b" as EntityId)
     })
 
     it("should get connected entities", async () => {
-      await SemanticMemory.link("user_1", "follows", "user_2")
-      await SemanticMemory.link("user_1", "follows", "user_3")
+      await SemanticMemory.link("user_1" as EntityId, "follows", "user_2" as EntityId)
+      await SemanticMemory.link("user_1" as EntityId, "follows", "user_3" as EntityId)
 
-      const connected = await SemanticMemory.getConnected("user_1")
-      expect(connected).toContain("user_2")
-      expect(connected).toContain("user_3")
+      const connected = await SemanticMemory.getConnected("user_1" as EntityId)
+      expect(connected as string[]).toContain("user_2")
+      expect(connected as string[]).toContain("user_3")
     })
   })
 
@@ -406,7 +412,7 @@ describe("Kiloclaw Memory 4-Layer", () => {
         name: "code_review",
         description: "Standard code review workflow",
         version: "1.0.0",
-        agencyId: "agency_dev",
+        agencyId: "agency_dev" as AgencyId,
         steps: [
           { id: "1", action: "lint", next: "2" },
           { id: "2", action: "test" },
@@ -435,21 +441,21 @@ describe("Kiloclaw Memory 4-Layer", () => {
         name: "workflow_a",
         description: "Workflow A",
         version: "1.0.0",
-        agencyId: "agency_dev",
+        agencyId: "agency_dev" as AgencyId,
         steps: [],
       })
       await ProceduralMemory.register({
         name: "workflow_b",
         description: "Workflow B",
         version: "1.0.0",
-        agencyId: "agency_knowledge",
+        agencyId: "agency_knowledge" as AgencyId,
         steps: [],
       })
 
       const all = await ProceduralMemory.list()
       expect(all.length).toBeGreaterThanOrEqual(2)
 
-      const devOnly = await ProceduralMemory.list({ agencyId: "agency_dev" })
+      const devOnly = await ProceduralMemory.list({ agencyId: "agency_dev" as AgencyId })
       expect(devOnly.length).toBeGreaterThanOrEqual(1)
     })
 
@@ -512,7 +518,7 @@ describe("Kiloclaw Memory 4-Layer", () => {
 
     it("should register and find skill patterns", async () => {
       await ProceduralMemory.registerPattern({
-        skillId: "skill_debug",
+        skillId: "skill_debug" as SkillId,
         name: "Debug pattern",
         description: "Systematic debugging approach",
         steps: ["observe", "hypothesize", "test", "fix"],
@@ -520,14 +526,14 @@ describe("Kiloclaw Memory 4-Layer", () => {
         successRate: 0.8,
       })
 
-      const pattern = await ProceduralMemory.findPattern("skill_debug")
+      const pattern = await ProceduralMemory.findPattern("skill_debug" as SkillId)
       expect(pattern).not.toBeNull()
       expect(pattern?.name).toBe("Debug pattern")
     })
 
     it("should update pattern statistics", async () => {
       await ProceduralMemory.registerPattern({
-        skillId: "skill_test",
+        skillId: "skill_test" as SkillId,
         name: "Test pattern",
         description: "Testing approach",
         steps: ["plan", "execute", "verify"],
@@ -649,6 +655,7 @@ describe("Kiloclaw Memory 4-Layer", () => {
         intent: "test",
         outcome: "success",
         durationMs: 100,
+        evidences: [],
       })
 
       const classifications = MemoryLifecycle.classify(artifacts)
@@ -744,7 +751,7 @@ describe("Kiloclaw Memory 4-Layer", () => {
         name: "reusable_workflow",
         description: "A workflow to be reused",
         version: "1.0.0",
-        agencyId: "agency_dev",
+        agencyId: "agency_dev" as AgencyId,
         steps: [
           { id: "1", action: "analyze" },
           { id: "2", action: "implement" },
@@ -758,7 +765,7 @@ describe("Kiloclaw Memory 4-Layer", () => {
 
       // Record as a successful pattern
       await ProceduralMemory.registerPattern({
-        skillId: "skill_dev",
+        skillId: "skill_dev" as SkillId,
         name: "Development workflow",
         description: "Standard development process",
         steps: ["analyze", "implement", "verify"],
@@ -767,7 +774,7 @@ describe("Kiloclaw Memory 4-Layer", () => {
       })
 
       // Find and use the pattern
-      const pattern = await ProceduralMemory.findPattern("skill_dev")
+      const pattern = await ProceduralMemory.findPattern("skill_dev" as SkillId)
       expect(pattern).not.toBeNull()
     })
   })

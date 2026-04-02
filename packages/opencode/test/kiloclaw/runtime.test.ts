@@ -1,13 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test"
-import { tmpdir } from "bun"
+import { tmpdir } from "../fixture/fixture"
 import { join } from "path"
 import {
-  // Types
+  // Types (Zod schemas - used as values)
   AgencyId,
   AgentId,
   SkillId,
   ToolId,
-  CorrelationId,
   SemanticVersion,
   Duration,
   Domain,
@@ -41,12 +40,8 @@ import {
   Tool,
   // Orchestrator
   CoreOrchestrator,
-  MemoryBroker,
-  Scheduler,
-  AuditLogger,
   // Dispatcher
   Dispatcher,
-  CorrelationId as CorrId,
   // Router
   Router,
   // Registry
@@ -54,6 +49,13 @@ import {
   // Config
   Config,
 } from "@/kiloclaw"
+import type {
+  // Orchestrator interfaces (type annotations only)
+  MemoryBroker,
+  Scheduler,
+  AuditLogger,
+} from "@/kiloclaw"
+import { CorrelationId } from "@/kiloclaw"
 
 // Test fixtures
 const FIXTURES = {
@@ -61,7 +63,7 @@ const FIXTURES = {
   agentId: "agent-001" as AgentId,
   skillId: "skill-read" as SkillId,
   toolId: "tool-fs" as ToolId,
-  correlationId: "kiloclaw-test-001" as CorrelationId,
+  correlationId: "kiloclaw-test-001" as CorrelationId.CorrelationId,
   version: "1.0.0" as SemanticVersion,
 }
 
@@ -367,6 +369,7 @@ describe("Kiloclaw Core Runtime", () => {
           id: "intent-001",
           type: "code_generation",
           description: "Generate a React component",
+          risk: "low",
         }
 
         const assignment = await orchestrator.routeIntent(intent)
@@ -384,7 +387,7 @@ describe("Kiloclaw Core Runtime", () => {
 
         const context: PolicyContext = {
           agencyId: FIXTURES.agencyId,
-          correlationId: FIXTURES.correlationId,
+          correlationId: FIXTURES.correlationId as unknown as (typeof CorrelationId)["type"],
         }
 
         const result = orchestrator.enforcePolicy(action, context)
@@ -487,6 +490,7 @@ describe("Kiloclaw Core Runtime", () => {
         id: "intent-001",
         type: "code_generation",
         description: "Generate a React component",
+        risk: "low",
       }
 
       const result = await router.route(intent)
@@ -500,6 +504,7 @@ describe("Kiloclaw Core Runtime", () => {
         id: "intent-002",
         type: "search",
         description: "Search for information about TypeScript",
+        risk: "low",
       }
 
       const result = await router.route(intent)
@@ -513,6 +518,7 @@ describe("Kiloclaw Core Runtime", () => {
         id: "intent-003",
         type: "weather_query",
         description: "What is the weather today?",
+        risk: "low",
       }
 
       const result = await router.route(intent)
@@ -528,6 +534,7 @@ describe("Kiloclaw Core Runtime", () => {
         id: "intent-004",
         type: "custom",
         description: "Custom action",
+        risk: "low",
       }
 
       const result = await router.route(intent)
@@ -723,6 +730,7 @@ describe("Kiloclaw Core Runtime", () => {
         id: "intent-full-stack",
         type: "code_generation",
         description: "Generate a React component",
+        risk: "low",
       }
 
       const assignment = await router.route(intent)
@@ -736,7 +744,7 @@ describe("Kiloclaw Core Runtime", () => {
         priority: 8,
       }
 
-      const corrId = CorrId.generate()
+      const corrId = CorrelationId.generate()
       dispatcher.enqueue(task, corrId)
 
       // Execute task via agency
@@ -756,6 +764,7 @@ describe("Kiloclaw Core Runtime", () => {
         id: "intent-unknown",
         type: "unknown_action",
         description: "Some unknown action",
+        risk: "low",
       }
 
       const result = await router.route(intent)
@@ -785,7 +794,7 @@ describe("Kiloclaw Core Runtime", () => {
 
       const context: PolicyContext = {
         agencyId: FIXTURES.agencyId,
-        correlationId: FIXTURES.correlationId,
+        correlationId: FIXTURES.correlationId as CorrelationId.CorrelationId,
       }
 
       // Policy should still allow (default behavior), but we can test the structure
