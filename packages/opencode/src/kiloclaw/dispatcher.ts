@@ -1,8 +1,10 @@
 import { Log } from "@/util/log"
 import { fn } from "@/util/fn"
 import z from "zod"
-import type { CorrelationId } from "./types"
 import type { Task } from "./agency"
+
+// Local CorrelationId type for this module
+type CorrelationIdType = string & { readonly __brand: "CorrelationId" }
 
 // Priority queue item
 interface QueueItem {
@@ -105,12 +107,18 @@ export const Dispatcher = {
   }),
 }
 
-// Correlation ID generation
-export function generateCorrelationId(): string {
-  const log = Log.create({ service: "kiloclaw.correlation" })
-  const timestamp = Date.now().toString(36)
-  const random = Math.random().toString(36).substring(2, 10)
-  const id = `kiloclaw-${timestamp}-${random}`
-  log.debug("correlation ID generated", { correlationId: id })
-  return id
+// Correlation ID namespace with generate method
+export namespace CorrelationId {
+  export type CorrelationId = CorrelationIdType
+
+  export function generate(): CorrelationIdType {
+    const log = Log.create({ service: "kiloclaw.correlation" })
+    const timestamp = Date.now().toString(36)
+    const random = Math.random().toString(36).substring(2, 10)
+    const id = `kiloclaw-${timestamp}-${random}` as CorrelationIdType
+    log.debug("correlation ID generated", { correlationId: id })
+    return id
+  }
+
+  export const schema = z.string().brand<"CorrelationId">()
 }

@@ -29,41 +29,52 @@ export interface Skill {
   readonly tags: string[]
 }
 
-// Skill factory
-export const createSkill = fn(
-  z.object({
+// Skill namespace with factory
+export namespace Skill {
+  export interface Info {
+    readonly id: SkillId
+    readonly version: SemanticVersion
+    readonly name: string
+    readonly capabilities: string[]
+    readonly tags: string[]
+  }
+
+  export const Info = z.object({
     id: z.string(),
     version: z.string(),
     name: z.string(),
     capabilities: z.array(z.string()),
     tags: z.array(z.string()),
-    inputSchema: z.record(z.string(), z.unknown()),
-    outputSchema: z.record(z.string(), z.unknown()),
-  }),
-  (input) => {
-    const log = Log.create({ service: "kiloclaw.skill" })
-    const skillId = input.id
-    const skillName = input.name
-    const skillInputSchema = input.inputSchema
-    const skillOutputSchema = input.outputSchema
+  })
 
-    const skill: Skill = {
-      id: skillId as SkillId,
-      version: input.version as SemanticVersion,
-      name: skillName,
-      inputSchema: skillInputSchema as unknown as JsonSchema,
-      outputSchema: skillOutputSchema as unknown as JsonSchema,
-      capabilities: input.capabilities,
-      tags: input.tags,
-      async execute(input: unknown, context: SkillContext): Promise<unknown> {
-        log.info("skill executing", {
-          skillId,
-          skillName,
-          correlationId: context.correlationId,
-        })
-        return { result: "skill executed", input }
-      },
-    }
-    return skill
-  },
-)
+  export const create = fn(
+    Info.extend({
+      inputSchema: z.record(z.string(), z.unknown()),
+      outputSchema: z.record(z.string(), z.unknown()),
+    }),
+    (input) => {
+      const log = Log.create({ service: "kiloclaw.skill" })
+      const skillId = input.id
+      const skillName = input.name
+
+      const skill: Skill = {
+        id: skillId as SkillId,
+        version: input.version as SemanticVersion,
+        name: skillName,
+        inputSchema: input.inputSchema as unknown as JsonSchema,
+        outputSchema: input.outputSchema as unknown as JsonSchema,
+        capabilities: input.capabilities,
+        tags: input.tags,
+        async execute(input: unknown, context: SkillContext): Promise<unknown> {
+          log.info("skill executing", {
+            skillId,
+            skillName,
+            correlationId: context.correlationId,
+          })
+          return { result: "skill executed", input }
+        },
+      }
+      return skill
+    },
+  )
+}

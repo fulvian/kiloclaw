@@ -13,14 +13,21 @@ export interface Tool {
   health(): Promise<ToolHealth>
 }
 
-// Tool factory
-export const createTool = fn(
-  z.object({
+// Tool namespace with factory
+export namespace Tool {
+  export interface Info {
+    readonly id: ToolId
+    readonly name: string
+    readonly permissionScope: PermissionScope[]
+  }
+
+  export const Info = z.object({
     id: z.string(),
     name: z.string(),
     permissionScope: z.array(PermissionScope),
-  }),
-  (input) => {
+  })
+
+  export const create = fn(Info, (input) => {
     const log = Log.create({ service: "kiloclaw.tool" })
     const toolId = input.id as ToolId
     const toolName = input.name
@@ -58,5 +65,5 @@ export const createTool = fn(
       },
     }
     return tool
-  },
-)
+  })
+}

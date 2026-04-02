@@ -1,7 +1,7 @@
 import z from "zod"
 import { Log } from "@/util/log"
 import { fn } from "@/util/fn"
-import { AgencyId, Domain, AgencyStatus, AgentId } from "./types"
+import { type AgencyId, type Domain, type AgencyStatus, type AgentId } from "./types"
 import type { Agent } from "./agent"
 
 // Task and result types
@@ -117,13 +117,19 @@ export interface Agency {
   synthesizeResults(results: AgentResult[]): Synthesis
 }
 
-// Agency factory
-export const createAgency = fn(
-  z.object({
+// Agency namespace with factory
+export namespace Agency {
+  export interface Info {
+    readonly id: AgencyId
+    readonly domain: Domain
+  }
+
+  export const Info = z.object({
     id: z.string(),
     domain: z.enum(["development", "knowledge", "nutrition", "weather", "custom"]),
-  }),
-  (input) => {
+  })
+
+  export const create = fn(Info, (input) => {
     const log = Log.create({ service: "kiloclaw.agency" })
     const agents = new Map<AgentId, Agent>()
     let status: AgencyStatus = "idle"
@@ -175,5 +181,5 @@ export const createAgency = fn(
     }
 
     return agency
-  },
-)
+  })
+}

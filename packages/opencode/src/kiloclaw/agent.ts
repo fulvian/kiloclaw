@@ -14,15 +14,23 @@ export interface Agent {
   getStatus(): AgentStatus
 }
 
-// Agent factory
-export const createAgent = fn(
-  z.object({
+// Agent namespace with factory
+export namespace Agent {
+  export interface Info {
+    readonly id: AgentId
+    readonly agency: AgencyId
+    readonly capabilities: CapabilitySet
+    readonly limits: LimitSet
+  }
+
+  export const Info = z.object({
     id: z.string(),
     agency: z.string(),
     capabilities: CapabilitySet,
     limits: LimitSet,
-  }),
-  (input) => {
+  })
+
+  export const create = fn(Info, (input) => {
     const log = Log.create({ service: "kiloclaw.agent" })
     let status: AgentStatus = "idle"
 
@@ -59,5 +67,5 @@ export const createAgent = fn(
       },
     }
     return agent
-  },
-)
+  })
+}
