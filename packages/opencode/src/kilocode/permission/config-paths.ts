@@ -66,7 +66,7 @@ export namespace ConfigProtection {
     if (within(resolved, path.resolve(Global.Path.config))) return true
 
     // ~/.kiloclaw/ (isolated from KiloCode)
-    for (const dir of KilocodePaths.globalDirs()) {
+    for (const dir of KiloclawPaths.globalDirs()) {
       if (within(resolved, path.resolve(dir))) return true
     }
 
