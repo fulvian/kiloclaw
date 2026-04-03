@@ -1,5 +1,23 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
   "extends": "@tsconfig/bun/tsconfig.json",
-  "compilerOptions": {}
+  "compilerOptions": {
+    "jsx": "preserve",
+    "jsxImportSource": "@opentui/solid",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "types": [],
+    "noUncheckedIndexedAccess": false,
+    "paths": {
+      "@/*": ["./packages/opencode/src/*"],
+      "@kilocode/*": ["./packages/*/src"],
+      "@/kiloclaw/*": ["./packages/opencode/src/kiloclaw/*"]
+    }
+  },
+  "references": [
+    { "path": "./packages/opencode" },
+    { "path": "./packages/kilo-gateway" },
+    { "path": "./packages/kilo-telemetry" },
+    { "path": "./packages/sdk/js" },
+    { "path": "./packages/plugin" }
+  ]
 }
