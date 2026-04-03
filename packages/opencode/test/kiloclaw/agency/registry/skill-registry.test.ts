@@ -105,12 +105,12 @@ describe("SkillRegistry", () => {
       expect(result[0].id).toBe("web-search")
     })
 
-    it("should find skills by multiple capabilities (AND logic)", () => {
+    it("should find skills by multiple capabilities (OR semantics)", () => {
       SkillRegistry.registerSkill(createTestSkill({ id: "skill-a", capabilities: ["search", "analysis"] }))
       SkillRegistry.registerSkill(createTestSkill({ id: "skill-b", capabilities: ["analysis", "synthesis"] }))
       const result = SkillRegistry.findByCapabilities(["search", "analysis"])
-      expect(result).toHaveLength(1)
-      expect(result[0].id).toBe("skill-a")
+      expect(result).toHaveLength(2) // OR: both skills match at least one capability
+      expect(result[0].id).toBe("skill-a") // skill-a matches both, higher score
     })
 
     it("should return all skills when no capabilities specified", () => {
@@ -126,11 +126,12 @@ describe("SkillRegistry", () => {
       expect(result).toHaveLength(0)
     })
 
-    it("should return empty array when all required capabilities missing", () => {
+    it("should return matching skills when at least one capability matches (OR semantics)", () => {
       SkillRegistry.registerSkill(createTestSkill({ id: "skill-a", capabilities: ["search"] }))
       SkillRegistry.registerSkill(createTestSkill({ id: "skill-b", capabilities: ["analysis"] }))
       const result = SkillRegistry.findByCapabilities(["search", "synthesis"])
-      expect(result).toHaveLength(0)
+      expect(result).toHaveLength(1) // OR: skill-a matches "search"
+      expect(result[0].id).toBe("skill-a")
     })
   })
 

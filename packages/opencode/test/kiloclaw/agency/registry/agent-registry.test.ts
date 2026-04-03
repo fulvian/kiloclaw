@@ -104,12 +104,12 @@ describe("FlexibleAgentRegistry", () => {
       expect(result[0].id).toBe("coder")
     })
 
-    it("should find agents by multiple capabilities (AND logic)", () => {
+    it("should find agents by multiple capabilities (OR semantics)", () => {
       FlexibleAgentRegistry.registerAgent(createTestAgent({ id: "coder", capabilities: ["coding", "review"] }))
       FlexibleAgentRegistry.registerAgent(createTestAgent({ id: "reviewer", capabilities: ["review", "analysis"] }))
       const result = FlexibleAgentRegistry.findByCapabilities(["coding", "review"])
-      expect(result).toHaveLength(1)
-      expect(result[0].id).toBe("coder")
+      expect(result).toHaveLength(2) // OR: both agents match at least one capability
+      expect(result[0].id).toBe("coder") // coder matches both, higher score
     })
 
     it("should return all agents when no capabilities specified", () => {

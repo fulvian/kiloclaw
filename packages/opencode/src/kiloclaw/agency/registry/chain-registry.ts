@@ -3,6 +3,7 @@
 
 import { Log } from "@/util/log"
 import { SkillChainSchema, type SkillChain } from "./types"
+import { SkillRegistry } from "./skill-registry"
 
 const log = Log.create({ service: "kiloclaw.registry.chain" })
 
@@ -63,9 +64,23 @@ export namespace ChainRegistry {
   export function findChainForCapabilities(required: string[]): SkillChain | undefined {
     if (required.length === 0) return undefined
 
+    // Find chains where all required capabilities are provided by the chain's skills
     const matchingChains = getAllChains().filter((chain) => {
-      const chainSkillIds = chain.steps.map((s) => s.skillId)
-      return required.every((cap) => chainSkillIds.includes(cap))
+      // Get all capabilities provided by this chain's skills
+      const chainCapabilities = new Set<string>()
+      const chainSkillIds = new Set<string>()
+      for (const step of chain.steps) {
+        chainSkillIds.add(step.skillId)
+        const skill = SkillRegistry.getSkill(step.skillId)
+        if (skill) {
+          for (const cap of skill.capabilities) {
+            chainCapabilities.add(cap)
+          }
+        }
+      }
+      // Check if all required capabilities are provided
+      // Also accept skillId as a match (for cases where required is skillId, not capability)
+      return required.every((cap) => chainCapabilities.has(cap) || chainSkillIds.has(cap))
     })
 
     return matchingChains[0]

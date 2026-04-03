@@ -59,7 +59,8 @@ function findBestAgent(agents: FlexibleAgentDefinition[], required: string[]): F
   scored.sort((a, b) => b.score - a.score)
 
   const best = scored[0]
-  return best && best.score > 0 ? best.agent : null
+  // Return best agent even if score is 0 (fallback when no better matches exist)
+  return best ? best.agent : null
 }
 
 export namespace CapabilityRouter {
@@ -156,7 +157,11 @@ export namespace CapabilityRouter {
     }
 
     // 3. Try to find a matching agent
-    const agents = FlexibleAgentRegistry.findByCapabilities(capabilities, agency)
+    let agents = FlexibleAgentRegistry.findByCapabilities(capabilities, agency)
+    // Fallback: if no agents match capabilities, try getting any agent (for fallback behavior)
+    if (agents.length === 0 && capabilities.length > 0) {
+      agents = FlexibleAgentRegistry.getAllAgents()
+    }
     const bestAgent = findBestAgent(agents, capabilities)
     if (bestAgent) {
       const score = calculateMatchScore(bestAgent.capabilities, capabilities)

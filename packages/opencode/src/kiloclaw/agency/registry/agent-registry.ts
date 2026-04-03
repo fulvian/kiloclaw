@@ -87,8 +87,9 @@ export namespace FlexibleAgentRegistry {
       return candidates
     }
 
+    // Return agents that have at least one matching capability (OR semantics)
     return candidates
-      .filter((agent) => required.every((cap) => agent.capabilities.includes(cap)))
+      .filter((agent) => required.some((cap) => agent.capabilities.includes(cap)))
       .sort((a, b) => matchScore(b, required) - matchScore(a, required))
   }
 

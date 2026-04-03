@@ -77,17 +77,22 @@ export namespace SkillRegistry {
       const skillIds = capabilitiesIndex.get(cap)
       if (skillIds) {
         for (const id of skillIds) {
-          if (matchingSkillIds.size === 0 || matchingSkillIds.has(id)) {
-            matchingSkillIds.add(id)
-          }
+          // OR semantics: add all skills matching any capability
+          matchingSkillIds.add(id)
         }
       }
     }
 
+    // OR semantics: return any skill that has at least one matching capability
+    // Then sort by how many capabilities it matches (descending)
     return Array.from(matchingSkillIds)
       .map((id) => registry.get(id))
       .filter((s): s is SkillDefinition => s !== undefined)
-      .filter((skill) => required.every((cap) => skill.capabilities.includes(cap)))
+      .sort((a, b) => {
+        const scoreA = a.capabilities.filter((c) => required.includes(c)).length
+        const scoreB = b.capabilities.filter((c) => required.includes(c)).length
+        return scoreB - scoreA
+      })
   }
 
   export function findByTag(tag: string): SkillDefinition[] {
