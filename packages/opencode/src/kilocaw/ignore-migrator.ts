@@ -4,9 +4,9 @@ import { Log } from "../util/log"
 import type { Config } from "../config/config"
 
 export namespace IgnoreMigrator {
-  const log = Log.create({ service: "kilocode.ignore-migrator" })
+  const log = Log.create({ service: "kiloclaw.ignore-migrator" })
 
-  const KILOCODEIGNORE_FILE = ".kilocodeignore"
+  const KILOCODEIGNORE_FILE = ".kiloclawignore"
   const GLOBAL_KILOCODEIGNORE = path.join(os.homedir(), ".kiloclaw", KILOCODEIGNORE_FILE)
 
   export interface IgnorePattern {
@@ -26,7 +26,7 @@ export namespace IgnoreMigrator {
   }
 
   /**
-   * Parse .kilocodeignore content into patterns.
+   * Parse .kiloclawignore content into patterns.
    * Follows gitignore syntax:
    * - Lines starting with # are comments
    * - Empty lines are ignored
@@ -98,7 +98,7 @@ export namespace IgnoreMigrator {
   }
 
   /**
-   * Load patterns from a .kilocodeignore file
+   * Load patterns from a .kiloclawignore file
    */
   async function loadIgnoreFile(filepath: string, source: "global" | "project"): Promise<IgnorePattern[]> {
     if (!(await fileExists(filepath))) return []
@@ -146,29 +146,29 @@ export namespace IgnoreMigrator {
   }
 
   /**
-   * Migrate .kilocodeignore to Opencode permission config
+   * Migrate .kiloclawignore to Opencode permission config
    */
   export async function migrate(options: { projectDir: string; skipGlobalPaths?: boolean }): Promise<MigrationResult> {
     const warnings: string[] = []
     const allPatterns: IgnorePattern[] = []
 
-    // 1. Load global .kilocodeignore (lower priority)
+    // 1. Load global .kiloclawignore (lower priority)
     if (!options.skipGlobalPaths) {
       const globalPatterns = await loadIgnoreFile(GLOBAL_KILOCODEIGNORE, "global")
       allPatterns.push(...globalPatterns)
 
       if (globalPatterns.length > 0) {
-        log.debug("loaded global .kilocodeignore", { count: globalPatterns.length })
+        log.debug("loaded global .kiloclawignore", { count: globalPatterns.length })
       }
     }
 
-    // 2. Load project .kilocodeignore (higher priority - added last)
+    // 2. Load project .kiloclawignore (higher priority - added last)
     const projectIgnorePath = path.join(options.projectDir, KILOCODEIGNORE_FILE)
     const projectPatterns = await loadIgnoreFile(projectIgnorePath, "project")
     allPatterns.push(...projectPatterns)
 
     if (projectPatterns.length > 0) {
-      log.debug("loaded project .kilocodeignore", { count: projectPatterns.length })
+      log.debug("loaded project .kiloclawignore", { count: projectPatterns.length })
     }
 
     // 3. Build permission rules
@@ -196,7 +196,7 @@ export namespace IgnoreMigrator {
   }
 
   /**
-   * Load .kilocodeignore and return permission config.
+   * Load .kiloclawignore and return permission config.
    * Handles all logging internally.
    */
   export async function loadIgnoreConfig(projectDir: string, skipGlobalPaths?: boolean): Promise<Config.Permission> {
@@ -204,7 +204,7 @@ export namespace IgnoreMigrator {
       const result = await migrate({ projectDir, skipGlobalPaths })
 
       if (result.patternCount > 0) {
-        log.info("loaded .kilocodeignore patterns", {
+        log.info("loaded .kiloclawignore patterns", {
           count: result.patternCount,
         })
       }
@@ -215,7 +215,7 @@ export namespace IgnoreMigrator {
 
       return result.permission
     } catch (err) {
-      log.warn("failed to load .kilocodeignore", { error: err })
+      log.warn("failed to load .kiloclawignore", { error: err })
       return {}
     }
   }
