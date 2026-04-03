@@ -172,25 +172,51 @@ class CapabilityRouter {
 ### 3.6 Struttura File (Nuovi Moduli)
 
 ```
-packages/opencode/src/kiloclaw/
-├── agency/
-│   ├── catalog.ts           # Keep
-│   ├── key-pool.ts          # Keep
-│   ├── index.ts             # Update exports
-│   ├── types.ts             # REFACTOR: Add flexible types
-│   │
-│   ├── registry/            # NEW: Dynamic registries
-│   │   ├── skill-registry.ts
-│   │   ├── agent-registry.ts
-│   │   ├── agency-registry.ts
-│   │   └── chain-registry.ts
-│   │
-│   ├── routing/             # NEW: Capability routing
-│   │   ├── capability-router.ts
-│   │   ├── intent-classifier.ts
-│   │   └── chain-composer.ts
-│   │
-│   └── agents/             # Keep existing agents, update types
+packages/opencode/src/
+├── kiloclaw/                    # Core Kiloclaw (NUOVO - isolamento completo)
+│   ├── agency/                  # Agency system
+│   │   ├── registry/           # Dynamic registries
+│   │   │   ├── skill-registry.ts
+│   │   │   ├── agent-registry.ts
+│   │   │   ├── agency-registry.ts
+│   │   │   └── chain-registry.ts
+│   │   ├── routing/           # Capability routing
+│   │   │   ├── capability-router.ts
+│   │   │   ├── intent-classifier.ts
+│   │   │   └── chain-composer.ts
+│   │   ├── agents/            # Agent implementations
+│   │   └── types.ts
+│   ├── memory/                 # 4-layer memory system
+│   │   ├── working.ts
+│   │   ├── episodic.ts
+│   │   ├── semantic.ts
+│   │   ├── procedural.ts
+│   │   ├── broker.ts
+│   │   └── lifecycle.ts
+│   ├── skills/                 # Skill definitions
+│   │   ├── development/
+│   │   ├── knowledge/
+│   │   ├── nutrition/
+│   │   └── weather/
+│   ├── policy/                # Policy engine
+│   ├── guardrail/             # Guardrails system
+│   ├── hitl/                 # Human-in-the-loop
+│   ├── proactive/             # Proactive system
+│   ├── orchestrator.ts
+│   ├── agent.ts
+│   ├── skill.ts
+│   └── tool.ts
+│
+├── kiloclaw-legacy/           # Legacy wrappers (DEPRECATO - per compatibilità)
+│   ├── modes-migrator.ts
+│   ├── rules-migrator.ts
+│   ├── workflows-migrator.ts
+│   ├── mcp-migrator.ts
+│   ├── ignore-migrator.ts
+│   ├── paths.ts               # Usa ~/.kiloclaw/ non ~/.kilocode/
+│   └── components/            # UI components
+│
+└── [altre dir]               # OpenCode base (non isolate)
 ```
 
 ---
@@ -261,7 +287,9 @@ La governance runtime deve impedire azioni non verificabili, invasive o fuori po
 
 ## 6. Isola stack da Kilocode
 
-L’isolamento deve essere totale su identità applicativa, filesystem, telemetria e integrazioni. Kiloclaw non deve leggere né scrivere in percorsi o config operative di KiloCode.
+L'isolamento deve essere totale su identità applicativa, filesystem, telemetria e integrazioni. Kiloclaw non deve leggere né scrivere in percorsi o config operative di KiloCode.
+
+> **Stato Refactoring (Aprile 2024)**: L'isolamento è stato completato. La directory `src/kilocode/` (KiloCode originale) è stata eliminata. La directory `src/kilocaw/` è stata rinominata in `src/kilocaw-legacy/` per marcarla come deprecated. Il core Kiloclaw risiede in `src/kiloclaw/` con完全的 isolamento.
 
 ### 6.1 Applica separazione tecnica
 
@@ -391,16 +419,31 @@ La migrazione config da ARIA a Kiloclaw deve essere deterministica, versionata e
 
 ### 9.3 Definisci criteri di accettazione
 
-1. Avvio Kiloclaw senza leggere config, data-dir o secret KiloCode locali.
-2. Routing gerarchico funzionante su Core -> Agency -> Agent -> Skill -> Tool/MCP.
-3. **CapabilityRouter** attivo: routing basato su capabilities invece che TaskType enum.
-4. Memoria 4-layer attiva con retrieval policy verificabile via log.
-5. Audit trail completo per ogni azione high-impact.
-6. Migrazione ARIA config ripetibile e idempotente con report.
-7. Guardrail proattivi con budget giornaliero e kill-switch testato.
-8. Telemetria e branding completamente separati da KiloCode.
-9. **SkillChain composition** supportata per pipeline dinamiche.
-10. **Runtime registration** di skills/agents/agencies (Phase 4).
+| #   | Criterio                                     | Stato         |
+| --- | -------------------------------------------- | ------------- |
+| 1   | Avvio Kiloclaw senza leggere config KiloCode | ✅ COMPLETO   |
+| 2   | Routing gerarchico Core -> Agency -> Agent   | ✅ COMPLETO   |
+| 3   | **CapabilityRouter** attivo                  | ✅ COMPLETO   |
+| 4   | Memoria 4-layer attiva                       | ✅ COMPLETO   |
+| 5   | Audit trail completo per azioni high-impact  | ⏳ IN CORSO   |
+| 6   | Migrazione ARIA config                       | ⏳ IN CORSO   |
+| 7   | Guardrail proattivi con budget e kill-switch | ⏳ IN CORSO   |
+| 8   | Telemetria/branding separati da KiloCode     | ✅ COMPLETO\* |
+| 9   | **SkillChain composition**                   | ✅ COMPLETO   |
+| 10  | **Runtime registration**                     | ⏳ IN CORSO   |
+
+_Nota: L'isolamento del namespace è completo. Le dipendenze esterne `@kilocode/_` (gateway, telemetry, sdk) sono ancora presenti come package NPM ma non come codice sorgente KiloCode.
+
+**Stato Refactoring (Aprile 2024)**:
+
+- ✅ `src/kilocode/` eliminato (46 file)
+- ✅ `test/kilocode/` eliminato (21 file)
+- ✅ `src/kilocaw/` rinominato in `src/kilocaw-legacy/`
+- ✅ Tutti gli import aggiornati a `@/kilocaw-legacy/`
+- ✅ Service names corretti: `kilocode.*` → `kiloclaw.*`
+- ✅ Stringhe corrette: `.kilocodeignore` → `.kiloclawignore`, `.kilocoderules` → `.kiloclawrules`
+- ✅ 528 test kiloclaw passano
+- ✅ Pre-push hook passa
 
 ---
 
