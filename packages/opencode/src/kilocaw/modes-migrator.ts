@@ -3,7 +3,7 @@ import * as fs from "fs/promises"
 import * as path from "path"
 import os from "os"
 import { Config } from "../config/config"
-import { KilocodePaths } from "./paths"
+import { KiloclawPaths } from "./paths"
 import type { OrganizationMode } from "@kilocode/kilo-gateway"
 
 export namespace ModesMigrator {
@@ -159,7 +159,7 @@ export namespace ModesMigrator {
 
     if (!options.skipGlobalPaths) {
       // 1. VSCode extension global storage (primary location for global modes)
-      const vscodeGlobalPath = path.join(KilocodePaths.vscodeGlobalStorage(), "settings", "custom_modes.yaml")
+      const vscodeGlobalPath = path.join(KilocawPaths.vscodeGlobalStorage(), "settings", "custom_modes.yaml")
       allModes.push(...(await readModesFile(vscodeGlobalPath)))
 
       // 2. CLI global settings (fallback/alternative location)

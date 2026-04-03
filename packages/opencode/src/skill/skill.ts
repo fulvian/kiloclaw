@@ -138,7 +138,7 @@ export namespace Skill {
 
     // kilocode_change start - Scan Kilocode skill directories
     // Scanned before OpenCode so that OpenCode skills take precedence (last one wins)
-    const kilocodeSkillDirs = await KilocodePaths.skillDirectories({
+    const kilocodeSkillDirs = await KiloclawPaths.skillDirectories({
       projectDir: Instance.directory,
       worktreeRoot: Instance.worktree,
     })

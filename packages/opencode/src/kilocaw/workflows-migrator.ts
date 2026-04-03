@@ -3,7 +3,7 @@ import * as path from "path"
 import os from "os"
 import type { Config } from "../config/config"
 import { Filesystem } from "../util/filesystem"
-import { KilocodePaths } from "./paths"
+import { KiloclawPaths } from "./paths"
 
 export namespace WorkflowsMigrator {
   const home = () => process.env.HOME || process.env.USERPROFILE || os.homedir()
@@ -71,7 +71,7 @@ export namespace WorkflowsMigrator {
 
     if (!skipGlobalPaths) {
       // 1. VSCode extension global storage (primary location for global workflows)
-      const vscodeWorkflowsDir = path.join(KilocodePaths.vscodeGlobalStorage(), "workflows")
+      const vscodeWorkflowsDir = path.join(KilocawPaths.vscodeGlobalStorage(), "workflows")
       workflows.push(...(await loadWorkflowsFromDir(vscodeWorkflowsDir, "global")))
 
       // 2. Home directories ~/.kiloclaw/workflows

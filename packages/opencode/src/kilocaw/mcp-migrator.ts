@@ -3,7 +3,7 @@ import * as path from "path"
 import { Config } from "../config/config"
 import { Log } from "../util/log"
 import { Filesystem } from "../util/filesystem"
-import { KilocodePaths } from "./paths"
+import { KiloclawPaths } from "./paths"
 
 export namespace McpMigrator {
   const log = Log.create({ service: "kilocode.mcp-migrator" })
@@ -96,7 +96,7 @@ export namespace McpMigrator {
 
     if (!options?.skipGlobalPaths) {
       // 1. VSCode extension global storage (primary location for global MCP settings)
-      const vscodeSettingsPath = path.join(KilocodePaths.vscodeGlobalStorage(), "settings", "mcp_settings.json")
+      const vscodeSettingsPath = path.join(KilocawPaths.vscodeGlobalStorage(), "settings", "mcp_settings.json")
       const vscodeSettings = await readMcpSettings(vscodeSettingsPath)
       if (vscodeSettings?.mcpServers) {
         for (const [name, server] of Object.entries(vscodeSettings.mcpServers)) {
