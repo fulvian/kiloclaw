@@ -5,5 +5,50 @@
       "command": "bunx",
       "arguments": ["prettier", "--stdin-filepath", "{buffer_path}"]
     }
+  },
+  "languages": {
+    "TypeScript": {
+      "language_servers": ["typescript"],
+      "formatter": {
+        "external": {
+          "command": "bunx",
+          "arguments": ["prettier", "--stdin-filepath", "{buffer_path}"]
+        }
+      }
+    },
+    "TypeScript JSX": {
+      "language_servers": ["typescript"],
+      "formatter": {
+        "external": {
+          "command": "bunx",
+          "arguments": ["prettier", "--stdin-filepath", "{buffer_path}"]
+        }
+      }
+    },
+    "TSX": {
+      "language_servers": ["typescript"],
+      "formatter": {
+        "external": {
+          "command": "bunx",
+          "arguments": ["prettier", "--stdin-filepath", "{buffer_path}"]
+        }
+      }
+    }
+  },
+  "lsp": {
+    "typescript": {
+      "enabled": true,
+      "initialization_options": {
+        "preferences": {
+          "importModuleSpecifier": "non-relative",
+          "includePackageJsonAutoImports": true
+        },
+        "suggest": {
+          "autoImports": true,
+          "completeFunctionCalls": true,
+          "includeAutomaticOptionalChainCompletions": true
+        }
+      }
+    }
   }
 }
