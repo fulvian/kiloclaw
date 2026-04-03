@@ -6,6 +6,9 @@ import type { Agent } from "../../agent"
 import type { Task, ExecutionContext, ExecutionResult } from "../../agency"
 import { type AgentStatus, type AgentId, type AgencyId, CapabilitySet, LimitSet } from "../../types"
 import type { AgentDefinition } from "../types"
+import { CriticalAnalysisSkill } from "../../skills/knowledge/critical-analysis"
+import { ComparisonSkill } from "../../skills/development/comparison"
+import { runSkill } from "./exec"
 
 // AnalystAgent definition
 export const analystAgentDefinition: AgentDefinition = {
@@ -66,20 +69,10 @@ export class AnalystAgent implements Agent {
   }
 
   private async executeDataAnalysis(task: Task, context: ExecutionContext): Promise<ExecutionResult> {
-    // TODO: Integrate with CriticalAnalysisSkill
-    return {
-      success: true,
-      output: { message: "Data analysis task queued", taskType: task.type },
-      metrics: { durationMs: Date.now() - (context.metadata?.startTime as number) || 0 },
-    }
+    return runSkill(CriticalAnalysisSkill, task, context)
   }
 
   private async executeComparison(task: Task, context: ExecutionContext): Promise<ExecutionResult> {
-    // TODO: Integrate with ComparisonSkill
-    return {
-      success: true,
-      output: { message: "Comparison task queued", taskType: task.type },
-      metrics: { durationMs: Date.now() - (context.metadata?.startTime as number) || 0 },
-    }
+    return runSkill(ComparisonSkill, task, context)
   }
 }

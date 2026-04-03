@@ -39,6 +39,7 @@ export const CoreOrchestrator = {
   create: fn(z.object({}), () => {
     const log = Log.create({ service: "kiloclaw.orchestrator" })
     const auditLogs: Array<{ event: string; data: Record<string, unknown>; timestamp: number }> = []
+    const store = new Map<string, unknown>()
 
     const orchestrator: CoreOrchestrator = {
       async routeIntent(intent: Intent): Promise<AgencyAssignment> {
@@ -57,7 +58,6 @@ export const CoreOrchestrator = {
         }
       },
       memory(): MemoryBroker {
-        const store = new Map<string, unknown>()
         return {
           async read(key: string): Promise<unknown> {
             return store.get(key)

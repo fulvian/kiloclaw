@@ -117,7 +117,7 @@ const SCHEDULER_ENV_MAPPINGS: Record<
     kiloclaw: "KILOCLAW_SCHED_DISPATCH_MS",
     transform: (v) => Math.max(100, parseInt(v, 10)),
   },
-  ARIA_SCHEDRAIL_RECOVERY_POLICY: { kiloclaw: "KILOCLAW_SCHED_RECOVERY_POLICY", transform: (v) => v },
+  ARIA_SCHEDULER_RECOVERY_POLICY: { kiloclaw: "KILOCLAW_SCHED_RECOVERY_POLICY", transform: (v) => v },
 }
 
 const GUARDRAIL_ENV_MAPPINGS: Record<

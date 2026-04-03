@@ -3,7 +3,7 @@
 
 import { Log } from "@/util/log"
 import { type AgencyId, type Domain } from "../types"
-import { type Agency, type AgencyInfo } from "../agency"
+import { Agency, type AgencyInfo } from "../agency"
 import type { Agent } from "../agent"
 import type { Skill } from "../skill"
 import type { Tool } from "../tool"
@@ -322,6 +322,33 @@ export class AgencyCatalog {
     // - TAVILY_API_KEYS=key1,key2,key3 (comma-separated)
     // - TAVILY_API_KEY (single key, legacy)
     KeyManager.getInstance().loadAllFromEnv()
+
+    if (this.agencies.size === 0) {
+      this.registerAgency(
+        Agency.create({
+          id: "agency-development" as AgencyId,
+          domain: "development",
+        }),
+      )
+      this.registerAgency(
+        Agency.create({
+          id: "agency-knowledge" as AgencyId,
+          domain: "knowledge",
+        }),
+      )
+      this.registerAgency(
+        Agency.create({
+          id: "agency-nutrition" as AgencyId,
+          domain: "nutrition",
+        }),
+      )
+      this.registerAgency(
+        Agency.create({
+          id: "agency-weather" as AgencyId,
+          domain: "weather",
+        }),
+      )
+    }
 
     this.log.info("API key pools initialized", {
       providers: KeyManager.getInstance().listProviders(),

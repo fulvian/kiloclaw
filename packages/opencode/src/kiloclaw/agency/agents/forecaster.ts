@@ -6,6 +6,8 @@ import type { Agent } from "../../agent"
 import type { Task, ExecutionContext, ExecutionResult } from "../../agency"
 import { type AgentStatus, type AgentId, type AgencyId, CapabilitySet, LimitSet } from "../../types"
 import type { AgentDefinition } from "../types"
+import { WeatherForecastSkill } from "../../skills/weather/weather-forecast"
+import { runSkill } from "./exec"
 
 // ForecasterAgent definition
 export const forecasterAgentDefinition: AgentDefinition = {
@@ -64,11 +66,6 @@ export class ForecasterAgent implements Agent {
   }
 
   private async executeWeatherForecast(task: Task, context: ExecutionContext): Promise<ExecutionResult> {
-    // TODO: Integrate with WeatherForecastSkill
-    return {
-      success: true,
-      output: { message: "Weather forecast task queued", taskType: task.type },
-      metrics: { durationMs: Date.now() - (context.metadata?.startTime as number) || 0 },
-    }
+    return runSkill(WeatherForecastSkill, task, context)
   }
 }

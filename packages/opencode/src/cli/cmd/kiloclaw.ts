@@ -10,6 +10,14 @@ import { EOL } from "os"
 
 const log = Log.create({ service: "kiloclaw.cli" })
 
+function skillsForAgency(domain: string) {
+  if (domain === "development") return developmentSkills
+  if (domain === "knowledge") return knowledgeSkills
+  if (domain === "nutrition") return nutritionSkills
+  if (domain === "weather") return weatherSkills
+  return []
+}
+
 // Agency List Command
 const AgencyListCommand = cmd({
   command: "list",
@@ -39,7 +47,7 @@ const AgencyListCommand = cmd({
     console.log("=".repeat(60))
     for (const agency of agencies) {
       const providers = catalog.listProviders(agency.domain as any)
-      const skills = catalog.listSkills(agency.domain as any)
+      const skills = skillsForAgency(agency.domain)
       console.log(`\n[${agency.domain.toUpperCase()}]`)
       console.log(`  ID: ${agency.id}`)
       console.log(`  Status: ${agency.status}`)
@@ -52,7 +60,7 @@ const AgencyListCommand = cmd({
 
 // Agency Info Command
 const AgencyInfoCommand = cmd({
-  command: "info",
+  command: "info <name>",
   describe: "show detailed information about an agency",
   builder: (yargs) =>
     yargs.positional("name", {
@@ -73,7 +81,7 @@ const AgencyInfoCommand = cmd({
     }
 
     const providers = catalog.listProviders(agency.domain as any)
-    const skills = catalog.listSkills(agency.domain as any)
+    const skills = skillsForAgency(agency.domain)
 
     console.log(`\nAgency: ${agency.domain.toUpperCase()}`)
     console.log("=".repeat(60))
@@ -171,7 +179,7 @@ const SkillListCommand = cmd({
 
 // Skill Info Command
 const SkillInfoCommand = cmd({
-  command: "info",
+  command: "info <name>",
   describe: "show detailed information about a skill",
   builder: (yargs) =>
     yargs.positional("name", {
@@ -235,7 +243,7 @@ const ProviderListCommand = cmd({
 
 // Provider Health Command
 const ProviderHealthCommand = cmd({
-  command: "health",
+  command: "health <name>",
   describe: "check health status of a provider",
   builder: (yargs) =>
     yargs.positional("name", {
@@ -394,7 +402,7 @@ const AgentListCommand = cmd({
 
 // Agent Info Command
 const AgentInfoCommand = cmd({
-  command: "info",
+  command: "info <name>",
   describe: "show detailed information about an agent",
   builder: (yargs) =>
     yargs.positional("name", {
@@ -437,7 +445,7 @@ const AgentInfoCommand = cmd({
 
 // Agent Tasks Command
 const AgentTasksCommand = cmd({
-  command: "tasks",
+  command: "tasks <name>",
   describe: "show the tasks an agent can perform",
   builder: (yargs) =>
     yargs.positional("name", {

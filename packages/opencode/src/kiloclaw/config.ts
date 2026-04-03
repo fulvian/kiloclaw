@@ -84,9 +84,8 @@ function envToConfig(): Partial<ConfigInfo> {
   const result: Partial<ConfigInfo> = {}
 
   for (const [key, value] of Object.entries(envVars)) {
-    // Strip prefix and convert to camelCase
-    const stripped = key.substring(ACCEPTED_PREFIX.length)
-    const configKey = stripped.charAt(0).toLowerCase() + stripped.substring(1)
+    // Strip prefix and normalize to canonical uppercase token
+    const configKey = key.substring(ACCEPTED_PREFIX.length).toUpperCase()
 
     switch (configKey) {
       case "LOG_LEVEL":

@@ -236,5 +236,11 @@ All 364 tests pass across 10 test suites:
 
 ---
 
+## Stabilization note (April 2026)
+
+See `docs/foundation/STABILIZZAZIONE_APRILE_2026.md` for consolidated infrastructure unblockers, core fixes, real agent-to-skill integration status, verification evidence, and updated dev-mode CLI commands.
+
+---
+
 _Release Notes Version: 1.0.1_  
 _Generated: 2026-04-03_

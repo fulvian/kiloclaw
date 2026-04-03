@@ -6,6 +6,10 @@ import type { Agent } from "../../agent"
 import type { Task, ExecutionContext, ExecutionResult } from "../../agency"
 import { type AgentStatus, type AgentId, type AgencyId, CapabilitySet, LimitSet } from "../../types"
 import type { AgentDefinition } from "../types"
+import { WebResearchSkill } from "../../skills/knowledge/web-research"
+import { LiteratureReviewSkill } from "../../skills/knowledge/literature-review"
+import { FactCheckSkill } from "../../skills/knowledge/fact-check"
+import { runSkill } from "./exec"
 
 // ResearcherAgent definition
 export const researcherAgentDefinition: AgentDefinition = {
@@ -42,8 +46,6 @@ export class ResearcherAgent implements Agent {
     })
     this.status = "busy"
 
-    const startTime = Date.now()
-
     try {
       switch (task.type) {
         case "web-search":
@@ -72,38 +74,18 @@ export class ResearcherAgent implements Agent {
   }
 
   private async executeWebSearch(task: Task, context: ExecutionContext): Promise<ExecutionResult> {
-    // TODO: Integrate with WebResearchSkill via AgencyCatalog
-    return {
-      success: true,
-      output: { message: "Web search task queued", taskType: task.type },
-      metrics: { durationMs: Date.now() - (context.metadata?.startTime as number) || 0 },
-    }
+    return runSkill(WebResearchSkill, task, context)
   }
 
   private async executeAcademicResearch(task: Task, context: ExecutionContext): Promise<ExecutionResult> {
-    // TODO: Integrate with LiteratureReviewSkill via AgencyCatalog
-    return {
-      success: true,
-      output: { message: "Academic research task queued", taskType: task.type },
-      metrics: { durationMs: Date.now() - (context.metadata?.startTime as number) || 0 },
-    }
+    return runSkill(LiteratureReviewSkill, task, context)
   }
 
   private async executeFactCheck(task: Task, context: ExecutionContext): Promise<ExecutionResult> {
-    // TODO: Integrate with FactCheckSkill via AgencyCatalog
-    return {
-      success: true,
-      output: { message: "Fact check task queued", taskType: task.type },
-      metrics: { durationMs: Date.now() - (context.metadata?.startTime as number) || 0 },
-    }
+    return runSkill(FactCheckSkill, task, context)
   }
 
   private async executeSourceVerification(task: Task, context: ExecutionContext): Promise<ExecutionResult> {
-    // TODO: Implement source verification logic
-    return {
-      success: true,
-      output: { message: "Source verification task queued", taskType: task.type },
-      metrics: { durationMs: Date.now() - (context.metadata?.startTime as number) || 0 },
-    }
+    return runSkill(FactCheckSkill, task, context)
   }
 }

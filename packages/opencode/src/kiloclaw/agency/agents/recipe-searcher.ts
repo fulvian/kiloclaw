@@ -6,6 +6,8 @@ import type { Agent } from "../../agent"
 import type { Task, ExecutionContext, ExecutionResult } from "../../agency"
 import { type AgentStatus, type AgentId, type AgencyId, CapabilitySet, LimitSet } from "../../types"
 import type { AgentDefinition } from "../types"
+import { RecipeSearchSkill } from "../../skills/nutrition/recipe-search"
+import { runSkill } from "./exec"
 
 // RecipeSearcherAgent definition
 export const recipeSearcherAgentDefinition: AgentDefinition = {
@@ -64,11 +66,6 @@ export class RecipeSearcherAgent implements Agent {
   }
 
   private async executeRecipeSearch(task: Task, context: ExecutionContext): Promise<ExecutionResult> {
-    // TODO: Integrate with RecipeSearchSkill
-    return {
-      success: true,
-      output: { message: "Recipe search task queued", taskType: task.type },
-      metrics: { durationMs: Date.now() - (context.metadata?.startTime as number) || 0 },
-    }
+    return runSkill(RecipeSearchSkill, task, context)
   }
 }

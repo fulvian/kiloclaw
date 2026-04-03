@@ -6,6 +6,9 @@ import type { Agent } from "../../agent"
 import type { Task, ExecutionContext, ExecutionResult } from "../../agency"
 import { type AgentStatus, type AgentId, type AgencyId, CapabilitySet, LimitSet } from "../../types"
 import type { AgentDefinition } from "../types"
+import { NutritionAnalysisSkill } from "../../skills/nutrition/nutrition-analysis"
+import { DietPlanSkill } from "../../skills/nutrition/diet-plan"
+import { runSkill } from "./exec"
 
 // NutritionistAgent definition
 export const nutritionistAgentDefinition: AgentDefinition = {
@@ -72,47 +75,22 @@ export class NutritionistAgent implements Agent {
   }
 
   private async executeNutritionAnalysis(task: Task, context: ExecutionContext): Promise<ExecutionResult> {
-    // TODO: Integrate with NutritionAnalysisSkill
-    return {
-      success: true,
-      output: { message: "Nutrition analysis task queued", taskType: task.type },
-      metrics: { durationMs: Date.now() - (context.metadata?.startTime as number) || 0 },
-    }
+    return runSkill(NutritionAnalysisSkill, task, context)
   }
 
   private async executeFoodAnalysis(task: Task, context: ExecutionContext): Promise<ExecutionResult> {
-    // TODO: Integrate with RecipeSearchSkill
-    return {
-      success: true,
-      output: { message: "Food analysis task queued", taskType: task.type },
-      metrics: { durationMs: Date.now() - (context.metadata?.startTime as number) || 0 },
-    }
+    return runSkill(NutritionAnalysisSkill, task, context)
   }
 
   private async executeMealPlanning(task: Task, context: ExecutionContext): Promise<ExecutionResult> {
-    // TODO: Integrate with DietPlanSkill
-    return {
-      success: true,
-      output: { message: "Meal planning task queued", taskType: task.type },
-      metrics: { durationMs: Date.now() - (context.metadata?.startTime as number) || 0 },
-    }
+    return runSkill(DietPlanSkill, task, context)
   }
 
   private async executeDietGeneration(task: Task, context: ExecutionContext): Promise<ExecutionResult> {
-    // TODO: Integrate with DietPlanSkill for generating diet plans
-    return {
-      success: true,
-      output: { message: "Diet generation task queued", taskType: task.type },
-      metrics: { durationMs: Date.now() - (context.metadata?.startTime as number) || 0 },
-    }
+    return runSkill(DietPlanSkill, task, context)
   }
 
   private async executeCalorieCalculation(task: Task, context: ExecutionContext): Promise<ExecutionResult> {
-    // TODO: Implement calorie calculation logic
-    return {
-      success: true,
-      output: { message: "Calorie calculation task queued", taskType: task.type },
-      metrics: { durationMs: Date.now() - (context.metadata?.startTime as number) || 0 },
-    }
+    return runSkill(NutritionAnalysisSkill, task, context)
   }
 }

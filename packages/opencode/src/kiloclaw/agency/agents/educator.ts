@@ -6,6 +6,8 @@ import type { Agent } from "../../agent"
 import type { Task, ExecutionContext, ExecutionResult } from "../../agency"
 import { type AgentStatus, type AgentId, type AgencyId, CapabilitySet, LimitSet } from "../../types"
 import type { AgentDefinition } from "../types"
+import { SynthesisSkill } from "../../skills/knowledge/synthesis"
+import { runSkill } from "./exec"
 
 // EducatorAgent definition
 export const educatorAgentDefinition: AgentDefinition = {
@@ -66,20 +68,10 @@ export class EducatorAgent implements Agent {
   }
 
   private async executeSummarization(task: Task, context: ExecutionContext): Promise<ExecutionResult> {
-    // TODO: Integrate with SynthesisSkill for summarization
-    return {
-      success: true,
-      output: { message: "Summarization task queued", taskType: task.type },
-      metrics: { durationMs: Date.now() - (context.metadata?.startTime as number) || 0 },
-    }
+    return runSkill(SynthesisSkill, task, context)
   }
 
   private async executeExplanation(task: Task, context: ExecutionContext): Promise<ExecutionResult> {
-    // TODO: Implement explanation logic
-    return {
-      success: true,
-      output: { message: "Explanation task queued", taskType: task.type },
-      metrics: { durationMs: Date.now() - (context.metadata?.startTime as number) || 0 },
-    }
+    return runSkill(SynthesisSkill, task, context)
   }
 }

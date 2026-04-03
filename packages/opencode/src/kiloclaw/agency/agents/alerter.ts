@@ -6,6 +6,8 @@ import type { Agent } from "../../agent"
 import type { Task, ExecutionContext, ExecutionResult } from "../../agency"
 import { type AgentStatus, type AgentId, type AgencyId, CapabilitySet, LimitSet } from "../../types"
 import type { AgentDefinition } from "../types"
+import { WeatherAlertsSkill } from "../../skills/weather/weather-alerts"
+import { runSkill } from "./exec"
 
 // AlerterAgent definition
 export const alerterAgentDefinition: AgentDefinition = {
@@ -66,20 +68,10 @@ export class AlerterAgent implements Agent {
   }
 
   private async executeWeatherAlerts(task: Task, context: ExecutionContext): Promise<ExecutionResult> {
-    // TODO: Integrate with WeatherAlertsSkill
-    return {
-      success: true,
-      output: { message: "Weather alerts task queued", taskType: task.type },
-      metrics: { durationMs: Date.now() - (context.metadata?.startTime as number) || 0 },
-    }
+    return runSkill(WeatherAlertsSkill, task, context)
   }
 
   private async executeNotifications(task: Task, context: ExecutionContext): Promise<ExecutionResult> {
-    // TODO: Implement notification logic
-    return {
-      success: true,
-      output: { message: "Notifications task queued", taskType: task.type },
-      metrics: { durationMs: Date.now() - (context.metadata?.startTime as number) || 0 },
-    }
+    return runSkill(WeatherAlertsSkill, task, context)
   }
 }

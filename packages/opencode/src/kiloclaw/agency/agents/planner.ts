@@ -6,6 +6,8 @@ import type { Agent } from "../../agent"
 import type { Task, ExecutionContext, ExecutionResult } from "../../agency"
 import { type AgentStatus, type AgentId, type AgencyId, CapabilitySet, LimitSet } from "../../types"
 import type { AgentDefinition } from "../types"
+import { TddSkill } from "../../skills/development/tdd"
+import { runSkill } from "./exec"
 
 // PlannerAgent definition
 export const plannerAgentDefinition: AgentDefinition = {
@@ -66,20 +68,10 @@ export class PlannerAgent implements Agent {
   }
 
   private async executeTaskPlanning(task: Task, context: ExecutionContext): Promise<ExecutionResult> {
-    // TODO: Implement task planning logic
-    return {
-      success: true,
-      output: { message: "Task planning task queued", taskType: task.type },
-      metrics: { durationMs: Date.now() - (context.metadata?.startTime as number) || 0 },
-    }
+    return runSkill(TddSkill, task, context)
   }
 
   private async executeCodePlanning(task: Task, context: ExecutionContext): Promise<ExecutionResult> {
-    // TODO: Implement code planning logic
-    return {
-      success: true,
-      output: { message: "Code planning task queued", taskType: task.type },
-      metrics: { durationMs: Date.now() - (context.metadata?.startTime as number) || 0 },
-    }
+    return runSkill(TddSkill, task, context)
   }
 }

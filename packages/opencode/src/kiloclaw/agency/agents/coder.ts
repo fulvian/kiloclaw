@@ -6,6 +6,9 @@ import type { Agent } from "../../agent"
 import type { Task, ExecutionContext, ExecutionResult } from "../../agency"
 import { type AgentStatus, type AgentId, type AgencyId, CapabilitySet, LimitSet } from "../../types"
 import type { AgentDefinition } from "../types"
+import { TddSkill } from "../../skills/development/tdd"
+import { DebuggingSkill } from "../../skills/development/debugging"
+import { runSkill } from "./exec"
 
 // CoderAgent definition
 export const coderAgentDefinition: AgentDefinition = {
@@ -68,29 +71,14 @@ export class CoderAgent implements Agent {
   }
 
   private async executeCodeGeneration(task: Task, context: ExecutionContext): Promise<ExecutionResult> {
-    // TODO: Integrate with TddSkill for test-driven development workflow
-    return {
-      success: true,
-      output: { message: "Code generation task queued", taskType: task.type },
-      metrics: { durationMs: Date.now() - (context.metadata?.startTime as number) || 0 },
-    }
+    return runSkill(TddSkill, task, context)
   }
 
   private async executeCodeModification(task: Task, context: ExecutionContext): Promise<ExecutionResult> {
-    // TODO: Implement code modification logic
-    return {
-      success: true,
-      output: { message: "Code modification task queued", taskType: task.type },
-      metrics: { durationMs: Date.now() - (context.metadata?.startTime as number) || 0 },
-    }
+    return runSkill(TddSkill, task, context)
   }
 
   private async executeBugFixing(task: Task, context: ExecutionContext): Promise<ExecutionResult> {
-    // TODO: Integrate with DebuggingSkill
-    return {
-      success: true,
-      output: { message: "Bug fixing task queued", taskType: task.type },
-      metrics: { durationMs: Date.now() - (context.metadata?.startTime as number) || 0 },
-    }
+    return runSkill(DebuggingSkill, task, context)
   }
 }

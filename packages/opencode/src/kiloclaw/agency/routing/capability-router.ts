@@ -55,12 +55,18 @@ function findBestSkill(skills: SkillDefinition[], required: string[]): SkillDefi
 function findBestAgent(agents: FlexibleAgentDefinition[], required: string[]): FlexibleAgentDefinition | null {
   if (agents.length === 0) return null
 
+  if (required.length === 0) {
+    return null
+  }
+
   const scored = agents.map((a) => ({ agent: a, score: calculateMatchScore(a.capabilities, required) }))
   scored.sort((a, b) => b.score - a.score)
 
   const best = scored[0]
-  // Return best agent even if score is 0 (fallback when no better matches exist)
-  return best ? best.agent : null
+  if (!best) {
+    return null
+  }
+  return best.agent
 }
 
 export namespace CapabilityRouter {

@@ -6,6 +6,8 @@ import type { Agent } from "../../agent"
 import type { Task, ExecutionContext, ExecutionResult } from "../../agency"
 import { type AgentStatus, type AgentId, type AgencyId, CapabilitySet, LimitSet } from "../../types"
 import type { AgentDefinition } from "../types"
+import { WeatherCurrentSkill } from "../../skills/weather/weather-current"
+import { runSkill } from "./exec"
 
 // WeatherCurrentAgent definition
 export const weatherCurrentAgentDefinition: AgentDefinition = {
@@ -66,20 +68,10 @@ export class WeatherCurrentAgent implements Agent {
   }
 
   private async executeWeatherQuery(task: Task, context: ExecutionContext): Promise<ExecutionResult> {
-    // TODO: Integrate with WeatherCurrentSkill from skills/weather
-    return {
-      success: true,
-      output: { message: "Weather query task queued", taskType: task.type },
-      metrics: { durationMs: Date.now() - (context.metadata?.startTime as number) || 0 },
-    }
+    return runSkill(WeatherCurrentSkill, task, context)
   }
 
   private async executeLocationAnalysis(task: Task, context: ExecutionContext): Promise<ExecutionResult> {
-    // TODO: Implement location-based weather analysis
-    return {
-      success: true,
-      output: { message: "Location analysis task queued", taskType: task.type },
-      metrics: { durationMs: Date.now() - (context.metadata?.startTime as number) || 0 },
-    }
+    return runSkill(WeatherCurrentSkill, task, context)
   }
 }

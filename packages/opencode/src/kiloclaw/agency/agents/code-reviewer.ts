@@ -6,6 +6,9 @@ import type { Agent } from "../../agent"
 import type { Task, ExecutionContext, ExecutionResult } from "../../agency"
 import { type AgentStatus, type AgentId, type AgencyId, CapabilitySet, LimitSet } from "../../types"
 import type { AgentDefinition } from "../types"
+import { CodeReviewSkill } from "../../skills/development/code-review"
+import { FactCheckSkill } from "../../skills/knowledge/fact-check"
+import { runSkill } from "./exec"
 
 // CodeReviewerAgent definition
 export const codeReviewerAgentDefinition: AgentDefinition = {
@@ -66,20 +69,10 @@ export class CodeReviewerAgent implements Agent {
   }
 
   private async executeCodeReview(task: Task, context: ExecutionContext): Promise<ExecutionResult> {
-    // TODO: Integrate with CodeReviewSkill
-    return {
-      success: true,
-      output: { message: "Code review task queued", taskType: task.type },
-      metrics: { durationMs: Date.now() - (context.metadata?.startTime as number) || 0 },
-    }
+    return runSkill(CodeReviewSkill, task, context)
   }
 
   private async executeFactChecking(task: Task, context: ExecutionContext): Promise<ExecutionResult> {
-    // TODO: Integrate with FactCheckSkill
-    return {
-      success: true,
-      output: { message: "Fact checking task queued", taskType: task.type },
-      metrics: { durationMs: Date.now() - (context.metadata?.startTime as number) || 0 },
-    }
+    return runSkill(FactCheckSkill, task, context)
   }
 }
