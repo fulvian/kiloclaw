@@ -1,6 +1,6 @@
 # Kiloclaw 7.2.0 Release Notes
 
-> **Release Date:** 2026-04-02  
+> **Release Date:** 2026-04-03  
 > **Version:** 7.2.0  
 > **Type:** Major Foundation Release  
 > **Status:** Ready for Go-Live
@@ -73,13 +73,14 @@ Comprehensive safety system with multiple guardrails:
 
 Complete technical separation from upstream:
 
-| Domain         | Kiloclaw Target    | Verification |
-| -------------- | ------------------ | ------------ |
-| Namespace      | `@kilocode/*`      | ✅ Complete  |
-| Config prefix  | `KILOCLAW_*` only  | ✅ Enforced  |
-| Data directory | `~/.kiloclaw/`     | ✅ Isolated  |
-| Binary         | `kiloclaw`         | ✅ Named     |
-| Telemetry      | Dedicated pipeline | ✅ Isolated  |
+| Domain         | Kiloclaw Target                                           | Verification |
+| -------------- | --------------------------------------------------------- | ------------ |
+| Namespace      | `@kiloclaw/*`                                             | ✅ Complete  |
+| Config prefix  | `KILOCLAW_*` only                                         | ✅ Enforced  |
+| Data directory | `~/.kiloclaw/`                                            | ✅ Isolated  |
+| Binary         | `kiloclaw`                                                | ✅ Named     |
+| Telemetry      | Dedicated pipeline                                        | ✅ Isolated  |
+| Path isolation | No fallback to `~/.kilo/`, `~/.kilocode/`, `~/.opencode/` | ✅ Enforced  |
 
 ---
 
@@ -235,5 +236,5 @@ All 364 tests pass across 10 test suites:
 
 ---
 
-_Release Notes Version: 1.0.0_  
-_Generated: 2026-04-02_
+_Release Notes Version: 1.0.1_  
+_Generated: 2026-04-03_
