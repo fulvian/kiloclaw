@@ -491,7 +491,81 @@ All Phase 6 acceptance criteria from FLEXIBLE_AGENCY_ARCHITECTURE_TDD.md:
 
 ### Commit
 
-- `efe8d3d` fix(tests): resolve all TypeScript errors in kiloclaw test suite (previous)
+- `f5dbefe` chore: improve TypeScript LSP configuration and add test tsconfig
+- `f9c9331` docs: update FLEXIBLE_AGENCY_ARCHITECTURE_TDD.md - mark Phase 6 complete
+- `84ef050` feat(tests): complete Phase 6 integration tests for Flexible Agency Architecture
+- `efe8d3d` fix(tests): resolve all TypeScript errors in kiloclaw test suite
+
+---
+
+## 2026-04-03 - Environment PATH Fix
+
+### Problem
+
+The PATH environment variable was corrupted with a literal `$PATH` string:
+
+```
+/usr/local/bin:/home/fulvio/coding/kiloclaw/packages/opencode:$PATH:/home/fulvio/.lmstudio/bin
+```
+
+This happened because `export PATH="...:$PATH"` was executed when `$PATH` was empty/unset, resulting in the literal string `$PATH` being stored.
+
+### Root Cause
+
+The corruption happened because of a non-interactive bash shell where:
+
+1. `case $- in *i*) ;; *) return;; esac` exits `.bashrc` early in non-interactive mode
+2. The PATH fix code was placed AFTER this check, so it never executed
+
+### Solution
+
+Moved the PATH corruption fix to the VERY FIRST LINE of `.bashrc`, before the interactive check:
+
+```bash
+# ~/.bashrc
+# ROBUST PATH FIX: Must run FIRST, before the interactive return check
+case "$PATH" in
+    *:\$PATH:*|*\$PATH*)
+        _fixed_path="/usr/local/bin:/usr/bin:/bin"
+        for _dir in "$HOME/.bun/bin" "$HOME/.cargo/bin" "$HOME/.local/bin" "$HOME/bin"; do
+            if [ -d "$_dir" ]; then
+                case ":$_fixed_path:" in
+                    *":$_dir:"*) ;;
+                    *) _fixed_path="$_fixed_path:$_dir" ;;
+                esac
+            fi
+        done
+        export PATH="$_fixed_path"
+        unset _fixed_path _dir
+        ;;
+esac
+
+# If not running interactively, don't do anything
+case $- in
+    *i*) ;;
+      *) return;;
+esac
+```
+
+### Verification
+
+```
+PATH=/usr/local/bin:/usr/bin:/bin:/home/fulvio/.bun/bin:...
+bun --version: 1.3.11
+typecheck: PASSED (0 errors)
+tests: 97 pass, 0 fail
+```
+
+### Additional Configuration
+
+Added VS Code settings for better TypeScript LSP support:
+
+- `typescript.enablePromptUseWorkspaceTsdk`: true
+- `typescript.suggest.autoImports`: true
+- `typescript.tsserver.maxTsServerMemory`: 8192
+- `typescript.tsserver.experimental.enableProjectDiagnostics`: true
+
+Added `packages/opencode/test/tsconfig.json` for test file type-checking.
 
 ### Problem
 
