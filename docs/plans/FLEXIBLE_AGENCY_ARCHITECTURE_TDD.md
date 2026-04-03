@@ -749,12 +749,12 @@ export class ChainCompositionError extends CapabilityRouterError {
 - Add deprecation warnings ✅
 - Write unit tests ✅
 
-### Phase 6: Integration
+### Phase 6: Integration ✅ COMPLETE
 
-- Update `AgencyCatalog` to use new registries
-- Update exports in `agency/index.ts`
-- Run full typecheck
-- Run existing integration tests
+- Update `AgencyCatalog` to use new registries ✅
+- Update exports in `agency/index.ts` ✅
+- Run full typecheck ✅
+- Run existing integration tests ✅
 
 ---
 
@@ -774,18 +774,17 @@ export class ChainCompositionError extends CapabilityRouterError {
 
 ## 14. Test Count Summary
 
-| Component              | Test Cases |
-| ---------------------- | ---------- |
-| TaskIntent Schema      | 3          |
-| SkillDefinition Schema | 3          |
-| SkillRegistry          | 5          |
-| FlexibleAgentRegistry  | 5          |
-| CapabilityRouter       | 7          |
-| IntentClassifier       | 17         |
-| ChainComposer          | 16         |
-| ChainRegistry          | 3          |
-| AgencyRegistry         | 2          |
-| **Total**              | **61**     |
+| Component                     | Test Cases |
+| ----------------------------- | ---------- |
+| TaskIntent/RouteResult Schema | 17         |
+| SkillRegistry                 | 13         |
+| FlexibleAgentRegistry         | 14         |
+| ChainRegistry                 | 11         |
+| AgencyRegistry                | 12         |
+| CapabilityRouter              | 7          |
+| IntentClassifier              | 17         |
+| ChainComposer                 | 16         |
+| **Total**                     | **97**     |
 
 ## 15. Implementation Notes
 
@@ -814,9 +813,17 @@ export class ChainCompositionError extends CapabilityRouterError {
 - getCapabilityKeywords: 1 test
 - migrateLegacyTaskType (from types): 4 tests
 
+### Phase 6 Tests (Integration)
+
+- SkillRegistry: 13 tests (CRUD, findByCapabilities, findByTag, getVersion, clear)
+- FlexibleAgentRegistry: 14 tests (CRUD, findByCapabilities with agency filter, getAgentsByAgency)
+- AgencyRegistry: 12 tests (CRUD, domain lookup, policy access)
+- ChainRegistry: 11 tests (CRUD, findChainForCapabilities)
+- Routing Types: 17 tests (TaskIntentSchema, RouteResultSchema validation, migrateLegacyTaskType)
+
 ---
 
-**Document Status:** Implementation Complete (Phases 1-5)  
+**Document Status:** Implementation Complete (All Phases)  
 **Last Updated:** 2026-04-03  
 **Implementation Status:**
 
@@ -825,4 +832,4 @@ export class ChainCompositionError extends CapabilityRouterError {
 - ✅ Phase 3: CapabilityRouter
 - ✅ Phase 4: Chain Composition
 - ✅ Phase 5: Intent Classification
-- ⏳ Phase 6: Integration (Pending)
+- ✅ Phase 6: Integration (Complete)
