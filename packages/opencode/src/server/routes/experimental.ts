@@ -11,8 +11,8 @@ import { zodToJsonSchema } from "zod-to-json-schema"
 import { errors } from "../error"
 import { lazy } from "../../util/lazy"
 import { Snapshot } from "../../snapshot" // kilocode_change
-import { Review } from "../../kilocaw/review/review" // kilocode_change
-import { WorktreeDiff } from "../../kilocaw/review/worktree-diff" // kilocode_change
+import { Review } from "../../kilocaw-legacy/review/review" // kilocode_change
+import { WorktreeDiff } from "../../kilocaw-legacy/review/worktree-diff" // kilocode_change
 import { Log } from "../../util/log" // kilocode_change
 import { WorkspaceRoutes } from "./workspace"
 

@@ -10,7 +10,7 @@ import fs from "fs/promises"
 import { Filesystem } from "../util/filesystem"
 import { Instance } from "../project/instance"
 import { Flag } from "../flag/flag"
-import { TsCheck } from "../kilocaw/ts-check" // kilocode_change
+import { TsCheck } from "../kilocaw-legacy/ts-check" // kilocode_change
 import { Archive } from "../util/archive"
 import { Process } from "../util/process"
 import { which } from "../util/which"

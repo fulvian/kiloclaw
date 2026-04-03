@@ -6,7 +6,7 @@ import { Filesystem } from "../util/filesystem"
 import { KiloclawPaths } from "./paths"
 
 export namespace McpMigrator {
-  const log = Log.create({ service: "kilocode.mcp-migrator" })
+  const log = Log.create({ service: "kiloclaw.mcp-migrator" })
 
   // Remote transport types used by the Kilocode extension
   const REMOTE_TYPES = new Set(["streamable-http", "sse"])
@@ -154,23 +154,23 @@ export namespace McpMigrator {
       const result = await migrate({ projectDir })
 
       if (Object.keys(result.mcp).length > 0) {
-        log.debug("loaded kilocode MCP servers", {
+        log.debug("loaded kiloclaw MCP servers", {
           count: Object.keys(result.mcp).length,
           servers: Object.keys(result.mcp),
         })
       }
 
       for (const skipped of result.skipped) {
-        log.debug("skipped kilocode MCP server", { name: skipped.name, reason: skipped.reason })
+        log.debug("skipped kiloclaw MCP server", { name: skipped.name, reason: skipped.reason })
       }
 
       for (const warning of result.warnings) {
-        log.warn("kilocode MCP migration warning", { warning })
+        log.warn("kiloclaw MCP migration warning", { warning })
       }
 
       return result.mcp
     } catch (err) {
-      log.warn("failed to load kilocode MCP servers", { error: err })
+      log.warn("failed to load kiloclaw MCP servers", { error: err })
       return {}
     }
   }

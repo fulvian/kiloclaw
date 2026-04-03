@@ -1,6 +1,6 @@
 import path from "path"
 import { Global } from "@/global"
-import { KiloclawPaths } from "@/kilocaw/paths"
+import { KiloclawPaths } from "@/kilocaw-legacy/paths"
 
 export namespace ConfigProtection {
   /**

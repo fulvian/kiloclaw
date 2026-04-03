@@ -1,7 +1,7 @@
 import { Bus } from "@/bus"
 import { Wildcard } from "@/util/wildcard"
 import type { PermissionNext } from "@/permission/next"
-import { ConfigProtection } from "@/kilocaw/permission/config-paths"
+import { ConfigProtection } from "@/kilocaw-legacy/permission/config-paths"
 
 /**
  * Auto-resolve pending permissions now fully covered by approved or denied rules.

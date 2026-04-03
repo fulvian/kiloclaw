@@ -28,7 +28,7 @@ import { SkillTool } from "../../tool/skill"
 import { BashTool } from "../../tool/bash"
 import { TodoWriteTool } from "../../tool/todo"
 import { Locale } from "../../util/locale"
-import { importCloudSession, validateCloudFork } from "@/kilocaw/cloud-session" // kilocode_change
+import { importCloudSession, validateCloudFork } from "@/kilocaw-legacy/cloud-session" // kilocode_change
 
 type ToolProps<T extends Tool.Info> = {
   input: Tool.InferParameters<T>

@@ -9,7 +9,7 @@ import z from "zod"
 import { Config } from "../config/config"
 import { Instance } from "../project/instance"
 import { Scheduler } from "../scheduler"
-import * as KiloSnapshot from "../kilocaw/snapshot" // kilocode_change
+import * as KiloSnapshot from "../kilocaw-legacy/snapshot" // kilocode_change
 
 export namespace Snapshot {
   const log = Log.create({ service: "snapshot" })

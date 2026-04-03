@@ -3,8 +3,8 @@ import * as path from "path"
 import os from "os"
 
 export namespace RulesMigrator {
-  // Only support .kilocoderules (no migration for .roorules or .clinerules)
-  const LEGACY_RULE_FILE = ".kilocoderules"
+  // Only support .kiloclawrules (no migration for .roorules or .clinerules)
+  const LEGACY_RULE_FILE = ".kiloclawrules"
   const home = () => process.env.HOME || process.env.USERPROFILE || os.homedir()
 
   // Directory-based rules (Kiloclaw only - fully isolated from KiloCode)
@@ -79,7 +79,7 @@ export namespace RulesMigrator {
       }
     }
 
-    // 3. Legacy .kilocoderules file (only kilocode, not roo/cline)
+    // 3. Legacy .kiloclawrules file (only kiloclaw, not roo/cline)
     const legacyFile = path.join(projectDir, LEGACY_RULE_FILE)
     if (await exists(legacyFile)) {
       rules.push({ path: legacyFile, source: "legacy" })
@@ -103,8 +103,8 @@ export namespace RulesMigrator {
         }
       }
 
-      // Legacy mode-specific file (.kilocoderules-{mode})
-      const legacyModeFile = path.join(projectDir, `.kilocoderules-${mode}`)
+      // Legacy mode-specific file (.kiloclawrules-{mode})
+      const legacyModeFile = path.join(projectDir, `.kiloclawrules-${mode}`)
       if (await exists(legacyModeFile)) {
         rules.push({ path: legacyModeFile, source: "legacy", mode })
       }

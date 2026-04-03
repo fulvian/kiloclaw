@@ -14,7 +14,7 @@ import type { Provider } from "@/provider/provider"
 
 // kilocode_change start - soul moved to kiloclaw namespace
 import SOUL from "../kiloclaw/soul.txt"
-import { staticEnvLines, type EditorContext } from "../kilocaw/editor-context"
+import { staticEnvLines, type EditorContext } from "../kilocaw-legacy/editor-context"
 // kilocode_change end
 
 export namespace SystemPrompt {

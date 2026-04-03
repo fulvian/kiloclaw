@@ -47,7 +47,7 @@ import { GoogleAuth } from "google-auth-library"
 import { ProviderTransform } from "./transform"
 import { Installation } from "../installation"
 
-import { DEFAULT_HEADERS } from "@/kilocaw/const" // kilocode_change
+import { DEFAULT_HEADERS } from "@/kilocaw-legacy/const" // kilocode_change
 
 export namespace Provider {
   const log = Log.create({ service: "provider" })

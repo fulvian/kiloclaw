@@ -46,8 +46,8 @@ import { LLM } from "./llm"
 import { iife } from "@/util/iife"
 import { Shell } from "@/shell/shell"
 import { Truncate } from "@/tool/truncation"
-import { PlanFollowup } from "@/kilocaw/plan-followup" // kilocode_change
-import { environmentDetails } from "@/kilocaw/editor-context" // kilocode_change
+import { PlanFollowup } from "@/kilocaw-legacy/plan-followup" // kilocode_change
+import { environmentDetails } from "@/kilocaw-legacy/editor-context" // kilocode_change
 
 // @ts-ignore
 globalThis.AI_SDK_LOG_WARNINGS = false

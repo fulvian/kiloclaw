@@ -7,29 +7,29 @@ export namespace KiloclawPaths {
 
   /**
    * Get the platform-specific VSCode global storage path for Kiloclaw extension.
-   * - macOS: ~/Library/Application Support/Code/User/globalStorage/kilocode.kilo-code
-   * - Windows: %APPDATA%/Code/User/globalStorage/kilocode.kilo-code
-   * - Linux: ~/.config/Code/User/globalStorage/kilocode.kilo-code
+   * - macOS: ~/Library/Application Support/Code/User/globalStorage/kiloclaw.kilo-code
+   * - Windows: %APPDATA%/Code/User/globalStorage/kiloclaw.kilo-code
+   * - Linux: ~/.config/Code/User/globalStorage/kiloclaw.kilo-code
    */
   export function vscodeGlobalStorage(): string {
     const home = os.homedir()
     switch (process.platform) {
       case "darwin":
-        return path.join(home, "Library", "Application Support", "Code", "User", "globalStorage", "kilocode.kilo-code")
+        return path.join(home, "Library", "Application Support", "Code", "User", "globalStorage", "kiloclaw.kilo-code")
       case "win32":
         return path.join(
           process.env.APPDATA || path.join(home, "AppData", "Roaming"),
           "Code",
           "User",
           "globalStorage",
-          "kilocode.kilo-code",
+          "kiloclaw.kilo-code",
         )
       default:
-        return path.join(home, ".config", "Code", "User", "globalStorage", "kilocode.kilo-code")
+        return path.join(home, ".config", "Code", "User", "globalStorage", "kiloclaw.kilo-code")
     }
   }
 
-  /** Global Kiloclaw directories in user home: ~/.kiloclaw only (fully isolated from KiloCode) */
+  /** Global Kiloclaw directories in user home: ~/.kiloclaw only (fully isolated from KiloCode - LEGACY) */
   export function globalDirs(): string[] {
     return [path.join(home(), ".kiloclaw")]
   }
@@ -42,7 +42,7 @@ export namespace KiloclawPaths {
    * - Includes global ~/.kiloclaw/
    * - Includes VSCode extension global storage
    *
-   * Fully isolated from KiloCode - does NOT read .kilocode/ or .kilo/ directories.
+   * Fully isolated from KiloCode - LEGACY - does NOT read .kilocode/ or .kilo/ directories.
    *
    * Does NOT copy/migrate skills - just provides paths for discovery.
    * Skills remain in their original locations and can be managed independently

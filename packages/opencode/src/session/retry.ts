@@ -1,6 +1,6 @@
 import type { NamedError } from "@opencode-ai/util/error"
 import { MessageV2 } from "./message-v2"
-import { isKiloError } from "@/kilocaw/kilo-errors" // kilocode_change
+import { isKiloError } from "@/kilocaw-legacy/kilo-errors" // kilocode_change
 import { iife } from "@/util/iife"
 
 export namespace SessionRetry {

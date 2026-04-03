@@ -15,8 +15,8 @@ import { Session } from "@/session"
 import { Discovery } from "./discovery"
 import { Glob } from "../util/glob"
 
-import { KiloclawPaths } from "../kilocaw/paths" // kilocode_change
-import { BUILTIN_SKILLS } from "../kilocaw/skills/builtin" // kilocode_change
+import { KiloclawPaths } from "../kilocaw-legacy/paths" // kilocode_change
+import { BUILTIN_SKILLS } from "../kilocaw-legacy/skills/builtin" // kilocode_change
 
 export namespace Skill {
   const log = Log.create({ service: "skill" })

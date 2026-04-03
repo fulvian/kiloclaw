@@ -22,10 +22,10 @@ import { SystemPrompt } from "./system"
 import { Flag } from "@/flag/flag"
 import { PermissionNext } from "@/permission/next"
 import { Auth } from "@/auth"
-import { DEFAULT_HEADERS } from "@/kilocaw/const" // kilocode_change
+import { DEFAULT_HEADERS } from "@/kilocaw-legacy/const" // kilocode_change
 import { Telemetry } from "@kilocode/kilo-telemetry" // kilocode_change
 // kilocode_change start
-import { getKiloProjectId } from "@/kilocaw/project-id"
+import { getKiloProjectId } from "@/kilocaw-legacy/project-id"
 import { HEADER_PROJECTID, HEADER_MACHINEID, HEADER_TASKID } from "@kilocode/kilo-gateway"
 import { Identity } from "@kilocode/kilo-telemetry"
 // kilocode_change end

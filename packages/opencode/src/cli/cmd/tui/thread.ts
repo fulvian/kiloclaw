@@ -16,7 +16,7 @@ import type { EventSource } from "./context/sdk"
 import { win32DisableProcessedInput, win32InstallCtrlCGuard } from "./win32"
 import { TuiConfig } from "@/config/tui"
 import { Instance } from "@/project/instance"
-import { importCloudSession, validateCloudFork } from "@/kilocaw/cloud-session" // kilocode_change
+import { importCloudSession, validateCloudFork } from "@/kilocaw-legacy/cloud-session" // kilocode_change
 
 declare global {
   const KILO_WORKER_PATH: string // kilocode_change

@@ -2,7 +2,7 @@
 import { Hono } from "hono"
 import { describeRoute, resolver, validator } from "hono-openapi"
 import z from "zod"
-import { enhancePrompt } from "../../kilocaw/enhance-prompt"
+import { enhancePrompt } from "../../kilocaw-legacy/enhance-prompt"
 import { lazy } from "../../util/lazy"
 import { errors } from "../error"
 

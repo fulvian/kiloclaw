@@ -40,12 +40,12 @@ import { Control } from "@/control"
 import { ConfigPaths } from "./paths"
 import { Filesystem } from "@/util/filesystem"
 
-import { ModesMigrator } from "../kilocaw/modes-migrator" // kilocode_change
+import { ModesMigrator } from "../kilocaw-legacy/modes-migrator" // kilocode_change
 import { fetchOrganizationModes } from "@kilocode/kilo-gateway" // kilocode_change
-import { RulesMigrator } from "../kilocaw/rules-migrator" // kilocode_change
-import { WorkflowsMigrator } from "../kilocaw/workflows-migrator" // kilocode_change
-import { McpMigrator } from "../kilocaw/mcp-migrator" // kilocode_change
-import { IgnoreMigrator } from "../kilocaw/ignore-migrator" // kilocode_change
+import { RulesMigrator } from "../kilocaw-legacy/rules-migrator" // kilocode_change
+import { WorkflowsMigrator } from "../kilocaw-legacy/workflows-migrator" // kilocode_change
+import { McpMigrator } from "../kilocaw-legacy/mcp-migrator" // kilocode_change
+import { IgnoreMigrator } from "../kilocaw-legacy/ignore-migrator" // kilocode_change
 
 export namespace Config {
   const ModelId = z.string().meta({ $ref: "https://models.dev/model-schema.json#/$defs/Model" })
