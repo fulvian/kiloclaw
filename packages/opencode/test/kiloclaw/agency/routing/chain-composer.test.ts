@@ -1,8 +1,8 @@
 import { test, expect, beforeEach, afterEach, describe } from "bun:test"
-import { ChainComposer, ChainCompositionError } from "../../../src/kiloclaw/agency/routing/chain-composer"
-import { SkillRegistry } from "../../../src/kiloclaw/agency/registry/skill-registry"
-import { ChainRegistry } from "../../../src/kiloclaw/agency/registry/chain-registry"
-import type { SkillDefinition, SkillChain } from "../../../src/kiloclaw/agency/registry/types"
+import { ChainComposer, ChainCompositionError } from "../../../../src/kiloclaw/agency/routing/chain-composer"
+import { SkillRegistry } from "../../../../src/kiloclaw/agency/registry/skill-registry"
+import { ChainRegistry } from "../../../../src/kiloclaw/agency/registry/chain-registry"
+import type { SkillDefinition, SkillChain } from "../../../../src/kiloclaw/agency/registry/types"
 
 // Helper to create a minimal skill
 function createSkill(override: Partial<SkillDefinition> = {}): SkillDefinition {
@@ -96,8 +96,8 @@ describe("ChainComposer", () => {
 
       expect(result).not.toBeNull()
       expect(result!.steps).toHaveLength(2)
-      expect(result!.steps[0].skillId).toBe("search")
-      expect(result!.steps[1].skillId).toBe("analyze")
+      expect(result!.steps[0]!.skillId).toBe("search")
+      expect(result!.steps[1]!.skillId).toBe("analyze")
     })
 
     test("given existing chain when compose then prefers existing", () => {
@@ -127,7 +127,7 @@ describe("ChainComposer", () => {
 
       expect(result).not.toBeNull()
       expect(result!.steps).toHaveLength(1)
-      expect(result!.steps[0].skillId).toBe("multi")
+      expect(result!.steps[0]!.skillId).toBe("multi")
     })
 
     test("given single capability when compose then returns single step chain", () => {
@@ -138,7 +138,7 @@ describe("ChainComposer", () => {
 
       expect(result).not.toBeNull()
       expect(result!.steps).toHaveLength(1)
-      expect(result!.steps[0].skillId).toBe("search")
+      expect(result!.steps[0]!.skillId).toBe("search")
     })
 
     test("given no matching skills when compose then returns null", () => {

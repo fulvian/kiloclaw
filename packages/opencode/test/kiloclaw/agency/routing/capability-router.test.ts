@@ -3,17 +3,17 @@ import {
   CapabilityRouter,
   CapabilityDeniedError,
   NoMatchingCapabilityError,
-} from "../../../src/kiloclaw/agency/routing/capability-router"
-import { SkillRegistry } from "../../../src/kiloclaw/agency/registry/skill-registry"
-import { FlexibleAgentRegistry } from "../../../src/kiloclaw/agency/registry/agent-registry"
-import { AgencyRegistry } from "../../../src/kiloclaw/agency/registry/agency-registry"
-import { ChainRegistry } from "../../../src/kiloclaw/agency/registry/chain-registry"
+} from "../../../../src/kiloclaw/agency/routing/capability-router"
+import { SkillRegistry } from "../../../../src/kiloclaw/agency/registry/skill-registry"
+import { FlexibleAgentRegistry } from "../../../../src/kiloclaw/agency/registry/agent-registry"
+import { AgencyRegistry } from "../../../../src/kiloclaw/agency/registry/agency-registry"
+import { ChainRegistry } from "../../../../src/kiloclaw/agency/registry/chain-registry"
 import type {
   SkillDefinition,
   FlexibleAgentDefinition,
   AgencyDefinition,
   SkillChain,
-} from "../../../src/kiloclaw/agency/registry/types"
+} from "../../../../src/kiloclaw/agency/registry/types"
 
 // Helper to create a minimal skill
 function createSkill(override: Partial<SkillDefinition> = {}): SkillDefinition {
@@ -109,7 +109,7 @@ describe("CapabilityRouter", () => {
 
       const result = CapabilityRouter.findSkillsForCapabilities(["search"])
       expect(result).toHaveLength(1)
-      expect(result[0].id).toBe("web-search")
+      expect(result[0]!.id).toBe("web-search")
     })
 
     test("given multiple skills when find by capability then returns matching", () => {
@@ -123,7 +123,7 @@ describe("CapabilityRouter", () => {
 
       const result = CapabilityRouter.findSkillsForCapabilities(["search"])
       expect(result).toHaveLength(1)
-      expect(result[0].id).toBe("web-search")
+      expect(result[0]!.id).toBe("web-search")
     })
 
     test("given skills with overlapping capabilities when find then returns intersection", () => {
@@ -164,7 +164,7 @@ describe("CapabilityRouter", () => {
 
       const result = CapabilityRouter.findAgentsForCapabilities(["coding"])
       expect(result).toHaveLength(1)
-      expect(result[0].id).toBe("coder")
+      expect(result[0]!.id).toBe("coder")
     })
 
     test("given multiple agents when find then scores and ranks", () => {
@@ -183,8 +183,8 @@ describe("CapabilityRouter", () => {
       const result = CapabilityRouter.findAgentsForCapabilities(["coding", "review", "debugging", "testing"])
       expect(result).toHaveLength(2)
       // coder has 3/4 match, reviewer has 1/4 match
-      expect(result[0].id).toBe("coder")
-      expect(result[1].id).toBe("reviewer")
+      expect(result[0]!.id).toBe("coder")
+      expect(result[1]!.id).toBe("reviewer")
     })
 
     test("given agency filter when find then filters by agency", () => {
@@ -204,7 +204,7 @@ describe("CapabilityRouter", () => {
 
       const result = CapabilityRouter.findAgentsForCapabilities(["coding"], "development")
       expect(result).toHaveLength(1)
-      expect(result[0].id).toBe("dev-coder")
+      expect(result[0]!.id).toBe("dev-coder")
     })
 
     test("given agents in multiple agencies when list by agency then includes secondary agencies", () => {
@@ -225,7 +225,7 @@ describe("CapabilityRouter", () => {
 
       const result = FlexibleAgentRegistry.getAgentsByAgency("knowledge")
       expect(result).toHaveLength(1)
-      expect(result[0].id).toBe("cross-agent")
+      expect(result[0]!.id).toBe("cross-agent")
     })
   })
 
@@ -266,7 +266,7 @@ describe("CapabilityRouter", () => {
       const intent = {
         intent: "research",
         parameters: { capabilities: ["search", "analyze"] },
-        context: {},
+        context: { urgency: "medium" as const },
       }
 
       const result = CapabilityRouter.composeChain(intent)
@@ -283,22 +283,22 @@ describe("CapabilityRouter", () => {
 
       const intent = {
         intent: "research",
-        parameters: { capabilities: ["search"] },
-        context: {},
+        parameters: { capabilities: ["search", "analyze"] },
+        context: { urgency: "medium" as const },
       }
 
       const result = CapabilityRouter.composeChain(intent)
       expect(result).not.toBeNull()
       expect(result!.id).toBe("composed-search")
       expect(result!.steps).toHaveLength(1)
-      expect(result!.steps[0].skillId).toBe("search")
+      expect(result!.steps[0]!.skillId).toBe("search")
     })
 
     test("given no matching skills when compose then returns null", () => {
       const intent = {
         intent: "unknown",
         parameters: { capabilities: ["nonexistent"] },
-        context: {},
+        context: { urgency: "medium" as const },
       }
 
       const result = CapabilityRouter.composeChain(intent)
@@ -309,7 +309,7 @@ describe("CapabilityRouter", () => {
       const intent = {
         intent: "test",
         parameters: {},
-        context: {},
+        context: { urgency: "medium" as const },
       }
 
       const result = CapabilityRouter.composeChain(intent)
@@ -328,7 +328,7 @@ describe("CapabilityRouter", () => {
       const intent = {
         intent: "search",
         parameters: { capabilities: ["search"] },
-        context: {},
+        context: { urgency: "medium" as const },
       }
 
       const result = CapabilityRouter.routeTask(intent)
@@ -353,7 +353,7 @@ describe("CapabilityRouter", () => {
       const intent = {
         intent: "code-debug",
         parameters: { capabilities: ["coding", "debugging"] },
-        context: {},
+        context: { urgency: "medium" as const },
       }
 
       const result = CapabilityRouter.routeTask(intent)
@@ -371,7 +371,7 @@ describe("CapabilityRouter", () => {
       const intent = {
         intent: "research",
         parameters: { capabilities: ["search", "analyze"] },
-        context: {},
+        context: { urgency: "medium" as const },
       }
 
       const result = CapabilityRouter.routeTask(intent)
@@ -390,7 +390,7 @@ describe("CapabilityRouter", () => {
       const intent = {
         intent: "complex-task",
         parameters: {},
-        context: {},
+        context: { urgency: "medium" as const },
       }
 
       // Since intent is "complex-task", capabilities extracted will be ["complex-task"]
@@ -417,7 +417,7 @@ describe("CapabilityRouter", () => {
       const intent = {
         intent: "task",
         parameters: { capabilities: ["network", "search"] },
-        context: {},
+        context: { urgency: "medium" as const },
       }
 
       expect(() => CapabilityRouter.routeTask(intent, "dev-agency")).toThrow(CapabilityDeniedError)
@@ -446,7 +446,7 @@ describe("CapabilityRouter", () => {
       const intent = {
         intent: "web-search",
         parameters: { capabilities: ["web", "search"] },
-        context: {},
+        context: { urgency: "medium" as const },
       }
 
       // Should succeed because web and search are not denied
@@ -459,7 +459,7 @@ describe("CapabilityRouter", () => {
       const intent = {
         intent: "completely-unknown-task",
         parameters: {},
-        context: {},
+        context: { urgency: "medium" as const },
       }
 
       expect(() => CapabilityRouter.routeTask(intent)).toThrow(NoMatchingCapabilityError)

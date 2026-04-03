@@ -1,6 +1,6 @@
 import { test, expect, describe } from "bun:test"
-import { IntentClassifier } from "../../../src/kiloclaw/agency/routing/intent-classifier"
-import { migrateLegacyTaskType } from "../../../src/kiloclaw/agency/routing/types"
+import { IntentClassifier } from "../../../../src/kiloclaw/agency/routing/intent-classifier"
+import { migrateLegacyTaskType } from "../../../../src/kiloclaw/agency/routing/types"
 
 describe("IntentClassifier", () => {
   describe("classify", () => {
