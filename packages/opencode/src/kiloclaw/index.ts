@@ -2,6 +2,7 @@
 
 export * from "./types"
 export * from "./agency"
+export * from "./agency/index"
 export * from "./agent"
 export * from "./skill"
 export * from "./tool"

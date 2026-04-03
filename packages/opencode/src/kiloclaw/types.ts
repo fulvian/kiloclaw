@@ -117,3 +117,26 @@ export const AgencyAssignment = z.object({
   reason: z.string().optional(),
 })
 export type AgencyAssignment = z.infer<typeof AgencyAssignment>
+
+// Re-export flexible agency types from agency module
+export type { TaskIntent, RouteResult } from "./agency/routing/types"
+export { TaskIntentSchema, RouteResultSchema, migrateLegacyTaskType } from "./agency/routing/types"
+
+export type {
+  SkillDefinition,
+  SkillChain,
+  SkillChainStep,
+  AgencyDefinition,
+  AgencyPolicies,
+  FlexibleAgentDefinition,
+  AgentConstraints,
+} from "./agency/registry/types"
+export {
+  SkillDefinitionSchema,
+  SkillChainSchema,
+  SkillChainStepSchema,
+  AgencyDefinitionSchema,
+  AgencyPoliciesSchema,
+  FlexibleAgentDefinitionSchema,
+  AgentConstraintsSchema,
+} from "./agency/registry/types"

@@ -12,68 +12,185 @@ Il perimetro 2026 è SOTA su orchestrazione multi-agente, osservabilità complet
 
 ## 2. Imposta principi
 
-1) **Compliance-first**: ogni azione è valutata contro policy legali, privacy, sicurezza e consenso utente.
+1. **Compliance-first**: ogni azione è valutata contro policy legali, privacy, sicurezza e consenso utente.
 
-2) **Verifiability-first**: ogni output critico deve essere tracciabile a evidenze, fonti o run log.
+2. **Verifiability-first**: ogni output critico deve essere tracciabile a evidenze, fonti o run log.
 
-3) **Isolation-by-default**: processi, namespace, config, storage e telemetria sono separati da KiloCode.
+3. **Isolation-by-default**: processi, namespace, config, storage e telemetria sono separati da KiloCode.
 
-4) **Safe proactivity**: iniziativa autonoma consentita solo dentro guardrail dinamici e budget di rischio.
+4. **Safe proactivity**: iniziativa autonoma consentita solo dentro guardrail dinamici e budget di rischio.
 
-5) **Least privilege runtime**: tool, MCP e integrazioni partono senza permessi e scalano per autorizzazione esplicita.
+5. **Least privilege runtime**: tool, MCP e integrazioni partono senza permessi e scalano per autorizzazione esplicita.
 
-6) **Memory as system**: la memoria non è accessoria, ma layer portante di routing, planning e personalizzazione.
+6. **Memory as system**: la memoria non è accessoria, ma layer portante di routing, planning e personalizzazione.
 
-7) **Agency governance**: ogni agency ha KPI, policy e audit path separati.
+7. **Agency governance**: ogni agency ha KPI, policy e audit path separati.
 
-8) **Evoluzione incrementale**: migrazione da ARIA e KiloCode in step compatibili e reversibili.
+8. **Evoluzione incrementale**: migrazione da ARIA e KiloCode in step compatibili e reversibili.
 
 ---
 
 ## 3. Progetta architettura target
 
-L’architettura segue la gerarchia obbligatoria: **Core Orchestrator -> Agencies -> Agents -> Skills -> Tools/MCP**. Il Core governa routing, policy enforcement, memoria globale, scheduling e osservabilità.
+L'architettura segue la gerarchia obbligatoria: **Intent → Core Orchestrator → Agencies → Agents → Skills → Tools/MCP**. Il Core governa routing, policy enforcement, memoria globale, scheduling e osservabilità con capability-based routing.
 
 ```text
 +---------------------------------------------------------------+
-|                     KILOCLAW CORE ORCHESTRATOR               |
-| intent routing | policy engine | memory broker | scheduler    |
+|                         INTENT (natural language)            |
 +------------------------------+--------------------------------+
                                |
-              +----------------+----------------+
-              |                |                |
-      +-------v------+  +------v-------+  +-----v-------+
-      |  Agency Dev  |  | Agency Know. |  | Agency Nutri|
-      +------+-------+  +------+-------+  +------+------+
-             |                 |                 |
-      +------v------+   +------v------+   +------v------+
-      | Agents      |   | Agents      |   | Agents      |
-      +------+------+
-             |
-      +------v---------------------------------------------+
-      | Skills layer (planning, review, retrieval, etc.)   |
-      +------+----------------------------------------------+
-             |
-      +------v----------------------------------------------+
-      | Tools + MCP (fs, git, web, APIs, connectors)       |
-      +-----------------------------------------------------+
+               +---------------v----------------+
+               |    KILOCLAW CORE ORCHESTRATOR  |
+               |  Intent Classifier              |
+               |  Capability Router  ←-- NEW    |
+               |  Policy Engine                  |
+               |  Memory Broker                  |
+               |  Scheduler                      |
+               +---------------+----------------+
+                               |
+               +---------------v----------------+
+               |         AGENCIES               |
+               |  Governance boundaries with:    |
+               |  - Policies (allowed/denied)   |
+               |  - Providers (API keys, limits) |
+               |  - Domain context               |
+               |  - Audit trail                  |
+               +---------------+----------------+
+                               |
+               +---------------v----------------+
+               |         AGENTS                  |
+               |  Capability bundles that:      |
+               |  - Can belong to multiple       |
+               |    agencies (cross-agency)     |
+               |  - Declare capabilities         |
+               |  - Use skills dynamically      |
+               +---------------+----------------+
+                               |
+               +---------------v----------------+
+               |    SKILL REGISTRY (Dynamic)     |
+               |  Versioned capabilities with:   |
+               |  - Input/output schemas        |
+               |  - Capability tags (flexible)  |
+               |  - Composition support (chains)|
+               |  - Runtime registration         |
+               +---------------+----------------+
+                               |
+               +---------------v----------------+
+               |      TOOL/MCP LAYER             |
+               |  Tavily | Brave | Firecrawl |   |
+               |  USDA | OpenWeatherMap | MCP    |
+               +-------------------------------+
 ```
 
 ### 3.1 Definisci responsabilità gerarchiche
 
-- **Core Orchestrator**: classifica intent, assegna agency, applica policy e unifica memoria.
-- **Agency**: coordina un dominio funzionale con autonomia operativa limitata.
-- **Agent**: esegue task specializzati con capacità e limiti dichiarati.
-- **Skill**: capability riusabile versionata, composabile in pipeline.
-- **Tools/MCP**: livello di esecuzione esterno con controlli di permissioning e audit.
+- **Intent**: Natural language input with context (domain, urgency, preferences, correlation ID)
+- **Core Orchestrator**: Classifica intent, assegna agency, applica policy e unifica memoria. Include **CapabilityRouter** per routing basato su capabilities invece che su tipi fissi.
+- **Agency**: Coordina un dominio funzionale con autonomia operativa limitata da policy governance.
+- **Agent**: Esegue task specializzati con capacità dichiarate come capability tags flessibili.
+- **Skill**: Capability riusabile versionata con schema I/O JSON, composabile in pipeline (SkillChain).
+- **Tools/MCP**: Livello di esecuzione esterno con controlli di permissioning e audit.
 
-### 3.2 Definisci ciclo esecuzione
+### 3.2 Tipi Flessibili (Capability-Based)
+
+I tipi chiusi (enum) vengono sostituiti con tipi flessibili per enable estensibilità runtime:
+
+```typescript
+// TaskIntent - invece di TaskType enum chiuso
+const TaskIntent = z.object({
+  intent: z.string(),                    // "search", "analyze", "generate", ANY
+  parameters: z.record(z.unknown()),    // Parametri dinamici
+  context: z.object({
+    domain: z.string().optional(),      // Agency domain context
+    urgency: z.enum(["low", "medium", "high"]).optional(),
+    preferences: z.record(z.unknown()).optional(),
+    correlationId: z.string().optional(),
+  }),
+})
+
+// SkillDefinition - capability con metadata
+const SkillDefinition = z.object({
+  id: SkillId,
+  name: z.string(),
+  version: SemanticVersion,
+  inputSchema: JsonSchema,
+  outputSchema: JsonSchema,
+  capabilities: z.array(z.string()),    // Tag flessibili: ["search", "web"]
+  tags: z.array(z.string()),            // Dominio: ["knowledge", "research"]
+  requires: z.array(z.string()).optional(),
+  execute(input: unknown, context: SkillContext): Promise<unknown>
+})
+
+// SkillChain - composizione dinamica
+const SkillChain = z.object({
+  id: z.string(),
+  steps: z.array(z.object({
+    skillId: z.string(),
+    inputTransform: z.function().optional(),
+    outputTransform: z.function().optional(),
+    condition: z.string().optional(),
+  })),
+  outputSchema: JsonSchema,
+})
+```
+
+### 3.3 Routing Architettura
+
+**CapabilityRouter** (invece di TaskType matching):
+
+```typescript
+class CapabilityRouter {
+  findSkillsForCapabilities(required: string[]): SkillDefinition[]
+  findAgentsForCapabilities(required: string[], agency?: string): AgentDefinition[]
+  composeChain(taskIntent: TaskIntent): SkillChain | SkillDefinition
+  matchScore(agent: AgentDefinition, required: string[]): number
+}
+```
+
+### 3.4 Percorso Migrazione
+
+| Fase    | Obiettivo                                       | Compatibilità    |
+| ------- | ----------------------------------------------- | ---------------- |
+| Phase 1 | Aggiungere capability tags alle skill esistenti | Non-breaking     |
+| Phase 2 | Rendere TaskType flessibile (graduale)          | Backwards compat |
+| Phase 3 | Implementare Skill Chains                       | Nuova feature    |
+| Phase 4 | Runtime registration                            | Nuova feature    |
+| Phase 5 | Rimuovere legacy (opzionale)                    | Breaking finale  |
+
+### 3.5 Ciclo Esecuzione with Capability Routing
 
 ```text
-[User/Event] -> [Intent+Risk Scoring] -> [Agency Routing]
-      -> [Agent Plan] -> [Skill Chain] -> [Tool/MCP Calls]
+[User/Event] -> [Intent Classification]
+      -> [Capability Router: find skills/agents by capabilities]
+      -> [Score-based matching with threshold]
+      -> [Compose Skill Chain if needed] -> [Agency Policy Gate]
+      -> [Agent Plan] -> [Skill Chain Execution] -> [Tool/MCP Calls]
       -> [Evidence Check] -> [Policy Gate] -> [Response/Action]
       -> [Memory Writeback + Audit Log]
+```
+
+### 3.6 Struttura File (Nuovi Moduli)
+
+```
+packages/opencode/src/kiloclaw/
+├── agency/
+│   ├── catalog.ts           # Keep
+│   ├── key-pool.ts          # Keep
+│   ├── index.ts             # Update exports
+│   ├── types.ts             # REFACTOR: Add flexible types
+│   │
+│   ├── registry/            # NEW: Dynamic registries
+│   │   ├── skill-registry.ts
+│   │   ├── agent-registry.ts
+│   │   ├── agency-registry.ts
+│   │   └── chain-registry.ts
+│   │
+│   ├── routing/             # NEW: Capability routing
+│   │   ├── capability-router.ts
+│   │   ├── intent-classifier.ts
+│   │   └── chain-composer.ts
+│   │
+│   └── agents/             # Keep existing agents, update types
 ```
 
 ---
@@ -84,20 +201,20 @@ I quattro layer sono obbligatori e indipendenti per storage, retention e retriev
 
 ### 4.1 Definisci layer
 
-| Layer | Scopo | TTL/Retention | Storage target | Accesso primario |
-|---|---|---|---|---|
-| Working | Contesto operativo live di sessione | minuti/ore | in-memory + cache locale | agent runtime |
-| Episodic | Eventi e task conclusi con timeline | 30-180 giorni | event store append-only | orchestrator + analytics |
-| Semantic | Fatti consolidati e conoscenza utente/sistema | lungo termine con review periodica | vector + graph + docs store | retrieval cross-agency |
-| Procedural | Strategie, playbook, policy e skill patterns | versionato, senza scadenza automatica | registry versioned | planner + skill engine |
+| Layer      | Scopo                                         | TTL/Retention                         | Storage target              | Accesso primario         |
+| ---------- | --------------------------------------------- | ------------------------------------- | --------------------------- | ------------------------ |
+| Working    | Contesto operativo live di sessione           | minuti/ore                            | in-memory + cache locale    | agent runtime            |
+| Episodic   | Eventi e task conclusi con timeline           | 30-180 giorni                         | event store append-only     | orchestrator + analytics |
+| Semantic   | Fatti consolidati e conoscenza utente/sistema | lungo termine con review periodica    | vector + graph + docs store | retrieval cross-agency   |
+| Procedural | Strategie, playbook, policy e skill patterns  | versionato, senza scadenza automatica | registry versioned          | planner + skill engine   |
 
 ### 4.2 Definisci lifecycle dati
 
-1) **Capture**: ogni run produce artefatti minimi (intent, plan, evidenze, outcome).  
-2) **Classify**: il broker assegna layer, sensibilità e livello di confidenza.  
-3) **Retain**: retention policy per layer, dominio e tipo dato.  
-4) **Refresh**: consolidamento periodico episodic -> semantic/procedural.  
-5) **Purge**: cancellazione sicura per scadenza, diritto oblio o policy breach.
+1. **Capture**: ogni run produce artefatti minimi (intent, plan, evidenze, outcome).
+2. **Classify**: il broker assegna layer, sensibilità e livello di confidenza.
+3. **Retain**: retention policy per layer, dominio e tipo dato.
+4. **Refresh**: consolidamento periodico episodic -> semantic/procedural.
+5. **Purge**: cancellazione sicura per scadenza, diritto oblio o policy breach.
 
 ### 4.3 Definisci retrieval policy
 
@@ -148,16 +265,16 @@ L’isolamento deve essere totale su identità applicativa, filesystem, telemetr
 
 ### 6.1 Applica separazione tecnica
 
-| Dominio | KiloCode (legacy/fork source) | Kiloclaw target (obbligatorio) |
-|---|---|---|
-| Namespace runtime | `kilocode` / `opencode` | `kiloclaw` |
-| Config prefix env | `KILO_*`, `OPENCODE_*` | `KILOCLAW_*` |
-| Data dir | percorsi KiloCode locali | `~/.kiloclaw/` dedicato |
-| Binary | `kilo` | `kiloclaw` |
-| Branding UI/CLI | nomi/loghi upstream | identità Kiloclaw |
-| Telemetria | endpoint/progetto KiloCode | pipeline dedicata, chiavi dedicate |
-| Provider keys | variabili condivise | secret namespace Kiloclaw |
-| Marketplace/registry | feed upstream | catalogo Kiloclaw o mirror controllato |
+| Dominio              | KiloCode (legacy/fork source) | Kiloclaw target (obbligatorio)         |
+| -------------------- | ----------------------------- | -------------------------------------- |
+| Namespace runtime    | `kilocode` / `opencode`       | `kiloclaw`                             |
+| Config prefix env    | `KILO_*`, `OPENCODE_*`        | `KILOCLAW_*`                           |
+| Data dir             | percorsi KiloCode locali      | `~/.kiloclaw/` dedicato                |
+| Binary               | `kilo`                        | `kiloclaw`                             |
+| Branding UI/CLI      | nomi/loghi upstream           | identità Kiloclaw                      |
+| Telemetria           | endpoint/progetto KiloCode    | pipeline dedicata, chiavi dedicate     |
+| Provider keys        | variabili condivise           | secret namespace Kiloclaw              |
+| Marketplace/registry | feed upstream                 | catalogo Kiloclaw o mirror controllato |
 
 ### 6.2 Definisci invarianti di isolamento
 
@@ -170,25 +287,44 @@ L’isolamento deve essere totale su identità applicativa, filesystem, telemetr
 
 ## 7. Mappa agencies iniziali
 
-La base concettuale ARIA viene migrata nel Core TS target (`packages/opencode/src/**`) con priorità alle quattro agency iniziali. Le agency future entrano tramite registry versionato e policy contract.
+La base concettuale ARIA viene migrata nel Core TS target (`packages/opencode/src/**`) con priorità alle quattro agency iniziali. Le agency future entrano tramite **registry versionato** e policy contract con **capability-based routing**.
 
 ### 7.1 Definisci matrice iniziale
 
-| Agency | Origine ARIA | Missione in Kiloclaw | Stato migrazione |
-|---|---|---|---|
-| development | presente | coding, review, test, delivery assistita | wave 1 |
-| knowledge | presente | ricerca, sintesi, grounding, knowledge ops | wave 1 |
-| nutrition | presente | piani nutrizionali, tracking, suggerimenti contestuali | wave 2 |
-| weather | presente | forecast, alert meteo, impatti attività | wave 2 |
+| Agency      | Origine ARIA | Missione in Kiloclaw                                   | Stato migrazione |
+| ----------- | ------------ | ------------------------------------------------------ | ---------------- |
+| development | presente     | coding, review, test, delivery assistita               | wave 1           |
+| knowledge   | presente     | ricerca, sintesi, grounding, knowledge ops             | wave 1           |
+| nutrition   | presente     | piani nutrizionali, tracking, suggerimenti contestuali | wave 2           |
+| weather     | presente     | forecast, alert meteo, impatti attività                | wave 2           |
 
-### 7.2 Pianifica espansione
+### 7.2 Pianifica espansione (con Capability Registry)
 
-| Agency futura | Obiettivo | Dipendenze principali |
-|---|---|---|
-| creative | contenuti, design, brainstorming | media tools, style memory |
-| productivity | planning, routine, reminder intelligenti | scheduler, calendar connectors |
-| personal | benessere, finanza personale, life ops | privacy tiers elevati |
-| analytics | insight dati, forecasting operativo | data connectors, report engine |
+| Agency futura | Obiettivo                                | Dipendenze principali          | Capability Tags                              |
+| ------------- | ---------------------------------------- | ------------------------------ | -------------------------------------------- |
+| creative      | contenuti, design, brainstorming         | media tools, style memory      | `["creative", "content", "design"]`          |
+| productivity  | planning, routine, reminder intelligenti | scheduler, calendar connectors | `["planning", "scheduling", "productivity"]` |
+| personal      | benessere, finanza personale, life ops   | privacy tiers elevati          | `["personal", "finance", "wellbeing"]`       |
+| analytics     | insight dati, forecasting operativo      | data connectors, report engine | `["analytics", "data", "forecasting"]`       |
+
+### 7.3 Agency Domain Flessibile
+
+Gli agency domain non sono più enum chiusi ma **stringe flessibili** validate via schema:
+
+```typescript
+const AgencyDefinition = z.object({
+  id: AgencyId,
+  name: z.string(),
+  domain: z.string(), // "knowledge", "development", "nutrition", "custom:anything"
+  policies: z.object({
+    allowedCapabilities: z.array(z.string()),
+    deniedCapabilities: z.array(z.string()),
+    // ...
+  }),
+  providers: z.array(z.string()),
+  metadata: z.record(z.unknown()),
+})
+```
 
 ---
 
@@ -198,22 +334,22 @@ La migrazione config da ARIA a Kiloclaw deve essere deterministica, versionata e
 
 ### 8.1 Definisci schema map env
 
-| ARIA env | Kiloclaw env | Regola migrazione |
-|---|---|---|
-| `ARIA_ENABLED` | `KILOCLAW_CORE_ENABLED` | cast bool diretto |
-| `ARIA_ROUTING_DEFAULT_AGENCY` | `KILOCLAW_ROUTING_DEFAULT_AGENCY` | enum validate |
-| `ARIA_ROUTING_CONFIDENCE_THRESHOLD` | `KILOCLAW_ROUTING_CONFIDENCE` | clamp [0,1] |
-| `ARIA_ROUTING_ENABLE_FALLBACK` | `KILOCLAW_ROUTING_FALLBACK` | bool diretto |
-| `ARIA_AGENCIES_DEVELOPMENT_ENABLED` | `KILOCLAW_AGENCY_DEVELOPMENT_ENABLED` | bool diretto |
-| `ARIA_AGENCIES_KNOWLEDGE_ENABLED` | `KILOCLAW_AGENCY_KNOWLEDGE_ENABLED` | bool diretto |
-| `ARIA_AGENCIES_NUTRITION_ENABLED` | `KILOCLAW_AGENCY_NUTRITION_ENABLED` | bool diretto |
-| `ARIA_AGENCIES_WEATHER_ENABLED` | `KILOCLAW_AGENCY_WEATHER_ENABLED` | bool diretto |
-| `ARIA_SCHEDULER_MAX_CONCURRENT_TASKS` | `KILOCLAW_SCHED_MAX_CONCURRENT` | min 1, max policy |
-| `ARIA_SCHEDULER_DEFAULT_PRIORITY` | `KILOCLAW_SCHED_DEFAULT_PRIORITY` | range 0-100 |
-| `ARIA_SCHEDULER_DISPATCH_INTERVAL_MS` | `KILOCLAW_SCHED_DISPATCH_MS` | min 100 |
-| `ARIA_SCHEDULER_RECOVERY_POLICY` | `KILOCLAW_SCHED_RECOVERY_POLICY` | enum strict |
-| `ARIA_GUARDRAILS_ALLOW_PROACTIVE` | `KILOCLAW_PROACTIVE_ENABLED` | bool + policy gate |
-| `ARIA_GUARDRAILS_MAX_DAILY_ACTIONS` | `KILOCLAW_PROACTIVE_DAILY_BUDGET` | min 0 |
+| ARIA env                              | Kiloclaw env                          | Regola migrazione  |
+| ------------------------------------- | ------------------------------------- | ------------------ |
+| `ARIA_ENABLED`                        | `KILOCLAW_CORE_ENABLED`               | cast bool diretto  |
+| `ARIA_ROUTING_DEFAULT_AGENCY`         | `KILOCLAW_ROUTING_DEFAULT_AGENCY`     | enum validate      |
+| `ARIA_ROUTING_CONFIDENCE_THRESHOLD`   | `KILOCLAW_ROUTING_CONFIDENCE`         | clamp [0,1]        |
+| `ARIA_ROUTING_ENABLE_FALLBACK`        | `KILOCLAW_ROUTING_FALLBACK`           | bool diretto       |
+| `ARIA_AGENCIES_DEVELOPMENT_ENABLED`   | `KILOCLAW_AGENCY_DEVELOPMENT_ENABLED` | bool diretto       |
+| `ARIA_AGENCIES_KNOWLEDGE_ENABLED`     | `KILOCLAW_AGENCY_KNOWLEDGE_ENABLED`   | bool diretto       |
+| `ARIA_AGENCIES_NUTRITION_ENABLED`     | `KILOCLAW_AGENCY_NUTRITION_ENABLED`   | bool diretto       |
+| `ARIA_AGENCIES_WEATHER_ENABLED`       | `KILOCLAW_AGENCY_WEATHER_ENABLED`     | bool diretto       |
+| `ARIA_SCHEDULER_MAX_CONCURRENT_TASKS` | `KILOCLAW_SCHED_MAX_CONCURRENT`       | min 1, max policy  |
+| `ARIA_SCHEDULER_DEFAULT_PRIORITY`     | `KILOCLAW_SCHED_DEFAULT_PRIORITY`     | range 0-100        |
+| `ARIA_SCHEDULER_DISPATCH_INTERVAL_MS` | `KILOCLAW_SCHED_DISPATCH_MS`          | min 100            |
+| `ARIA_SCHEDULER_RECOVERY_POLICY`      | `KILOCLAW_SCHED_RECOVERY_POLICY`      | enum strict        |
+| `ARIA_GUARDRAILS_ALLOW_PROACTIVE`     | `KILOCLAW_PROACTIVE_ENABLED`          | bool + policy gate |
+| `ARIA_GUARDRAILS_MAX_DAILY_ACTIONS`   | `KILOCLAW_PROACTIVE_DAILY_BUDGET`     | min 0              |
 
 ### 8.2 Applica policy env e secret
 
@@ -224,11 +360,11 @@ La migrazione config da ARIA a Kiloclaw deve essere deterministica, versionata e
 
 ### 8.3 Definisci rollout migrazione
 
-1) Export controllato da ARIA config snapshot.  
-2) Transform con schema map versionato.  
-3) Validate con policy engine e test di bootstrap.  
-4) Activate solo su data-dir Kiloclaw pulito.  
-5) Verify con smoke test agency routing e memory write/read.
+1. Export controllato da ARIA config snapshot.
+2. Transform con schema map versionato.
+3. Validate con policy engine e test di bootstrap.
+4. Activate solo su data-dir Kiloclaw pulito.
+5. Verify con smoke test agency routing e memory write/read.
 
 ---
 
@@ -236,14 +372,14 @@ La migrazione config da ARIA a Kiloclaw deve essere deterministica, versionata e
 
 ### 9.1 Elenca rischi principali
 
-| Rischio | Impatto | Mitigazione |
-|---|---|---|
-| Drift da fork KiloCode | regressioni e coupling nascosto | boundary test + contract checks |
-| Memory over-retention | rischio privacy/compliance | retention hard policy + purge job |
-| Proattività aggressiva | perdita fiducia utente | risk budget + confirmation gate |
-| Tool sprawl non governato | superficie attacco ampia | capability registry + least privilege |
-| Config contamination | comportamento non deterministico | prefisso unico + validator strict |
-| Telemetry leakage | esposizione metadata | endpoint isolati + redaction |
+| Rischio                   | Impatto                          | Mitigazione                           |
+| ------------------------- | -------------------------------- | ------------------------------------- |
+| Drift da fork KiloCode    | regressioni e coupling nascosto  | boundary test + contract checks       |
+| Memory over-retention     | rischio privacy/compliance       | retention hard policy + purge job     |
+| Proattività aggressiva    | perdita fiducia utente           | risk budget + confirmation gate       |
+| Tool sprawl non governato | superficie attacco ampia         | capability registry + least privilege |
+| Config contamination      | comportamento non deterministico | prefisso unico + validator strict     |
+| Telemetry leakage         | esposizione metadata             | endpoint isolati + redaction          |
 
 ### 9.2 Evita anti-pattern
 
@@ -255,13 +391,16 @@ La migrazione config da ARIA a Kiloclaw deve essere deterministica, versionata e
 
 ### 9.3 Definisci criteri di accettazione
 
-1) Avvio Kiloclaw senza leggere config, data-dir o secret KiloCode locali.  
-2) Routing gerarchico funzionante su Core -> Agency -> Agent -> Skill -> Tool/MCP.  
-3) Memoria 4-layer attiva con retrieval policy verificabile via log.  
-4) Audit trail completo per ogni azione high-impact.  
-5) Migrazione ARIA config ripetibile e idempotente con report.  
-6) Guardrail proattivi con budget giornaliero e kill-switch testato.  
-7) Telemetria e branding completamente separati da KiloCode.
+1. Avvio Kiloclaw senza leggere config, data-dir o secret KiloCode locali.
+2. Routing gerarchico funzionante su Core -> Agency -> Agent -> Skill -> Tool/MCP.
+3. **CapabilityRouter** attivo: routing basato su capabilities invece che TaskType enum.
+4. Memoria 4-layer attiva con retrieval policy verificabile via log.
+5. Audit trail completo per ogni azione high-impact.
+6. Migrazione ARIA config ripetibile e idempotente con report.
+7. Guardrail proattivi con budget giornaliero e kill-switch testato.
+8. Telemetria e branding completamente separati da KiloCode.
+9. **SkillChain composition** supportata per pipeline dinamiche.
+10. **Runtime registration** di skills/agents/agencies (Phase 4).
 
 ---
 
@@ -269,16 +408,16 @@ La migrazione config da ARIA a Kiloclaw deve essere deterministica, versionata e
 
 ### 10.1 Differenze chiave ARIA vs KiloCode vs Kiloclaw
 
-| Asse | ARIA | KiloCode | Kiloclaw (target) |
-|---|---|---|---|
-| Natura | assistente autonomo in evoluzione | coding-agent CLI | assistente AI 360° sempre attivo |
-| Architettura | core + agency model iniziale | agent/tool centrico | orchestrazione gerarchica completa |
-| Dominio | multi-dominio con focus personale | sviluppo software | multi-dominio con governance enterprise-ready |
-| Memoria | framework 4-layer concettuale/implementato parziale | session/history orientata coding | 4-layer obbligatoria con lifecycle policy |
-| Proattività | presente con guardrail | limitata e reattiva | proattività sicura, misurata, auditabile |
-| Isolamento | standalone da open fork | prodotto sorgente | isolamento totale tecnico e operativo |
-| Compliance | design orientato | non primario come principio globale | compliance-first by architecture |
-| Verificabilità | presente in blueprint | tool/result oriented | verifiability-first end-to-end |
+| Asse           | ARIA                                                | KiloCode                            | Kiloclaw (target)                             |
+| -------------- | --------------------------------------------------- | ----------------------------------- | --------------------------------------------- |
+| Natura         | assistente autonomo in evoluzione                   | coding-agent CLI                    | assistente AI 360° sempre attivo              |
+| Architettura   | core + agency model iniziale                        | agent/tool centrico                 | orchestrazione gerarchica completa            |
+| Dominio        | multi-dominio con focus personale                   | sviluppo software                   | multi-dominio con governance enterprise-ready |
+| Memoria        | framework 4-layer concettuale/implementato parziale | session/history orientata coding    | 4-layer obbligatoria con lifecycle policy     |
+| Proattività    | presente con guardrail                              | limitata e reattiva                 | proattività sicura, misurata, auditabile      |
+| Isolamento     | standalone da open fork                             | prodotto sorgente                   | isolamento totale tecnico e operativo         |
+| Compliance     | design orientato                                    | non primario come principio globale | compliance-first by architecture              |
+| Verificabilità | presente in blueprint                               | tool/result oriented                | verifiability-first end-to-end                |
 
 ### 10.2 Definisci traiettoria finale
 

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test"
 import { tmpdir } from "../fixture/fixture"
 import { join } from "path"
+import z from "zod"
 import {
   // Types (Zod schemas - used as values)
   AgencyId,
@@ -63,7 +64,7 @@ const FIXTURES = {
   agentId: "agent-001" as AgentId,
   skillId: "skill-read" as SkillId,
   toolId: "tool-fs" as ToolId,
-  correlationId: "kiloclaw-test-001" as CorrelationId.CorrelationId,
+  correlationId: "kiloclaw-test-001" as z.infer<typeof CorrelationId.schema>,
   version: "1.0.0" as SemanticVersion,
 }
 
@@ -72,12 +73,12 @@ describe("Kiloclaw Core Runtime", () => {
     describe("types", () => {
       it("should validate agency ID type", () => {
         const result = AgencyId.parse("agency-123")
-        expect(result).toBe("agency-123")
+        expect(result).toBe("agency-123" as AgencyId)
       })
 
       it("should validate semantic version", () => {
         const result = SemanticVersion.parse("1.2.3")
-        expect(result).toBe("1.2.3")
+        expect(result).toBe("1.2.3" as SemanticVersion)
       })
 
       it("should reject invalid semantic version", () => {
@@ -387,7 +388,7 @@ describe("Kiloclaw Core Runtime", () => {
 
         const context: PolicyContext = {
           agencyId: FIXTURES.agencyId,
-          correlationId: FIXTURES.correlationId as unknown as (typeof CorrelationId)["type"],
+          correlationId: FIXTURES.correlationId,
         }
 
         const result = orchestrator.enforcePolicy(action, context)
@@ -538,7 +539,7 @@ describe("Kiloclaw Core Runtime", () => {
       }
 
       const result = await router.route(intent)
-      expect(result.agencyId).toBe("custom-agency")
+      expect(result.agencyId).toBe("custom-agency" as AgencyId)
     })
   })
 
@@ -794,7 +795,7 @@ describe("Kiloclaw Core Runtime", () => {
 
       const context: PolicyContext = {
         agencyId: FIXTURES.agencyId,
-        correlationId: FIXTURES.correlationId as CorrelationId.CorrelationId,
+        correlationId: FIXTURES.correlationId as z.infer<typeof CorrelationId.schema>,
       }
 
       // Policy should still allow (default behavior), but we can test the structure

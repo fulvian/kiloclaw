@@ -17,6 +17,85 @@ import {
   WEATHER_SKILL_COUNT,
   TOTAL_WAVE2_SKILL_COUNT,
 } from "@/kiloclaw/skills"
+import type { Skill } from "@/kiloclaw/skill"
+
+// Result type interfaces for wave2 skill execute() return types
+interface DietPlanResult {
+  plan: {
+    dailyCalories: number
+    meals: Array<{ name: string; foods: string[]; calories: number }>
+    recommendations: string[]
+  }
+  macros: { protein: number; carbs: number; fat: number }
+}
+
+interface NutritionAnalysisResult {
+  macros: { protein: number; carbs: number; fat: number }
+  score: number
+  serving_size: string
+  calories: number
+}
+
+interface FoodRecallResult {
+  recalls: Array<{ product: string; reason: string; date: string }>
+  severity: "none" | "low" | "medium" | "high" | "critical"
+  lastUpdated: string
+}
+
+interface RecipeSearchResult {
+  recipes: Array<{ name: string; prepTime: number; cookTime: number }>
+  nutrition: Array<{ calories: number; protein: number; carbs: number; fat: number }>
+  totalFound: number
+  searchTips: string[]
+}
+
+interface WeatherForecastResult {
+  forecast: Array<{
+    date: string
+    dayName: string
+    high: number
+    low: number
+    condition: string
+    precipitation: number
+    humidity: number
+  }>
+  location: string
+  timezone: string
+}
+
+interface WeatherAlertsResult {
+  alerts: Array<{
+    id: string
+    type: string
+    severity: string
+    headline: string
+    description: string
+    effective: string
+    expires: string
+  }>
+  severity: string
+  activeCount: number
+  lastUpdated: string
+}
+
+interface WeatherCurrentResult {
+  conditions: {
+    temperature: number
+    condition: string
+    humidity: number
+    windSpeed: number
+    windDirection: string
+    feelsLike: number
+    pressure: number
+    visibility: number
+    uvIndex: number
+    cloudCover: number
+  }
+  location: string
+  temp: number
+  localTime: string
+  observationTime: string
+}
 
 // Test fixtures
 const CORRELATION_ID = "test-correlation-wave2-001"
@@ -31,7 +110,7 @@ const SKILL_CONTEXT = {
 describe("WP4.3 Wave 2: Nutrition Agency Skills", () => {
   describe("diet-plan skill", () => {
     it("should have correct metadata", () => {
-      expect(DietPlanSkill.id).toBe("diet-plan")
+      expect(DietPlanSkill.id as string).toBe("diet-plan")
       expect(DietPlanSkill.version).toEqual("1.0.0")
       expect(DietPlanSkill.name).toBe("Diet Plan Generation")
       expect(DietPlanSkill.capabilities).toContain("plan_generation")
@@ -40,7 +119,7 @@ describe("WP4.3 Wave 2: Nutrition Agency Skills", () => {
     })
 
     it("should generate diet plan with valid profile", async () => {
-      const result = await DietPlanSkill.execute(
+      const result = (await DietPlanSkill.execute(
         {
           user_profile: {
             age: 30,
@@ -51,7 +130,7 @@ describe("WP4.3 Wave 2: Nutrition Agency Skills", () => {
           goals: [{ type: "weight_loss", priority: 1 }],
         },
         SKILL_CONTEXT,
-      )
+      )) as DietPlanResult
       expect(result).toHaveProperty("plan")
       expect(result).toHaveProperty("macros")
       expect(result.plan).toHaveProperty("dailyCalories")
@@ -70,23 +149,23 @@ describe("WP4.3 Wave 2: Nutrition Agency Skills", () => {
         activityLevel: "moderate" as const,
       }
 
-      const maintenanceResult = await DietPlanSkill.execute(
+      const maintenanceResult = (await DietPlanSkill.execute(
         { user_profile: baseProfile, goals: [{ type: "maintenance", priority: 1 }] },
         SKILL_CONTEXT,
-      )
-      const weightLossResult = await DietPlanSkill.execute(
+      )) as DietPlanResult
+      const weightLossResult = (await DietPlanSkill.execute(
         { user_profile: baseProfile, goals: [{ type: "weight_loss", priority: 1 }] },
         SKILL_CONTEXT,
-      )
+      )) as DietPlanResult
 
       expect(weightLossResult.plan.dailyCalories).toBeLessThan(maintenanceResult.plan.dailyCalories)
     })
 
     it("should handle invalid profile", async () => {
-      const result = await DietPlanSkill.execute(
+      const result = (await DietPlanSkill.execute(
         { user_profile: { age: 0, weight: 0, height: 0, activityLevel: "sedentary" }, goals: [] },
         SKILL_CONTEXT,
-      )
+      )) as DietPlanResult
       expect(result.plan).toBeDefined()
       expect(result.macros).toBeDefined()
     })
@@ -94,7 +173,7 @@ describe("WP4.3 Wave 2: Nutrition Agency Skills", () => {
 
   describe("nutrition-analysis skill", () => {
     it("should have correct metadata", () => {
-      expect(NutritionAnalysisSkill.id).toBe("nutrition-analysis")
+      expect(NutritionAnalysisSkill.id as string).toBe("nutrition-analysis")
       expect(NutritionAnalysisSkill.version).toEqual("1.0.0")
       expect(NutritionAnalysisSkill.name).toBe("Nutrition Analysis")
       expect(NutritionAnalysisSkill.capabilities).toContain("food_analysis")
@@ -103,10 +182,10 @@ describe("WP4.3 Wave 2: Nutrition Agency Skills", () => {
     })
 
     it("should analyze known food", async () => {
-      const result = await NutritionAnalysisSkill.execute(
+      const result = (await NutritionAnalysisSkill.execute(
         { food_item: "chicken breast", serving: "100g" },
         SKILL_CONTEXT,
-      )
+      )) as NutritionAnalysisResult
       expect(result).toHaveProperty("macros")
       expect(result).toHaveProperty("score")
       expect(result).toHaveProperty("serving_size")
@@ -115,29 +194,32 @@ describe("WP4.3 Wave 2: Nutrition Agency Skills", () => {
     })
 
     it("should parse different serving sizes", async () => {
-      const result1 = await NutritionAnalysisSkill.execute(
+      const result1 = (await NutritionAnalysisSkill.execute(
         { food_item: "chicken breast", serving: "100g" },
         SKILL_CONTEXT,
-      )
-      const result2 = await NutritionAnalysisSkill.execute(
+      )) as NutritionAnalysisResult
+      const result2 = (await NutritionAnalysisSkill.execute(
         { food_item: "chicken breast", serving: "200g" },
         SKILL_CONTEXT,
-      )
+      )) as NutritionAnalysisResult
 
       expect(result2.calories).toBeGreaterThan(result1.calories)
     })
 
     it("should return estimate for unknown food", async () => {
-      const result = await NutritionAnalysisSkill.execute(
+      const result = (await NutritionAnalysisSkill.execute(
         { food_item: "some random unknown food", serving: "100g" },
         SKILL_CONTEXT,
-      )
+      )) as NutritionAnalysisResult
       expect(result).toHaveProperty("macros")
       expect(result.score).toBeGreaterThan(0)
     })
 
     it("should handle empty food item", async () => {
-      const result = await NutritionAnalysisSkill.execute({ food_item: "", serving: "100g" }, SKILL_CONTEXT)
+      const result = (await NutritionAnalysisSkill.execute(
+        { food_item: "", serving: "100g" },
+        SKILL_CONTEXT,
+      )) as NutritionAnalysisResult
       expect(result.score).toBe(0)
       expect(result.calories).toBe(0)
     })
@@ -145,7 +227,7 @@ describe("WP4.3 Wave 2: Nutrition Agency Skills", () => {
 
   describe("food-recall skill", () => {
     it("should have correct metadata", () => {
-      expect(FoodRecallSkill.id).toBe("food-recall")
+      expect(FoodRecallSkill.id as string).toBe("food-recall")
       expect(FoodRecallSkill.version).toEqual("1.0.0")
       expect(FoodRecallSkill.name).toBe("Food Recall Monitoring")
       expect(FoodRecallSkill.capabilities).toContain("monitoring")
@@ -154,7 +236,7 @@ describe("WP4.3 Wave 2: Nutrition Agency Skills", () => {
     })
 
     it("should return recalls for matching product", async () => {
-      const result = await FoodRecallSkill.execute({ product: "spinach" }, SKILL_CONTEXT)
+      const result = (await FoodRecallSkill.execute({ product: "spinach" }, SKILL_CONTEXT)) as FoodRecallResult
       expect(result).toHaveProperty("recalls")
       expect(result).toHaveProperty("severity")
       expect(result).toHaveProperty("lastUpdated")
@@ -162,13 +244,16 @@ describe("WP4.3 Wave 2: Nutrition Agency Skills", () => {
     })
 
     it("should return none severity for no matches", async () => {
-      const result = await FoodRecallSkill.execute({ product: "nonexistent xyz product" }, SKILL_CONTEXT)
+      const result = (await FoodRecallSkill.execute(
+        { product: "nonexistent xyz product" },
+        SKILL_CONTEXT,
+      )) as FoodRecallResult
       expect(result.recalls).toHaveLength(0)
       expect(result.severity).toBe("none")
     })
 
     it("should detect high severity for pathogen recalls", async () => {
-      const result = await FoodRecallSkill.execute({ product: "ground beef" }, SKILL_CONTEXT)
+      const result = (await FoodRecallSkill.execute({ product: "ground beef" }, SKILL_CONTEXT)) as FoodRecallResult
       if (result.recalls.length > 0) {
         expect(["high", "critical", "medium"]).toContain(result.severity)
       }
@@ -177,7 +262,7 @@ describe("WP4.3 Wave 2: Nutrition Agency Skills", () => {
 
   describe("recipe-search skill", () => {
     it("should have correct metadata", () => {
-      expect(RecipeSearchSkill.id).toBe("recipe-search")
+      expect(RecipeSearchSkill.id as string).toBe("recipe-search")
       expect(RecipeSearchSkill.version).toEqual("1.0.0")
       expect(RecipeSearchSkill.name).toBe("Recipe Search")
       expect(RecipeSearchSkill.capabilities).toContain("search")
@@ -186,7 +271,10 @@ describe("WP4.3 Wave 2: Nutrition Agency Skills", () => {
     })
 
     it("should find recipes by ingredients", async () => {
-      const result = await RecipeSearchSkill.execute({ ingredients: ["quinoa", "chicken"] }, SKILL_CONTEXT)
+      const result = (await RecipeSearchSkill.execute(
+        { ingredients: ["quinoa", "chicken"] },
+        SKILL_CONTEXT,
+      )) as RecipeSearchResult
       expect(result).toHaveProperty("recipes")
       expect(result).toHaveProperty("nutrition")
       expect(result).toHaveProperty("totalFound")
@@ -196,25 +284,25 @@ describe("WP4.3 Wave 2: Nutrition Agency Skills", () => {
     })
 
     it("should apply cuisine filter", async () => {
-      const result = await RecipeSearchSkill.execute(
+      const result = (await RecipeSearchSkill.execute(
         { ingredients: ["chicken"], filters: [{ type: "cuisine", value: "Asian" }] },
         SKILL_CONTEXT,
-      )
+      )) as RecipeSearchResult
       expect(result.recipes.length).toBeGreaterThan(0)
     })
 
     it("should apply time filter", async () => {
-      const result = await RecipeSearchSkill.execute(
+      const result = (await RecipeSearchSkill.execute(
         { ingredients: ["vegetables"], filters: [{ type: "time", value: "15" }] },
         SKILL_CONTEXT,
-      )
+      )) as RecipeSearchResult
       for (const recipe of result.recipes) {
         expect(recipe.prepTime + recipe.cookTime).toBeLessThanOrEqual(15)
       }
     })
 
     it("should return nutrition data for recipes", async () => {
-      const result = await RecipeSearchSkill.execute({ ingredients: ["salmon"] }, SKILL_CONTEXT)
+      const result = (await RecipeSearchSkill.execute({ ingredients: ["salmon"] }, SKILL_CONTEXT)) as RecipeSearchResult
       expect(result.nutrition.length).toBe(result.recipes.length)
       for (const nutrition of result.nutrition) {
         expect(nutrition).toHaveProperty("calories")
@@ -225,7 +313,7 @@ describe("WP4.3 Wave 2: Nutrition Agency Skills", () => {
     })
 
     it("should handle empty ingredients", async () => {
-      const result = await RecipeSearchSkill.execute({ ingredients: [] }, SKILL_CONTEXT)
+      const result = (await RecipeSearchSkill.execute({ ingredients: [] }, SKILL_CONTEXT)) as RecipeSearchResult
       expect(result.recipes).toHaveLength(0)
       expect(result.totalFound).toBe(0)
     })
@@ -236,7 +324,7 @@ describe("WP4.3 Wave 2: Nutrition Agency Skills", () => {
 describe("WP4.3 Wave 2: Weather Agency Skills", () => {
   describe("weather-forecast skill", () => {
     it("should have correct metadata", () => {
-      expect(WeatherForecastSkill.id).toBe("weather-forecast")
+      expect(WeatherForecastSkill.id as string).toBe("weather-forecast")
       expect(WeatherForecastSkill.version).toEqual("1.0.0")
       expect(WeatherForecastSkill.name).toBe("Weather Forecast")
       expect(WeatherForecastSkill.capabilities).toContain("prediction")
@@ -245,7 +333,10 @@ describe("WP4.3 Wave 2: Weather Agency Skills", () => {
     })
 
     it("should generate multi-day forecast", async () => {
-      const result = await WeatherForecastSkill.execute({ location: "New York", days: 5 }, SKILL_CONTEXT)
+      const result = (await WeatherForecastSkill.execute(
+        { location: "New York", days: 5 },
+        SKILL_CONTEXT,
+      )) as WeatherForecastResult
       expect(result).toHaveProperty("forecast")
       expect(result).toHaveProperty("location")
       expect(result).toHaveProperty("timezone")
@@ -253,17 +344,26 @@ describe("WP4.3 Wave 2: Weather Agency Skills", () => {
     })
 
     it("should respect day limit", async () => {
-      const result = await WeatherForecastSkill.execute({ location: "Boston", days: 7 }, SKILL_CONTEXT)
+      const result = (await WeatherForecastSkill.execute(
+        { location: "Boston", days: 7 },
+        SKILL_CONTEXT,
+      )) as WeatherForecastResult
       expect(result.forecast.length).toBe(7)
     })
 
     it("should limit to max 7 days", async () => {
-      const result = await WeatherForecastSkill.execute({ location: "Chicago", days: 10 }, SKILL_CONTEXT)
+      const result = (await WeatherForecastSkill.execute(
+        { location: "Chicago", days: 10 },
+        SKILL_CONTEXT,
+      )) as WeatherForecastResult
       expect(result.forecast.length).toBe(7)
     })
 
     it("should have forecast items with required fields", async () => {
-      const result = await WeatherForecastSkill.execute({ location: "Seattle", days: 3 }, SKILL_CONTEXT)
+      const result = (await WeatherForecastSkill.execute(
+        { location: "Seattle", days: 3 },
+        SKILL_CONTEXT,
+      )) as WeatherForecastResult
       for (const day of result.forecast) {
         expect(day).toHaveProperty("date")
         expect(day).toHaveProperty("dayName")
@@ -276,14 +376,17 @@ describe("WP4.3 Wave 2: Weather Agency Skills", () => {
     })
 
     it("should handle empty location", async () => {
-      const result = await WeatherForecastSkill.execute({ location: "", days: 5 }, SKILL_CONTEXT)
+      const result = (await WeatherForecastSkill.execute(
+        { location: "", days: 5 },
+        SKILL_CONTEXT,
+      )) as WeatherForecastResult
       expect(result.forecast).toHaveLength(0)
     })
   })
 
   describe("weather-alerts skill", () => {
     it("should have correct metadata", () => {
-      expect(WeatherAlertsSkill.id).toBe("weather-alerts")
+      expect(WeatherAlertsSkill.id as string).toBe("weather-alerts")
       expect(WeatherAlertsSkill.version).toEqual("1.0.0")
       expect(WeatherAlertsSkill.name).toBe("Weather Alerts")
       expect(WeatherAlertsSkill.capabilities).toContain("warning_detection")
@@ -292,7 +395,7 @@ describe("WP4.3 Wave 2: Weather Agency Skills", () => {
     })
 
     it("should return alerts for location", async () => {
-      const result = await WeatherAlertsSkill.execute({ location: "Downtown" }, SKILL_CONTEXT)
+      const result = (await WeatherAlertsSkill.execute({ location: "Downtown" }, SKILL_CONTEXT)) as WeatherAlertsResult
       expect(result).toHaveProperty("alerts")
       expect(result).toHaveProperty("severity")
       expect(result).toHaveProperty("activeCount")
@@ -301,13 +404,16 @@ describe("WP4.3 Wave 2: Weather Agency Skills", () => {
     })
 
     it("should return none severity when no alerts", async () => {
-      const result = await WeatherAlertsSkill.execute({ location: "nonexistent area xyz" }, SKILL_CONTEXT)
+      const result = (await WeatherAlertsSkill.execute(
+        { location: "nonexistent area xyz" },
+        SKILL_CONTEXT,
+      )) as WeatherAlertsResult
       expect(result.severity).toBe("none")
       expect(result.activeCount).toBe(0)
     })
 
     it("should include alert details", async () => {
-      const result = await WeatherAlertsSkill.execute({ location: "Downtown" }, SKILL_CONTEXT)
+      const result = (await WeatherAlertsSkill.execute({ location: "Downtown" }, SKILL_CONTEXT)) as WeatherAlertsResult
       if (result.alerts.length > 0) {
         const alert = result.alerts[0]
         expect(alert).toHaveProperty("id")
@@ -323,7 +429,7 @@ describe("WP4.3 Wave 2: Weather Agency Skills", () => {
 
   describe("weather-current skill", () => {
     it("should have correct metadata", () => {
-      expect(WeatherCurrentSkill.id).toBe("weather-current")
+      expect(WeatherCurrentSkill.id as string).toBe("weather-current")
       expect(WeatherCurrentSkill.version).toEqual("1.0.0")
       expect(WeatherCurrentSkill.name).toBe("Current Weather Conditions")
       expect(WeatherCurrentSkill.capabilities).toContain("current_conditions")
@@ -331,7 +437,7 @@ describe("WP4.3 Wave 2: Weather Agency Skills", () => {
     })
 
     it("should return current conditions", async () => {
-      const result = await WeatherCurrentSkill.execute({ location: "Miami" }, SKILL_CONTEXT)
+      const result = (await WeatherCurrentSkill.execute({ location: "Miami" }, SKILL_CONTEXT)) as WeatherCurrentResult
       expect(result).toHaveProperty("conditions")
       expect(result).toHaveProperty("location")
       expect(result).toHaveProperty("temp")
@@ -343,21 +449,21 @@ describe("WP4.3 Wave 2: Weather Agency Skills", () => {
     })
 
     it("should return temperature in Fahrenheit", async () => {
-      const result = await WeatherCurrentSkill.execute({ location: "Phoenix" }, SKILL_CONTEXT)
+      const result = (await WeatherCurrentSkill.execute({ location: "Phoenix" }, SKILL_CONTEXT)) as WeatherCurrentResult
       // Check if temp is in reasonable Fahrenheit range (32-120 F)
       expect(result.temp).toBeGreaterThanOrEqual(32)
       expect(result.temp).toBeLessThanOrEqual(120)
     })
 
     it("should include wind information", async () => {
-      const result = await WeatherCurrentSkill.execute({ location: "Denver" }, SKILL_CONTEXT)
+      const result = (await WeatherCurrentSkill.execute({ location: "Denver" }, SKILL_CONTEXT)) as WeatherCurrentResult
       expect(result.conditions).toHaveProperty("windSpeed")
       expect(result.conditions).toHaveProperty("windDirection")
       expect(typeof result.conditions.windSpeed).toBe("number")
     })
 
     it("should include weather details", async () => {
-      const result = await WeatherCurrentSkill.execute({ location: "Seattle" }, SKILL_CONTEXT)
+      const result = (await WeatherCurrentSkill.execute({ location: "Seattle" }, SKILL_CONTEXT)) as WeatherCurrentResult
       expect(result.conditions).toHaveProperty("feelsLike")
       expect(result.conditions).toHaveProperty("pressure")
       expect(result.conditions).toHaveProperty("visibility")
@@ -366,7 +472,7 @@ describe("WP4.3 Wave 2: Weather Agency Skills", () => {
     })
 
     it("should handle empty location", async () => {
-      const result = await WeatherCurrentSkill.execute({ location: "" }, SKILL_CONTEXT)
+      const result = (await WeatherCurrentSkill.execute({ location: "" }, SKILL_CONTEXT)) as WeatherCurrentResult
       expect(result.conditions.temperature).toBe(0)
       expect(result.location).toBe("")
     })
@@ -391,7 +497,7 @@ describe("WP4.3 Wave 2: Skill Registry Integration", () => {
   })
 
   it("should have unique skill IDs across wave 2", () => {
-    const ids = allWave2Skills.map((s) => s.id)
+    const ids = allWave2Skills.map((s: Skill) => s.id)
     const uniqueIds = new Set(ids)
     expect(uniqueIds.size).toBe(ids.length)
   })

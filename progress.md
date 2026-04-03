@@ -265,3 +265,179 @@
 1. Proceed to Phase 5: Proactivity/Safety
 2. Implement policy engine with static + dynamic rules
 3. Implement guardrails for tool calls, data exfiltration, escalation
+
+---
+
+## 2026-04-03 - Flexible Agency Architecture Integration
+
+### Morning Session
+
+- Reviewed FLEXIBLE_AGENCY_ARCHITECTURE_PLAN.md (architecture refactoring plan)
+- Reviewed KILOCLAW_BLUEPRINT.md (foundation document)
+- Identified alignment between architecture plan and blueprint
+
+### Updates to KILOCLAW_BLUEPRINT.md
+
+**Section 3 - Architecture Target Updates:**
+
+1. **New Layer Hierarchy** (Section 3):
+   - Added Intent layer at top (natural language input)
+   - Added CapabilityRouter to Core Orchestrator
+   - Updated diagram to show new flow: Intent → Core → Agencies → Agents → Skill Registry → Tools/MCP
+
+2. **New Section 3.1** - Definisci responsabilità gerarchiche:
+   - Added Intent type with context (domain, urgency, preferences, correlationId)
+   - Added CapabilityRouter description
+
+3. **New Section 3.2** - Tipi Flessibili (Capability-Based):
+   - Added TaskIntent type (flexible intent instead of closed enum)
+   - Added SkillDefinition with capability tags
+   - Added SkillChain for composition
+
+4. **New Section 3.3** - Routing Architettura:
+   - Added CapabilityRouter class definition
+   - Added findSkillsForCapabilities, findAgentsForCapabilities, composeChain, matchScore methods
+
+5. **New Section 3.4** - Percorso Migrazione:
+   - 5-phase migration path table
+
+6. **New Section 3.5** - Ciclo Esecuzione with Capability Routing:
+   - Updated execution cycle with capability-based routing
+
+7. **New Section 3.6** - Struttura File (Nuovi Moduli):
+   - Added registry/ and routing/ directories
+
+**Section 7 - Agency Updates:**
+
+1. **Section 7 intro** - Added reference to capability registry
+2. **Section 7.2** - Added Capability Tags column for future agencies
+3. **New Section 7.3** - Agency Domain Flessibile:
+   - Agency domain as flexible string (not enum)
+
+**Section 9.3 - Acceptance Criteria:**
+
+Added new criteria:
+
+- CapabilityRouter active
+- SkillChain composition supported
+- Runtime registration (Phase 4)
+
+### Next Actions
+
+1. Complete verification of blueprint vs architecture plan alignment
+2. Proceed to Phase 7 Release completion
+
+---
+
+## 2026-04-03 - Legacy AgentRegistry Deprecation
+
+### Deprecation Work Completed
+
+**Problem:** `FlexibleAgentRegistry` (new) conflicted naming with `AgentRegistry` (old legacy class in `types.ts`).
+
+**Solution:** Deprecated the old `AgentRegistry` completely and updated documentation.
+
+### Files Modified
+
+| File                                             | Change                                                                      |
+| ------------------------------------------------ | --------------------------------------------------------------------------- |
+| `agency/types.ts`                                | Added `@deprecated` JSDoc to `AgentRegistry` class and `getAgentRegistry()` |
+| `agency/factory.ts`                              | Added `@deprecated` header noting migration path                            |
+| `agency/index.ts`                                | Added deprecation block comment around legacy exports                       |
+| `docs/plans/FLEXIBLE_AGENCY_ARCHITECTURE_TDD.md` | Updated sections 4.2, 7, 8.4, 9.2-9.4 to reflect naming and deprecation     |
+
+### Deprecation Notice Added
+
+```typescript
+/**
+ * @deprecated Use FlexibleAgentRegistry from "./registry/agent-registry" instead.
+ * This class uses TaskType-based routing which is being replaced by capability-based routing.
+ * Migration: Use FlexibleAgentRegistry.findByCapabilities() with TaskIntent.
+ */
+export class AgentRegistry { ... }
+```
+
+### Documentation Updated
+
+- Section 4.2 renamed to "FlexibleAgentRegistry (Replaces Legacy AgentRegistry)"
+- Section 7 file structure updated with deprecation notes
+- Section 8.4 renamed to "FlexibleAgentRegistry Tests"
+- Section 9.2-9.4 added Deprecation Strategy table and warning messages
+
+### Next Steps
+
+1. Phase 3: CapabilityRouter implementation
+2. Update all usages of `getAgentRegistry()` to use `FlexibleAgentRegistry`
+
+---
+
+## 2026-04-03 - TypeScript Error Resolution in Test Suite
+
+### Problem
+
+All test files in `packages/opencode/test/kiloclaw/` had TypeScript errors due to:
+
+1. **Branded Types Issue (TS2769)**: `AgencyId`, `SkillId`, etc. are branded Zod types. When comparing with `expect(result).toBe("plain-string")`, the branded type doesn't match plain string.
+
+2. **CorrelationId Namespace vs Type Conflict**: Two conflicting definitions:
+   - `types.ts`: `export const CorrelationId = z.string().brand<"CorrelationId">()` (a schema/value)
+   - `dispatcher.ts`: `export namespace CorrelationId { export type CorrelationId = ... }` (a namespace)
+
+3. **Skill.execute() Returns Promise<unknown>**: `Skill` interface defines `execute(input: unknown, context: SkillContext): Promise<unknown>`. Tests accessing `result.score`, `result.issues` etc. failed because TypeScript saw these as `unknown`.
+
+4. **Type Assertion Issues (TS2709)**: Tests tried invalid type assertions like `CorrelationId["CorrelationId"]` where CorrelationId is a const schema, not a namespace.
+
+### Solution Applied
+
+**Pattern 1: Branded Type Assertions**
+
+```typescript
+// Before
+expect(CodeReviewSkill.id).toBe("code-review") // TS2769
+
+// After
+expect(CodeReviewSkill.id as string).toBe("code-review") // OK
+```
+
+**Pattern 2: Result Type Interfaces + Casting**
+
+```typescript
+// Created result type interfaces
+interface CodeReviewResult {
+  issues: Array<{ rule: string; message: string; line?: number }>
+  score: number
+}
+
+// Cast skill execute results
+const result = (await CodeReviewSkill.execute(input, context)) as CodeReviewResult
+```
+
+**Pattern 3: Implicit Any Callbacks**
+
+```typescript
+// Before
+result.issues.some((i) => i.rule === "no-var") // TS7006
+
+// After
+result.issues.some((i: { rule: string }) => i.rule === "no-var")
+```
+
+### Files Fixed
+
+| File              | Errors Fixed | Approach                                                                                 |
+| ----------------- | ------------ | ---------------------------------------------------------------------------------------- |
+| `runtime.test.ts` | ~10 errors   | Fixed CorrelationId namespace conflict, branded type assertions                          |
+| `wave1.test.ts`   | ~110 errors  | Added result type interfaces, cast skill.execute() results, fixed implicit any callbacks |
+| `wave2.test.ts`   | ~50 errors   | Same pattern as wave1.test.ts                                                            |
+
+### TypeScript Result
+
+```bash
+$ node node_modules/.bin/tsgo --noEmit -p packages/opencode/tsconfig.json
+# 0 errors
+```
+
+### Commit
+
+- `d0a04a2` fix(tests): correct import paths and types in agency routing tests
+- Previous commit: `139bcb6` feat(agency): implement Flexible Agency Architecture phases 1-5
