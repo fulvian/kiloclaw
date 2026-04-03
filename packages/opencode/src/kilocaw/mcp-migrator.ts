@@ -96,7 +96,7 @@ export namespace McpMigrator {
 
     if (!options?.skipGlobalPaths) {
       // 1. VSCode extension global storage (primary location for global MCP settings)
-      const vscodeSettingsPath = path.join(KilocawPaths.vscodeGlobalStorage(), "settings", "mcp_settings.json")
+      const vscodeSettingsPath = path.join(KiloclawPaths.vscodeGlobalStorage(), "settings", "mcp_settings.json")
       const vscodeSettings = await readMcpSettings(vscodeSettingsPath)
       if (vscodeSettings?.mcpServers) {
         for (const [name, server] of Object.entries(vscodeSettings.mcpServers)) {

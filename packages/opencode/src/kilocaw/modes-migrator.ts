@@ -159,7 +159,7 @@ export namespace ModesMigrator {
 
     if (!options.skipGlobalPaths) {
       // 1. VSCode extension global storage (primary location for global modes)
-      const vscodeGlobalPath = path.join(KilocawPaths.vscodeGlobalStorage(), "settings", "custom_modes.yaml")
+      const vscodeGlobalPath = path.join(KiloclawPaths.vscodeGlobalStorage(), "settings", "custom_modes.yaml")
       allModes.push(...(await readModesFile(vscodeGlobalPath)))
 
       // 2. CLI global settings (fallback/alternative location)

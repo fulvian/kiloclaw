@@ -636,7 +636,7 @@ export namespace Agent {
     const matter = (await import("gray-matter")).default
     const home = os.default.homedir()
     const modesFiles = [
-      path.join(KilocawPaths.vscodeGlobalStorage(), "settings", "custom_modes.yaml"),
+      path.join(KiloclawPaths.vscodeGlobalStorage(), "settings", "custom_modes.yaml"),
       path.join(home, ".kiloclaw", "cli", "global", "settings", "custom_modes.yaml"),
       path.join(home, ".kilocodemodes"),
       path.join(Instance.directory, ".kilocodemodes"),
