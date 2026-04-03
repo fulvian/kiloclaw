@@ -16,7 +16,7 @@ import { Locale } from "@/util/locale"
 import { Global } from "@/global"
 import { useDialog } from "../../ui/dialog"
 import { useTuiConfig } from "../../context/tui-config"
-import { ConfigProtection } from "@/kilocode/permission/config-paths" // kilocode_change
+import { ConfigProtection } from "@/kilocaw/permission/config-paths" // kilocode_change
 
 type PermissionStage = "permission" | "always" | "reject"
 

@@ -12,9 +12,9 @@ import PROMPT_CODEX from "./prompt/codex_header.txt"
 import PROMPT_TRINITY from "./prompt/trinity.txt"
 import type { Provider } from "@/provider/provider"
 
-// kilocode_change start
-import SOUL from "../kilocode/soul.txt"
-import { staticEnvLines, type EditorContext } from "../kilocode/editor-context"
+// kilocode_change start - soul moved to kiloclaw namespace
+import SOUL from "../kiloclaw/soul.txt"
+import { staticEnvLines, type EditorContext } from "../kilocaw/editor-context"
 // kilocode_change end
 
 export namespace SystemPrompt {

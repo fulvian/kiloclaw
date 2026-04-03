@@ -4,7 +4,7 @@
 
 ## Started: 2026-04-02T12:21:02+02:00
 
-## Last Updated: 2026-04-02T18:45:00+02:00
+## Last Updated: 2026-04-03T22:30:00+02:00
 
 ## PRD: docs/foundation/KILOCLAW_BLUEPRINT.md (APPROVED)
 
@@ -210,3 +210,61 @@
 - [x] No known bypass routes unmitigated
 - [x] Proactivity limits respected in deterministic evals
 - [x] Complete logging of safety decision points
+
+---
+
+## KiloCode → Kiloclaw Directory Migration - COMPLETED ✅
+
+### Summary
+
+Completed full migration of `kilocode/` directory to `kiloclaw/` with proper identity fix.
+
+### Work Completed
+
+**Identity Fix:**
+
+- Created `kilocaw/soul.txt` with proper Kiloclaw identity
+- Updated `session/system.ts` to import from `../kilocaw/soul.txt`
+- Removed "You are Kilo..." from 6 provider prompts
+- Updated review prompts and native-mode-defaults.ts
+
+**Directory Migration:**
+
+- Created 31 files in `packages/opencode/src/kiloclaw/`
+- Updated 46+ imports from `@/kilocode/` to `@/kilocaw/`
+- Updated 16+ relative imports from `../kilocode/` to `../kilocaw/`
+
+### Files Created (31 total)
+
+| Directory         | Files                                                                                                                                                                                                                                                                                                                                    |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Root              | `soul.txt`, `paths.ts`, `kilocode-compat.ts`, `const.ts`, `kilo-errors.ts`, `editor-context.ts`, `enhance-prompt.ts`, `plan-followup.ts`, `bash-hierarchy.ts`, `paste-summary.ts`, `cloud-session.ts`, `provider-options.ts`, `ts-check.ts`, `ts-client.ts`, `snapshot.ts`, `bell.ts`, `project-id.ts`, `config-injector.ts`, `index.ts` |
+| `permission/`     | `drain.ts`, `config-paths.ts`                                                                                                                                                                                                                                                                                                            |
+| `review/`         | `review.ts`, `worktree-diff.ts`, `command.ts`, `types.ts`                                                                                                                                                                                                                                                                                |
+| `session-import/` | `routes.ts`, `service.ts`, `types.ts`                                                                                                                                                                                                                                                                                                    |
+| `components/`     | `kilo-error-display.tsx`, `kilo-news.tsx`, `notification-banner.tsx`, `dialog-kilo-profile.tsx`, `dialog-kilo-team-select.tsx`, `dialog-kilo-organization.tsx`, `dialog-kilo-auto-method.tsx`, `dialog-kilo-notifications.tsx`, `tips.tsx`                                                                                               |
+| `skills/`         | `builtin.ts`                                                                                                                                                                                                                                                                                                                             |
+| Root TSX          | `remote-tui.tsx`, `kilo-commands.tsx`                                                                                                                                                                                                                                                                                                    |
+
+### Migrators Created
+
+| File                    | Purpose                   |
+| ----------------------- | ------------------------- |
+| `modes-migrator.ts`     | Custom modes migration    |
+| `rules-migrator.ts`     | Rules migration           |
+| `workflows-migrator.ts` | Workflows migration       |
+| `mcp-migrator.ts`       | MCP servers migration     |
+| `ignore-migrator.ts`    | Ignore patterns migration |
+
+### Verification
+
+- ✅ Zero `@/kilocode/` imports remain
+- ✅ All imports correctly resolve to `kilocaw/`
+- ✅ Identity now correctly reports as "Kiloclaw"
+
+### Legitimate KiloCode References Preserved
+
+- VS Code storage paths (`kilocode.kilo-code`)
+- Package names (`@kilocode/kilo-gateway`, `@kilocode/sdk`)
+- API operation IDs (`kilocode.removeSkill`, etc.)
+- Migration-related log messages

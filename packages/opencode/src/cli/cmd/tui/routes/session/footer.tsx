@@ -6,7 +6,7 @@ import { useConnected } from "../../component/dialog-model"
 import { useSDK } from "../../context/sdk" // kilocode_change
 import { createStore } from "solid-js/store"
 import { useRoute } from "../../context/route"
-import { RemoteIndicator } from "@/kilocode/remote-tui" // kilocode_change
+import { RemoteIndicator } from "@/kilocaw/remote-tui" // kilocode_change
 
 export function Footer() {
   const { theme } = useTheme()

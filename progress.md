@@ -635,3 +635,85 @@ $ node node_modules/.bin/tsgo --noEmit -p packages/opencode/tsconfig.json
 
 - `d0a04a2` fix(tests): correct import paths and types in agency routing tests
 - Previous commit: `139bcb6` feat(agency): implement Flexible Agency Architecture phases 1-5
+
+---
+
+## 2026-04-03 - Complete KiloCode → Kiloclaw Directory Migration
+
+### Problem
+
+The system identity responded with "Sono Kilo..." instead of "Sono Kiloclaw..." when users asked "chi sei?" in dev mode. This was due to:
+
+1. `soul.txt` pointing to KiloCode identity instead of Kiloclaw
+2. Provider prompts redefining identity with "You are Kilo..."
+3. Directory migration incomplete - imports pointed to `kilocode/` but files needed to be in `kilocaw/`
+
+### Solution Applied
+
+**Phase 1: Identity Fix**
+
+1. Created `kilocaw/soul.txt` with proper Kiloclaw identity:
+   - "You are Kiloclaw, a versatile AI virtual assistant designed to help you accomplish a wide range of tasks."
+2. Updated `session/system.ts` to import from `../kilocaw/soul.txt`
+3. Removed "You are Kilo..." redefinition from 6 provider prompts:
+   - `anthropic.txt`, `beast.txt`, `gemini.txt`, `codex_header.txt`, `qwen.txt`, `trinity.txt`
+4. Updated review prompts in `review.ts` (2 places)
+5. Updated `native-mode-defaults.ts` (6 roleDefinition updates)
+
+**Phase 2: Directory Migration**
+
+Created 31 files in `packages/opencode/src/kilocaw/`:
+
+| Category       | Files                                                                                                                                                                                                                                                              |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Core           | `soul.txt`, `paths.ts`, `kilocode-compat.ts`, `const.ts`                                                                                                                                                                                                           |
+| Utilities      | `kilo-errors.ts`, `editor-context.ts`, `enhance-prompt.ts`, `plan-followup.ts`, `bash-hierarchy.ts`, `paste-summary.ts`, `cloud-session.ts`, `provider-options.ts`, `ts-check.ts`, `ts-client.ts`, `snapshot.ts`, `bell.ts`, `project-id.ts`, `config-injector.ts` |
+| Migrators      | `modes-migrator.ts`, `rules-migrator.ts`, `workflows-migrator.ts`, `mcp-migrator.ts`, `ignore-migrator.ts`                                                                                                                                                         |
+| Permission     | `permission/drain.ts`, `permission/config-paths.ts`                                                                                                                                                                                                                |
+| Review         | `review/review.ts`, `review/worktree-diff.ts`, `review/command.ts`, `review/types.ts`                                                                                                                                                                              |
+| Session-Import | `session-import/routes.ts`, `session-import/service.ts`, `session-import/types.ts`                                                                                                                                                                                 |
+| Components     | `remote-tui.tsx`, `kilo-commands.tsx`, `components/*.tsx` (9 files)                                                                                                                                                                                                |
+| Skills         | `skills/builtin.ts`                                                                                                                                                                                                                                                |
+
+### Verification Results
+
+- ✅ Zero `@/kilocode/` imports remain in TypeScript files
+- ✅ Zero `@/kilocode/` imports remain in TSX files
+- ✅ Only reference to `../kilocode/` is a comment in `kilocode-compat.ts` (legitimate)
+- ✅ All 31 files created in `kilocaw/` directory
+
+### Files Updated (Import Path Changes)
+
+- `session/system.ts` - Changed import to `../kilocaw/soul.txt`
+- `session/llm.ts` - `@/kilocode/const` → `@/kilocaw/const`
+- `session/prompt.ts` - `@/kilocode/plan-followup` → `@/kilocaw/`
+- `session/retry.ts` - `@/kilocode/kilo-errors` → `@/kilocaw/`
+- `provider/provider.ts` - `@/kilocode/const` → `@/kilocaw/`
+- `provider/transform.ts` - `@/kilocode/provider-options` → `@/kilocaw/`
+- `permission/next.ts` - `@/kilocode/permission/*` → `@/kilocaw/permission/*`
+- And 30+ other files
+
+### Key Changes in Content
+
+1. **soul.txt** (identity): "You are Kilo..." → "You are Kiloclaw..."
+2. **const.ts**: `kilocode.ai` → `kiloclaw.ai`, `Kilo Code` → `Kiloclaw`
+3. **review.ts** (review prompts): "You are Kilo Code" → "You are Kiloclaw"
+4. **builtin.ts** (skills): "Kilo CLI" → "Kiloclaw CLI"
+5. **paths.ts**: `KilocodePaths` namespace → `KiloclawPaths` namespace
+6. **permission/config-paths.ts**: Fixed reference to `KilocodePaths.globalDirs()` → `KilocawPaths.globalDirs()`
+
+### Legitimate KiloCode References (NOT Changed)
+
+These references are intentionally kept as they refer to external systems:
+
+- VS Code storage paths: `kilocode.kilo-code` (extension storage)
+- Package names: `@kilocode/kilo-gateway`, `@kilocode/sdk`
+- API operation IDs: `kilocode.removeSkill`, `kilocode.sessionImport.*`
+- Kilo Gateway integration strings
+- Migration terminology: "loaded kilocode MCP servers", "kilocode MCP migration warning"
+
+### Next Steps
+
+1. User can test by running dev mode and asking "chi sei?"
+2. All imports now correctly resolve to `kilocaw/` directory
+3. Identity correctly reports as "Kiloclaw"

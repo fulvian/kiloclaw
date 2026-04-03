@@ -34,7 +34,7 @@ import { useToast } from "../../ui/toast"
 import { useKV } from "../../context/kv"
 import { useTextareaKeybindings } from "../textarea-keybindings"
 import { DialogSkill } from "../dialog-skill"
-import { shouldSummarize as shouldPasteSummary } from "@/kilocode/paste-summary"
+import { shouldSummarize as shouldPasteSummary } from "@/kilocaw/paste-summary"
 
 export type PromptProps = {
   sessionID?: string

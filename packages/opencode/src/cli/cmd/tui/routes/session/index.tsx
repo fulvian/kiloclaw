@@ -58,7 +58,7 @@ import { TodoItem } from "../../component/todo-item"
 import { DialogMessage } from "./dialog-message"
 import type { PromptInfo } from "../../component/prompt/history"
 import { DialogConfirm } from "@tui/ui/dialog-confirm"
-import { KiloErrorBlock } from "@/kilocode/components/kilo-error-display" // kilocode_change
+import { KiloErrorBlock } from "@/kilocaw/components/kilo-error-display" // kilocode_change
 import { DialogTimeline } from "./dialog-timeline"
 import { DialogForkFromTimeline } from "./dialog-fork-from-timeline"
 import { DialogSessionRename } from "../../component/dialog-session-rename"
@@ -84,7 +84,7 @@ import { UI } from "@/cli/ui.ts"
 import { useTuiConfig } from "../../context/tui-config"
 
 import { formatMarkdownTables } from "../../util/markdown" // kilocode_change
-import { bell } from "@/kilocode/bell" // kilocode_change
+import { bell } from "@/kilocaw/bell" // kilocode_change
 
 addDefaultParsers(parsers.parsers)
 

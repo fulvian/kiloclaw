@@ -6,7 +6,7 @@ import { TuiConfig } from "@/config/tui"
 import { Instance } from "@/project/instance"
 import { existsSync } from "fs"
 import { createKiloClient } from "@kilocode/sdk/v2" // kilocode_change
-import { importCloudSession, validateCloudFork } from "@/kilocode/cloud-session" // kilocode_change
+import { importCloudSession, validateCloudFork } from "@/kilocaw/cloud-session" // kilocode_change
 
 export const AttachCommand = cmd({
   command: "attach <url>",

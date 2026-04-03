@@ -630,8 +630,8 @@ export namespace Agent {
     }
 
     // 2. Remove from legacy .kilocodemodes YAML files (read by ModesMigrator)
-    const { ModesMigrator } = await import("@/kilocode/modes-migrator")
-    const { KilocodePaths } = await import("@/kilocode/paths")
+    const { ModesMigrator } = await import("@/kilocaw/modes-migrator")
+    const { KiloclawPaths } = await import("@/kilocaw/paths")
     const os = await import("os")
     const matter = (await import("gray-matter")).default
     const home = os.default.homedir()

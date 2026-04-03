@@ -7,7 +7,7 @@ import PROMPT_INITIALIZE from "./template/initialize.txt"
 import PROMPT_REVIEW from "./template/review.txt"
 import { MCP } from "../mcp"
 import { Skill } from "../skill"
-import { localReviewCommand, localReviewUncommittedCommand } from "@/kilocode/review/command" // kilocode_change
+import { localReviewCommand, localReviewUncommittedCommand } from "@/kilocaw/review/command" // kilocode_change
 
 export namespace Command {
   export const Event = {

@@ -8,8 +8,8 @@ import { PermissionTable } from "@/session/session.sql"
 import { fn } from "@/util/fn"
 import { Log } from "@/util/log"
 import { Wildcard } from "@/util/wildcard"
-import { drainCovered } from "@/kilocode/permission/drain" // kilocode_change
-import { ConfigProtection } from "@/kilocode/permission/config-paths" // kilocode_change
+import { drainCovered } from "@/kilocaw/permission/drain" // kilocode_change
+import { ConfigProtection } from "@/kilocaw/permission/config-paths" // kilocode_change
 import os from "os"
 import z from "zod"
 
