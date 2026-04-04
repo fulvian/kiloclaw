@@ -167,28 +167,39 @@ score =
 
 ### Completed Implementation
 
-| Component  | File                   | Description                         |
-| ---------- | ---------------------- | ----------------------------------- |
-| Schema     | `memory.schema.sql.ts` | Drizzle ORM schema (10 tables)      |
-| Repository | `memory.repository.ts` | CRUD operations per layer           |
-| Ranking    | `memory.ranking.ts`    | Multi-factor scoring + token budget |
-| Retention  | `memory.retention.ts`  | TTL policies + purge enforcement    |
-| Feedback   | `memory.feedback.ts`   | User feedback + pattern learning    |
-| Database   | `memory.db.ts`         | SQLite initialization + auto-setup  |
-| State      | `memory.state.ts`      | Instance.state() integration        |
-| BrokerV2   | `memory.broker.v2.ts`  | Dual-write persistent broker        |
-| Adapter    | `memory.adapter.ts`    | Orchestrator integration            |
-| Backfill   | `memory.backfill.ts`   | Legacy → V2 migration               |
+| Component      | File                   | Description                         |
+| -------------- | ---------------------- | ----------------------------------- |
+| Schema         | `memory.schema.sql.ts` | Drizzle ORM schema (10 tables)      |
+| Repository     | `memory.repository.ts` | CRUD operations per layer           |
+| Ranking        | `memory.ranking.ts`    | Multi-factor scoring + token budget |
+| Retention      | `memory.retention.ts`  | TTL policies + purge enforcement    |
+| Feedback       | `memory.feedback.ts`   | User feedback + pattern learning    |
+| Database       | `memory.db.ts`         | SQLite initialization + auto-setup  |
+| State          | `memory.state.ts`      | Instance.state() integration        |
+| BrokerV2       | `memory.broker.v2.ts`  | Dual-write persistent broker        |
+| Adapter        | `memory.adapter.ts`    | Orchestrator integration            |
+| Backfill       | `memory.backfill.ts`   | Legacy → V2 migration               |
+| Context Plugin | `memory/plugin.ts`     | Chat memory injection + recall hook |
+
+### 2026-04-04 Runtime Fixes
+
+| Issue                                             | Fix                                                                       | File                  |
+| ------------------------------------------------- | ------------------------------------------------------------------------- | --------------------- |
+| Episodic write only recorded events, not episodes | `write()` now creates full episode records                                | `memory.broker.v2.ts` |
+| Purge V2 was no-op in adapter                     | Now calls `MemoryRetention.purgeEntries()`                                | `memory.adapter.ts`   |
+| No memory context injection in prompts            | New plugin hooks: `chat.message` + `experimental.chat.messages.transform` | `memory/plugin.ts`    |
+| Router lacked memory retrieval path               | Plugin intercepts recall queries and injects session+memory context       | `memory/plugin.ts`    |
 
 ### Tests
 
-| Test Suite  | Tests  | Status      |
-| ----------- | ------ | ----------- |
-| Persistence | 6      | ✅ Pass     |
-| Ranking     | 11     | ✅ Pass     |
-| Retention   | 16     | ✅ Pass     |
-| Feedback    | 4      | ✅ Pass     |
-| **Total**   | **37** | ✅ **Pass** |
+| Test Suite   | Tests  | Status      |
+| ------------ | ------ | ----------- |
+| Persistence  | 6      | ✅ Pass     |
+| Ranking      | 11     | ✅ Pass     |
+| Retention    | 16     | ✅ Pass     |
+| Feedback     | 4      | ✅ Pass     |
+| No-stub gate | 5      | ✅ Pass     |
+| **Total**    | **43** | ✅ **Pass** |
 
 ### Feature Flag
 

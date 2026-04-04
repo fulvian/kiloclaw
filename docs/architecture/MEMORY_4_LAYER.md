@@ -266,12 +266,48 @@ const policy = MemoryLifecycle.applyRetentionPolicy("episodic", "audit")
 MemoryBroker.retain(entry, policy)
 ```
 
+## Context Plugin (Memory Recall)
+
+The `memory/plugin.ts` provides runtime memory integration via two hooks:
+
+### `chat.message` hook
+
+Automatically captures every user turn into memory:
+
+- **Working memory**: stores `session:{id}:last_user_query` with 6h TTL
+- **Episodic memory**: records episode with task description, outcome, agent, timestamps
+
+### `experimental.chat.messages.transform` hook
+
+Intercepts queries matching recall patterns and injects context:
+
+- **Patterns**: "ultime conversazioni", "cronologia", "what did we talk about", "previous conversation", "remember our past"
+- **Retrieval**: queries `MemoryBrokerV2.retrieve()` for relevant semantic/episodic hits
+- **Session history**: fetches recent sessions with titles and last user message snippets
+- **Injection**: appends `<system-reminder>` block with recovered context to user message
+
+This enables the router agent to answer questions about previous conversations by recovering context from the 4-layer memory system.
+
 ## Testing
 
-Run memory layer tests:
-
 ```bash
+# Core memory tests
 bun test test/kiloclaw/memory.test.ts
+
+# Persistence tests (restart recovery)
+bun test test/kiloclaw/memory-persistence.test.ts
+
+# No-stub gate (no placeholder code in production paths)
+bun test test/kiloclaw/memory-no-stub.test.ts
+
+# Retention enforcement tests
+bun test test/kiloclaw/memory-retention.test.ts
+
+# Retrieval benchmark (requires KILO_RUN_MEMORY_BENCHMARK=true)
+KILO_RUN_MEMORY_BENCHMARK=true bun test test/kiloclaw/memory-retrieval-benchmark.test.ts
+
+# Full V2 integration
+bun test test/kiloclaw/
 ```
 
 ## References

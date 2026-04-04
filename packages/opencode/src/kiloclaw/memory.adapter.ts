@@ -93,10 +93,36 @@ export async function readEntries(query: {
  */
 export async function purgeEntry(entryId: MemoryId, reason: PurgeReason): Promise<void> {
   if (Flag.KILO_EXPERIMENTAL_MEMORY_V2) {
-    // V2 uses FeedbackRepo for this - audit is handled internally
-    // For now, just log
-    console.log("purge entry via V2", { entryId, reason })
+    const { MemoryRetention } = await import("./memory/memory.retention")
+
+    const layer = inferLayer(entryId)
+    const map = {
+      expired: "expired",
+      right_to_forget: "right_to_forget",
+      policy_breach: "policy_breach",
+      manual: "manual",
+      migration: "migration",
+    } as const
+
+    const result = await MemoryRetention.purgeEntries("default", [
+      {
+        layer,
+        id: entryId,
+        reason: map[reason],
+      },
+    ])
+
+    if (result.failed > 0) {
+      throw new Error(result.errors[0]?.reason ?? `failed to purge memory entry ${entryId}`)
+    }
   } else {
     await legacyBroker.purge(entryId, reason)
   }
+}
+
+function inferLayer(id: string): "working" | "episodic" | "semantic" | "procedural" {
+  if (id.startsWith("wk_") || id.startsWith("mem_")) return "working"
+  if (id.startsWith("ep_") || id.startsWith("ev_")) return "episodic"
+  if (id.startsWith("fact_") || id.startsWith("vec_")) return "semantic"
+  return "procedural"
 }

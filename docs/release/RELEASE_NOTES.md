@@ -36,6 +36,17 @@ Kiloclaw 7.3.0 completes the **Memory Persistence Refoundation (ADR-005)** - ena
 
 **Tests:** 37 tests covering persistence, ranking, retention, and feedback
 
+### Bug Fixes in 7.3.0 (2026-04-04)
+
+| Issue                           | Description                                                                                                                                                                | Fix                                                                                                                                                                        |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Episodic write gap**          | `MemoryBrokerV2.write(layer: "episodic")` only recorded events, not episode records. `retrieve()` reads from `getRecentEpisodes()`, resulting in empty episodic retrieval. | `write()` now creates full episode records in `episodes` table alongside events                                                                                            |
+| **Purge no-op**                 | `purgeEntry()` in V2 path only logged to console, did not actually delete entries. Retention enforcement was not operational.                                              | Now calls `MemoryRetention.purgeEntries()` with proper layer inference and error handling                                                                                  |
+| **No memory context injection** | Router agent had no path to retrieve and inject memory context into prompts. Questions about "previous conversations" returned "I don't have access".                      | New `memory/plugin.ts` with two hooks: `chat.message` captures turns; `experimental.chat.messages.transform` intercepts recall queries and injects session + semantic hits |
+| **No-stub gate missing**        | No CI gate prevented placeholder/stub code in memory production paths                                                                                                      | Added `memory-no-stub.test.ts` checking for banned patterns (TODO, placeholder, pseudo-embedding, etc.)                                                                    |
+
+**Net effect:** Router agent can now answer "what did we talk about in our last conversations?" by recovering context from persistent memory.
+
 ---
 
 ## Migration from 7.2.0

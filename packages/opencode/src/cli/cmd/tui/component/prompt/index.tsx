@@ -941,7 +941,35 @@ export function Prompt(props: PromptProps) {
                 // Normalize line endings at the boundary
                 // Windows ConPTY/Terminal often sends CR-only newlines in bracketed paste
                 // Replace CRLF first, then any remaining CR
-                const normalizedText = event.text.replace(/\r\n/g, "\n").replace(/\r/g, "\n")
+                let normalizedText = event.text.replace(/\r\n/g, "\n").replace(/\r/g, "\n")
+
+                // Force word-wrap on very long lines (terminal overflow fix)
+                // Split lines longer than terminal width to prevent horizontal overflow
+                const maxLineLength = 120
+                const wrappedLines: string[] = []
+                for (const line of normalizedText.split("\n")) {
+                  if (line.length > maxLineLength) {
+                    // Insert newlines at word boundaries to wrap long lines
+                    let remaining = line
+                    while (remaining.length > maxLineLength) {
+                      // Find last space before maxLineLength
+                      const breakPoint = remaining.lastIndexOf(" ", maxLineLength)
+                      if (breakPoint <= 0) {
+                        // No space found, force break at maxLineLength
+                        wrappedLines.push(remaining.slice(0, maxLineLength))
+                        remaining = remaining.slice(maxLineLength)
+                      } else {
+                        wrappedLines.push(remaining.slice(0, breakPoint))
+                        remaining = remaining.slice(breakPoint + 1)
+                      }
+                    }
+                    if (remaining) wrappedLines.push(remaining)
+                  } else {
+                    wrappedLines.push(line)
+                  }
+                }
+                normalizedText = wrappedLines.join("\n")
+
                 const pastedContent = normalizedText.trim()
                 if (!pastedContent) {
                   command.trigger("prompt.paste")

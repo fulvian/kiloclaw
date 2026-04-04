@@ -32,7 +32,12 @@ export interface MemoryBrokerV2 {
   }
 
   episodic(): {
-    record(event: { type: string; data: Record<string, unknown>; correlationId?: string; userId?: string }): Promise<string>
+    record(event: {
+      type: string
+      data: Record<string, unknown>
+      correlationId?: string
+      userId?: string
+    }): Promise<string>
     getRecent(count: number, since?: number): Promise<any[]>
   }
 
@@ -106,7 +111,12 @@ export const MemoryBrokerV2: MemoryBrokerV2 = {
 
   episodic() {
     return {
-      async record(event: { type: string; data: Record<string, unknown>; correlationId?: string; userId?: string }): Promise<string> {
+      async record(event: {
+        type: string
+        data: Record<string, unknown>
+        correlationId?: string
+        userId?: string
+      }): Promise<string> {
         if (!Flag.KILO_EXPERIMENTAL_MEMORY_V2) {
           return `legacy_${Date.now()}`
         }
@@ -264,6 +274,32 @@ export const MemoryBrokerV2: MemoryBrokerV2 = {
     }
 
     if (entry.layer === "episodic") {
+      const now = Date.now()
+      const val = (entry.value ?? {}) as Record<string, unknown>
+      const startedAt = Number(val["startedAt"] ?? now)
+      const completedAt = Number(val["completedAt"] ?? now)
+      const confidence = Number(val["confidence"] ?? 70)
+      const desc = `${entry.key}: ${toText(entry.value)}`.slice(0, 1200)
+
+      await EpisodicMemoryRepo.recordEpisode({
+        id: `ep_${crypto.randomUUID()}`,
+        tenant_id: TENANT,
+        user_id: typeof val["userId"] === "string" ? (val["userId"] as string) : null,
+        task_id: typeof val["taskId"] === "string" ? (val["taskId"] as string) : null,
+        task_description: typeof val["taskDescription"] === "string" ? (val["taskDescription"] as string) : desc,
+        outcome: typeof val["outcome"] === "string" ? (val["outcome"] as string) : "observed",
+        started_at: Number.isFinite(startedAt) ? startedAt : now,
+        completed_at: Number.isFinite(completedAt) ? completedAt : now,
+        correlation_id: typeof val["correlationId"] === "string" ? (val["correlationId"] as string) : null,
+        agency_id: typeof val["agencyId"] === "string" ? (val["agencyId"] as string) : null,
+        agent_id: typeof val["agentId"] === "string" ? (val["agentId"] as string) : null,
+        source_event_ids: [],
+        artifacts: val,
+        confidence: Number.isFinite(confidence) ? Math.max(0, Math.min(100, confidence)) : 70,
+        expires_at: entry.ttlMs ? now + entry.ttlMs : null,
+        created_at: now,
+      })
+
       await this.episodic().record({
         type: "memory_write",
         data: { key: entry.key, value: entry.value },
