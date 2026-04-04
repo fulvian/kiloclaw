@@ -51,5 +51,8 @@ export { MemoryState, ensureMemoryInit } from "./memory/memory.state.js"
 export { MemoryBrokerV2 } from "./memory/memory.broker.v2.js"
 export { getOrchestratorMemory, writeEntry, readEntries, purgeEntry } from "./memory.adapter.js"
 
+// Service health check (ADR-005)
+export { ServiceHealth } from "./service-health.js"
+
 // Skills (Wave 1 - Development and Knowledge agencies)
 export * from "./skills"
