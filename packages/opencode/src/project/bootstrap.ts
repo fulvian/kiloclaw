@@ -13,9 +13,18 @@ import { KiloSessions } from "@/kilo-sessions/kilo-sessions" // kilocode_change
 import { Snapshot } from "../snapshot"
 import { Truncate } from "../tool/truncation"
 import { MemoryDb } from "../kiloclaw/memory/memory.db" // kilocode_change - memory persistence
+import { ServiceHealth } from "../kiloclaw/service-health" // kilocode_change - service health check
 
 export async function InstanceBootstrap() {
   Log.Default.info("bootstrapping", { directory: Instance.directory })
+
+  // kilocode_change start - run service health checks first
+  const healthReport = await ServiceHealth.checkAll()
+  if (!healthReport.allRequiredHealthy) {
+    ServiceHealth.printWarnings(healthReport)
+  }
+  // kilocode_change end
+
   await Plugin.init()
   KiloSessions.init() // kilocode_change
   Format.init()
