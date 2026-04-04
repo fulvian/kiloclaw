@@ -1,7 +1,7 @@
 # Piano di Implementazione: Eliminazione Agenti Nativi OpenCode
 
 **Data**: 2026-04-04
-**Stato**: ✅ IMPLEMENTATO (Fasi 1-6 completate, Fase 7 posticipata)
+**Stato**: ✅ IMPLEMENTATO (Tutte le fasi completate)
 **Versione**: 2.0
 **Commit**: `641e55a` - feat(agency): implement flexible agents bridge to Task tool
 
@@ -318,15 +318,16 @@ export async function list() {
 
 ---
 
-### ⏸️ Fase 7: CLI - Scegliere il Sistema di Riferimento [POSTICIPATA]
+### ✅ Fase 7: CLI - Unificare CLI [COMPLETATA]
 
-**Decisione Required**: Il progetto è Kiloclaw, non Kilocode.
+**Decisione**: Il progetto è Kiloclaw, non Kilocode.
 
-**Stato**: ⏸️ Posticipata
+**Stato**: ✅ Implementato
 
-- Struttura CLI esistente funziona con nuovo sistema
-- `kiloclaw agent list` già presente in `kiloclaw.ts`
-- `kilocode agent list` mantiene compatibilità per ora
+- Rimosso `AgentCommand` da `index.ts` - `kiloccode agent list` non esiste più
+- `kiloclaw agent list` ora usa `Agent.list()` che mostra TUTTI gli agenti (native + flexible)
+- Output migliorato: raggruppato per mode (primary/subagent) e mostra deprecation status
+- File: `packages/opencode/src/index.ts`, `packages/opencode/src/cli/cmd/kiloclaw.ts`
 
 **Opzione A**: Usare `kiloclaw agent list` come unico comando
 
@@ -399,7 +400,7 @@ Fase 7: CLI cleanup
 | Task tool esegue flexible agents con prompt e permissions corretti | ✅             |
 | Test passano per tutte le nuove funzionalità                       | ✅ (531 tests) |
 
-**Nota**: Riferimento "kilocode" nella CLI mantenuto per compatibilità (Fase 7 posticipata).
+**Nota**: Tutte le fasi completate. `kilocode agent list` rimosso, solo `kiloclaw agent list` disponibile.
 
 ---
 
