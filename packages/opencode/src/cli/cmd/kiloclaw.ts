@@ -2,11 +2,12 @@
 import { cmd } from "./cmd"
 import { getCatalog, type Provider } from "../../kiloclaw/agency/catalog"
 import { KeyManager } from "../../kiloclaw/agency/key-pool"
-import { AgentFactory } from "../../kiloclaw/agency/factory"
+import { AgentFactory } from "../../kiloclaw/agency/factory" // kilocode_change - kept for info/tasks commands during transition
 import { AgencyName } from "../../kiloclaw/agency/types"
 import { allSkills, knowledgeSkills, developmentSkills, nutritionSkills, weatherSkills } from "../../kiloclaw/skills"
 import { Log } from "@/util/log"
 import { EOL } from "os"
+import { Agent } from "../../agent/agent" // kilocode_change - for unified agent list
 
 const log = Log.create({ service: "kiloclaw.cli" })
 
@@ -345,14 +346,16 @@ const ProviderCommand = cmd({
 })
 
 // Agent List Command
+// kilocode_change - uses Agent.list() which includes both native and flexible agents
 const AgentListCommand = cmd({
   command: "list",
-  describe: "list all agents, optionally filtered by agency",
+  describe: "list all agents (native + flexible), optionally filtered by agency",
   builder: (yargs) =>
     yargs
       .option("agency", {
         type: "string",
-        describe: "filter by agency (knowledge, development, nutrition, weather)",
+        describe: "filter by agency (development, knowledge, nutrition, weather)",
+        hidden: true, // kilocode_change - agency filter deprecated
       })
       .option("json", {
         type: "boolean",
@@ -360,23 +363,21 @@ const AgentListCommand = cmd({
         default: false,
       }),
   async handler(args) {
-    const agency = args.agency as AgencyName | undefined
+    // kilocode_change - use unified Agent.list() which includes flexible agents
+    const allAgents = await Agent.list()
 
-    const agents = agency ? AgentFactory.listAgentsByAgency(agency) : AgentFactory.listAgents()
+    // Filter out hidden agents
+    const visibleAgents = allAgents.filter((a) => !a.hidden)
 
     if (args.json) {
       console.log(
         JSON.stringify(
-          agents.map((a) => ({
-            id: a.id,
+          visibleAgents.map((a) => ({
             name: a.name,
-            agencyOwner: a.agencyOwner,
-            agencyCross: a.agencyCross,
-            taskTypes: a.taskTypes,
-            skills: a.skills,
-            capabilities: a.capabilities,
-            description: a.description,
-            version: a.version,
+            description: a.description ?? "",
+            mode: a.mode,
+            native: a.native ?? false,
+            deprecated: a.deprecated ?? false,
           })),
           null,
           2,
@@ -385,18 +386,31 @@ const AgentListCommand = cmd({
       return
     }
 
-    console.log(`\nAgents${agency ? ` (${agency})` : ""}: ${agents.length}`)
+    // Group by mode
+    const primaryAgents = visibleAgents.filter((a) => a.mode === "primary")
+    const subagents = visibleAgents.filter((a) => a.mode === "subagent")
+
+    console.log(`\nKiloclaw Agents: ${visibleAgents.length}`)
     console.log("=".repeat(60))
-    for (const a of agents) {
-      console.log(`\n[${a.name}]`)
-      console.log(`  ID: ${a.id}`)
-      console.log(`  Agency Owner: ${a.agencyOwner}`)
-      if (a.agencyCross.length > 0) {
-        console.log(`  Agency Cross: ${a.agencyCross.join(", ")}`)
+
+    if (primaryAgents.length > 0) {
+      console.log(`\nPrimary Agents:`)
+      for (const a of primaryAgents) {
+        const deprecated = a.deprecated ? " [DEPRECATED]" : ""
+        console.log(`  - ${a.name}${deprecated}: ${a.description ?? ""}`)
       }
-      console.log(`  Tasks: ${a.taskTypes.join(", ")}`)
-      console.log(`  Skills: ${a.skills.join(", ")}`)
     }
+
+    if (subagents.length > 0) {
+      console.log(`\nSubagents:`)
+      for (const a of subagents) {
+        console.log(`  - ${a.name}: ${a.description ?? ""}`)
+      }
+    }
+
+    console.log(
+      `\nTotal: ${visibleAgents.length} agents (${primaryAgents.length} primary, ${subagents.length} subagents)`,
+    )
   },
 })
 

@@ -4,7 +4,8 @@ import { RunCommand } from "./cli/cmd/run"
 import { GenerateCommand } from "./cli/cmd/generate"
 import { Log } from "./util/log"
 import { AuthCommand } from "./cli/cmd/auth"
-import { AgentCommand } from "./cli/cmd/agent"
+// kilocode_change start - AgentCommand removed, use 'kiloclaw agent' instead
+// import { AgentCommand } from "./cli/cmd/agent"
 import { UpgradeCommand } from "./cli/cmd/upgrade"
 import { UninstallCommand } from "./cli/cmd/uninstall"
 import { ModelsCommand } from "./cli/cmd/models"
@@ -182,7 +183,7 @@ let cli = yargs(hideBin(process.argv))
   .command(GenerateCommand)
   .command(DebugCommand)
   .command(AuthCommand)
-  .command(AgentCommand)
+  // .command(AgentCommand) // kilocode_change - removed, use 'kiloclaw agent' instead
   .command(UpgradeCommand)
   .command(UninstallCommand)
   .command(ServeCommand)

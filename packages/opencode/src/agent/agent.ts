@@ -561,9 +561,10 @@ export namespace Agent {
         {
           name: a.name,
           description: a.description ?? `Flexible agent: ${a.id}`,
-          mode: a.mode ?? "subagent",
+          mode: (a.mode ?? "subagent") as "primary" | "subagent" | "all",
           native: false,
           hidden: false,
+          deprecated: false,
           permission: a.permission ?? [],
           prompt: a.prompt,
         },
