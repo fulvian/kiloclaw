@@ -63,23 +63,29 @@ See [docs/plans/KILOCLAW_FOUNDATION_PLAN.md](docs/plans/KILOCLAW_FOUNDATION_PLAN
 
 ### Flexible Agents
 
-Kiloclaw uses capability-based flexible agents that can be invoked via the Task tool:
+Kiloclaw uses capability-based flexible agents. The **router** agent is the main entry point that automatically delegates to specialized agents based on user intent. Users can also select specific agents directly.
 
-| Agent           | Agency      | Capabilities                                   |
+**Primary Agent (Entry Point):**
+| Agent | Description |
+|--------|-------------|
+| router | Automatically routes tasks to specialized agents based on intent classification |
+
+**Subagents (invoked by router or directly via Task tool):**
+| Agent | Agency | Capabilities |
 | --------------- | ----------- | ---------------------------------------------- |
-| coder           | development | code-generation, code-modification, bug-fixing |
-| debugger        | development | debugging, root-cause-analysis                 |
-| planner         | development | task-planning, code-planning                   |
-| code-reviewer   | development | code-review, quality-assurance                 |
-| researcher      | knowledge   | web-search, academic-research, fact-checking   |
-| analyst         | knowledge   | data-analysis, comparison, evaluation          |
-| educator        | knowledge   | explanation, summarization, teaching           |
-| nutritionist    | nutrition   | nutrition-analysis, food-analysis              |
-| recipe-searcher | nutrition   | recipe-search, meal-ideas                      |
-| diet-planner    | nutrition   | meal-planning, diet-generation                 |
-| weather-current | weather     | weather-query, current-weather                 |
-| forecaster      | weather     | weather-forecast, prediction                   |
-| alerter         | weather     | weather-alerts, notifications                  |
+| coder | development | code-generation, code-modification, bug-fixing |
+| debugger | development | debugging, root-cause-analysis |
+| planner | development | task-planning, code-planning |
+| code-reviewer | development | code-review, quality-assurance |
+| researcher | knowledge | web-search, academic-research, fact-checking |
+| analyst | knowledge | data-analysis, comparison, evaluation |
+| educator | knowledge | explanation, summarization, teaching |
+| nutritionist | nutrition | nutrition-analysis, food-analysis |
+| recipe-searcher | nutrition | recipe-search, meal-ideas |
+| diet-planner | nutrition | meal-planning, diet-generation |
+| weather-current | weather | weather-query, current-weather |
+| forecaster | weather | weather-forecast, prediction |
+| alerter | weather | weather-alerts, notifications |
 
 Run `kiloclaw agent list` to see all available agents.
 
