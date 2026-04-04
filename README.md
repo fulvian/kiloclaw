@@ -24,9 +24,12 @@ Kiloclaw extends the foundation with:
 ## Status
 
 **Foundation Phase**: ✅ Complete  
-**Core Runtime**: ✅ Implemented  
-**Memory 4-Layer**: In Progress  
-**Agency Migration**: Pending
+**Core Runtime**: ✅ Complete  
+**Memory 4-Layer**: ✅ Complete  
+**Agency Migration**: ✅ Complete  
+**Flexible Agents**: ✅ Complete (13 agents with prompt/permission)
+
+See [docs/plans/KILOCLAW_FOUNDATION_PLAN.md](docs/plans/KILOCLAW_FOUNDATION_PLAN.md) for the full roadmap.
 
 See [docs/plans/KILOCLAW_FOUNDATION_PLAN.md](docs/plans/KILOCLAW_FOUNDATION_PLAN.md) for the full roadmap.
 
@@ -41,12 +44,13 @@ See [docs/plans/KILOCLAW_FOUNDATION_PLAN.md](docs/plans/KILOCLAW_FOUNDATION_PLAN
                +----------------+----------------+
                |                |                |
        +-------v------+  +------v-------+  +-----v-------+
-       |  Agency Dev  |  | Agency Know. |  | Agency Nutri|
-       +------+-------+  +------+-------+  +------+------+
-              |                 |                 |
-       +------v------+   +------v------+   +------v------+
-       | Agents      |   | Agents      |   | Agents      |
-       +------+------+   +------+------+   +------+------+
+       |  Agency Dev  |  | Agency Know. |  | Agency Nutri|  +-----v-------+
+       +------+-------+  +------+-------+  +------+------+  | Agency Wea.|
+       +------+-------+  +------+-------+  +------+------+  +------+------+
+              |                 |                 |                 |
+       +------v------+   +------v------+   +------v------+   +------v------+
+       | Agents      |   | Agents      |   | Agents      |   | Agents      |
+       +------+------+   +------+------+   +------+------+   +------+------+
               |
        +------v----------------------------------------------+
        | Skills layer (planning, review, retrieval, etc.)       |
@@ -57,16 +61,39 @@ See [docs/plans/KILOCLAW_FOUNDATION_PLAN.md](docs/plans/KILOCLAW_FOUNDATION_PLAN
        +-----------------------------------------------------+
 ```
 
+### Flexible Agents
+
+Kiloclaw uses capability-based flexible agents that can be invoked via the Task tool:
+
+| Agent           | Agency      | Capabilities                                   |
+| --------------- | ----------- | ---------------------------------------------- |
+| coder           | development | code-generation, code-modification, bug-fixing |
+| debugger        | development | debugging, root-cause-analysis                 |
+| planner         | development | task-planning, code-planning                   |
+| code-reviewer   | development | code-review, quality-assurance                 |
+| researcher      | knowledge   | web-search, academic-research, fact-checking   |
+| analyst         | knowledge   | data-analysis, comparison, evaluation          |
+| educator        | knowledge   | explanation, summarization, teaching           |
+| nutritionist    | nutrition   | nutrition-analysis, food-analysis              |
+| recipe-searcher | nutrition   | recipe-search, meal-ideas                      |
+| diet-planner    | nutrition   | meal-planning, diet-generation                 |
+| weather-current | weather     | weather-query, current-weather                 |
+| forecaster      | weather     | weather-forecast, prediction                   |
+| alerter         | weather     | weather-alerts, notifications                  |
+
+Run `kiloclaw agent list` to see all available agents.
+
 ## Key Documents
 
-| Document                                                     | Description                                      |
-| ------------------------------------------------------------ | ------------------------------------------------ |
-| [BLUEPRINT](docs/foundation/KILOCLAW_BLUEPRINT.md)           | Vision, principles, architecture target          |
-| [FOUNDATION_PLAN](docs/plans/KILOCLAW_FOUNDATION_PLAN.md)    | 16-week implementation roadmap                   |
-| [ADR-001](docs/adr/ADR-001_Runtime_Hierarchy.md)             | Runtime hierarchy (Core→Agency→Agent→Skill→Tool) |
-| [ADR-002](docs/adr/ADR-002_Memory_4_Layer.md)                | 4-layer memory architecture                      |
-| [ADR-003](docs/adr/ADR-003_Safety_Guardrails_Proactivity.md) | Safety, guardrails, proactivity policy           |
-| [ADR-004](docs/adr/ADR-004_Isolation_from_KiloCode.md)       | Isolation from KiloCode runtime                  |
+| Document                                                              | Description                                      |
+| --------------------------------------------------------------------- | ------------------------------------------------ |
+| [BLUEPRINT](docs/foundation/KILOCLAW_BLUEPRINT.md)                    | Vision, principles, architecture target          |
+| [FOUNDATION_PLAN](docs/plans/KILOCLAW_FOUNDATION_PLAN.md)             | 16-week implementation roadmap                   |
+| [ELIMINATE_NATIVE_AGENTS](docs/plans/ELIMINATE_NATIVE_AGENTS_PLAN.md) | Migrating to flexible agents                     |
+| [ADR-001](docs/adr/ADR-001_Runtime_Hierarchy.md)                      | Runtime hierarchy (Core→Agency→Agent→Skill→Tool) |
+| [ADR-002](docs/adr/ADR-002_Memory_4_Layer.md)                         | 4-layer memory architecture                      |
+| [ADR-003](docs/adr/ADR-003_Safety_Guardrails_Proactivity.md)          | Safety, guardrails, proactivity policy           |
+| [ADR-004](docs/adr/ADR-004_Isolation_from_KiloCode.md)                | Isolation from KiloCode runtime                  |
 
 ## Getting Started
 
