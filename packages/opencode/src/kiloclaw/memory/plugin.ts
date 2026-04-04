@@ -1,11 +1,14 @@
 import { Identifier } from "@/id/id"
 import { Log } from "@/util/log"
+import { Instance } from "@/project/instance"
 import { Session } from "@/session"
 import { MessageV2 } from "@/session/message-v2"
 import type { Hooks, PluginInput } from "@kilocode/plugin"
 import { MemoryBrokerV2 } from "./memory.broker.v2"
 
 const log = Log.create({ service: "kiloclaw.memory.plugin" })
+
+log.info("createMemoryContextPlugin loaded")
 
 const RECALL = [
   /ultim[ea]\s+conversaz/i,
@@ -22,6 +25,7 @@ export async function createMemoryContextPlugin(_input: PluginInput): Promise<Ho
     "chat.message": async (input, output) => {
       const text = userText(output.parts)
       if (!text) return
+      console.log("[MEMORY-PLUGIN] chat.message hook fired", { sessionID: input.sessionID, textLength: text.length })
 
       const ts = Date.now()
       const body = clip(text, 1200)
@@ -52,14 +56,28 @@ export async function createMemoryContextPlugin(_input: PluginInput): Promise<Ho
     },
 
     "experimental.chat.messages.transform": async (_input, output) => {
+      console.log("[MEMORY-PLUGIN] transform hook fired", { messageCount: output.messages.length })
       const msg = output.messages.findLast((item) => item.info.role === "user")
-      if (!msg) return
+      if (!msg) {
+        console.log("[MEMORY-PLUGIN] no user message found")
+        return
+      }
 
       const text = userText(msg.parts)
-      if (!needsRecall(text)) return
+      console.log("[MEMORY-PLUGIN] user text:", text.slice(0, 100))
+      if (!needsRecall(text)) {
+        console.log("[MEMORY-PLUGIN] recall NOT needed")
+        return
+      }
+      console.log("[MEMORY-PLUGIN] recall IS needed, fetching sessions and memory")
 
       const cur = msg.info.sessionID
-      const items = [...Session.listGlobal({ roots: true, limit: 12 })].filter((s) => s.id !== cur).slice(0, 5)
+      const currentDir = Instance.directory
+      console.log("[MEMORY-PLUGIN] current directory:", currentDir)
+      const allSessions = [...Session.listGlobal({ directory: currentDir, roots: true, limit: 12 })]
+      console.log("[MEMORY-PLUGIN] all sessions found:", allSessions.length)
+      const items = allSessions.filter((s) => s.id !== cur).slice(0, 5)
+      console.log("[MEMORY-PLUGIN] filtered sessions (excluding current):", items.length)
       const lines = await Promise.all(
         items.map(async (session) => {
           const msgs = await Session.messages({ sessionID: session.id, limit: 8 }).catch(() => [])
@@ -74,7 +92,12 @@ export async function createMemoryContextPlugin(_input: PluginInput): Promise<Ho
 
       const mem = await MemoryBrokerV2.retrieve({ query: text, limit: 6 })
         .then((x) => x.items)
-        .catch(() => [])
+        .catch((err) => {
+          console.log("[MEMORY-PLUGIN] retrieve failed:", err)
+          return []
+        })
+
+      console.log("[MEMORY-PLUGIN] memory retrieve returned:", mem.length, "items")
 
       const memLines = mem
         .slice(0, 4)
@@ -92,6 +115,7 @@ export async function createMemoryContextPlugin(_input: PluginInput): Promise<Ho
         "</system-reminder>",
       ].join("\n")
 
+      console.log("[MEMORY-PLUGIN] injecting memory block, length:", block.length)
       msg.parts.push({
         id: Identifier.ascending("part"),
         messageID: msg.info.id,
@@ -100,6 +124,12 @@ export async function createMemoryContextPlugin(_input: PluginInput): Promise<Ho
         text: block,
         synthetic: true,
       } satisfies MessageV2.TextPart)
+      console.log(
+        "[MEMORY-PLUGIN] parts after injection:",
+        msg.parts.length,
+        "synthetic count:",
+        msg.parts.filter((p) => "synthetic" in p && p.synthetic).length,
+      )
     },
   }
 }
