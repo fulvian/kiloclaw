@@ -15,10 +15,11 @@ import {
   FeedbackRepo,
   AuditRepo,
 } from "./memory.repository"
-import { rank, applyBudget, DEFAULT_BUDGET, DEFAULT_WEIGHTS, DEFAULT_THRESHOLDS } from "./memory.ranking"
+import { rank, applyBudget, DEFAULT_BUDGET, DEFAULT_WEIGHTS, DEFAULT_THRESHOLDS, rankByScope } from "./memory.ranking"
 import type { RankedItem, TokenBudget } from "./memory.ranking"
 import { MemoryEmbedding } from "./memory.embedding"
 import { MemoryMetrics } from "./memory.metrics"
+import { MemoryReranker, type RerankCandidate } from "./memory.reranker"
 
 const log = Log.create({ service: "kiloclaw.memory.broker.v2" })
 
@@ -370,9 +371,16 @@ export const MemoryBrokerV2: MemoryBrokerV2 = {
   async retrieve(options: {
     query?: string
     userId?: string
+    sessionId?: string
+    agentId?: string
     limit?: number
     budget?: Partial<TokenBudget>
     weights?: typeof DEFAULT_WEIGHTS
+    // BP-09: Metadata filters
+    actorType?: string
+    actorId?: string
+    since?: number
+    until?: number
   }): Promise<{ items: RankedItem<any>[]; tokenUsage: number }> {
     const started = performance.now()
     const limit = options.limit ?? 50
@@ -411,7 +419,17 @@ export const MemoryBrokerV2: MemoryBrokerV2 = {
     }
 
     const episodes = await EpisodicMemoryRepo.getRecentEpisodes(TENANT, Math.max(limit * 2, 50))
-    for (const ep of episodes) {
+
+    // BP-09: Apply metadata filters to episodes
+    const filteredEpisodes = episodes.filter((ep) => {
+      if (options.actorType && ep.actor_type !== options.actorType) return false
+      if (options.actorId && ep.actor_id !== options.actorId) return false
+      if (options.since && ep.completed_at < options.since) return false
+      if (options.until && ep.completed_at > options.until) return false
+      return true
+    })
+
+    for (const ep of filteredEpisodes) {
       const text = `${ep.task_description} ${ep.outcome}`
       const relevance = lexicalRelevance(q, text)
       candidates.push({
@@ -423,6 +441,7 @@ export const MemoryBrokerV2: MemoryBrokerV2 = {
           confidence: normalize100(ep.confidence),
           successSignal: ep.outcome === "success" ? 1 : ep.outcome === "partial" ? 0.5 : 0.2,
           provenanceQuality: 0.8,
+          actorType: ep.actor_type ?? undefined,
           userPreferenceMatch: prefMatch,
           sensitivityPenalty: 0,
           contradictionPenalty: 0,
@@ -449,8 +468,37 @@ export const MemoryBrokerV2: MemoryBrokerV2 = {
       }))
     }
 
+    // Apply reranking to semantic candidates for better precision
+    if (semanticVec.length > 1 && q.length > 0) {
+      const rerankCandidates: RerankCandidate[] = semanticVec.map((r) => ({
+        id: r.fact.id,
+        content: `${r.fact.subject} ${r.fact.predicate} ${r.fact.object}`,
+        originalScore: r.similarity,
+        metadata: { fact: r.fact },
+      }))
+
+      try {
+        const reranked = await MemoryReranker.rerank(q, rerankCandidates, Math.max(limit * 2, 50))
+
+        // Replace with reranked results
+        semanticVec = reranked.map((r) => ({
+          fact: r.metadata?.fact ?? r,
+          similarity: r.rerankScore,
+        }))
+        log.debug("semantic reranking applied", { original: rerankCandidates.length, reranked: semanticVec.length })
+      } catch (err) {
+        log.error("semantic reranking failed, using original scores", { err })
+      }
+    }
+
     for (const row of semanticVec) {
       const fact = row.fact
+      // BP-09: Apply metadata filters to semantic facts
+      if (options.actorType && fact.actor_type !== options.actorType) continue
+      if (options.actorId && fact.actor_id !== options.actorId) continue
+      if (options.since && (fact.created_at ?? 0) < options.since) continue
+      if (options.until && (fact.created_at ?? Infinity) > options.until) continue
+
       candidates.push({
         item: { layer: "semantic" as const, ...fact },
         score: 0,
@@ -460,6 +508,7 @@ export const MemoryBrokerV2: MemoryBrokerV2 = {
           confidence: normalize100(fact.confidence),
           successSignal: 0.8,
           provenanceQuality: provenanceQuality(fact.provenance),
+          actorType: fact.actor_type ?? undefined,
           userPreferenceMatch: prefMatch,
           sensitivityPenalty: 0,
           contradictionPenalty: 0,
@@ -489,7 +538,23 @@ export const MemoryBrokerV2: MemoryBrokerV2 = {
       })
     }
 
-    const ranked = rank(candidates, weights, DEFAULT_THRESHOLDS)
+    // BP-03: Apply scope-based ranking if user/session/agent scope provided
+    let ranked = rank(candidates, weights, DEFAULT_THRESHOLDS)
+    if (options.userId || options.sessionId || options.agentId) {
+      const scopeResult = rankByScope(ranked, {
+        userId: options.userId,
+        sessionId: options.sessionId,
+        agentId: options.agentId,
+      })
+      ranked = scopeResult.composed
+      log.debug("scope ranking applied", {
+        user: scopeResult.userMemories.length,
+        session: scopeResult.sessionMemories.length,
+        agent: scopeResult.agentMemories.length,
+        global: scopeResult.globalMemories.length,
+      })
+    }
+
     const maxTokens = limit * 100
     const result = applyBudget(ranked, budget, maxTokens)
 

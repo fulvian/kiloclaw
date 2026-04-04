@@ -221,6 +221,8 @@ export const FactSchema = z.object({
   object: z.unknown(),
   confidence: z.number().min(0).max(1),
   source: z.string().optional(),
+  actorType: z.enum(["user", "agent", "system"]).optional(),
+  actorId: z.string().optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 })

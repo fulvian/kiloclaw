@@ -43,6 +43,7 @@ export interface ScoreFactors {
   confidence: number // 0-1 from fact/procedure confidence
   successSignal: number // 0-1 historical success rate
   provenanceQuality: number // 0-1 source reliability
+  actorType?: string // BP-06: Actor type for provenance
   userPreferenceMatch: number // 0-1 user preference alignment
   sensitivityPenalty: number // 0-1 sensitivity level
   contradictionPenalty: number // 0-1 contradiction detection
@@ -100,6 +101,7 @@ export function rank<T>(
     confidence?: number
     successRate?: number
     provenance?: string
+    actorType?: string
     sensitivity?: string
     userPreferenceMatch?: number
     contradictions?: number
@@ -187,6 +189,7 @@ function computeFactors(
     confidence?: number
     successRate?: number
     provenance?: string
+    actorType?: string
     sensitivity?: string
     userPreferenceMatch?: number
     contradictions?: number
@@ -198,7 +201,7 @@ function computeFactors(
     recencyNorm: computeRecencyNorm(now, raw.timestamp, raw.ageMs),
     confidence: clamp(raw.confidence ?? 0, 0, 1),
     successSignal: clamp(raw.successRate ?? 0, 0, 1),
-    provenanceQuality: computeProvenanceQuality(raw.provenance),
+    provenanceQuality: computeProvenanceQuality(raw.provenance, raw.actorType),
     userPreferenceMatch: clamp(raw.userPreferenceMatch ?? 0, 0, 1),
     sensitivityPenalty: raw.sensitivity ? (SENSITIVITY_PENALTY[raw.sensitivity] ?? 0) : 0,
     contradictionPenalty: clamp(raw.contradictions ?? 0, 0, 1),
@@ -224,21 +227,35 @@ function computeRecencyNorm(now: number, timestamp?: number, ageMs?: number): nu
   return clamp(decay, 0, 1)
 }
 
-function computeProvenanceQuality(provenance?: string): number {
-  if (!provenance) return 0.4
-
-  // Source quality scores
-  const sourceQuality: Record<string, number> = {
-    user_direct: 1.0,
-    user_feedback: 0.9,
-    task_result: 0.8,
-    agent_inference: 0.6,
-    system_default: 0.4,
-    unknown: 0.3,
+function computeProvenanceQuality(provenance?: string, actorType?: string): number {
+  // Base provenance quality
+  let base = 0.6
+  if (provenance) {
+    const normalized = provenance.toLowerCase().trim()
+    // Source quality scores
+    const sourceQuality: Record<string, number> = {
+      user_direct: 1.0,
+      user_feedback: 0.9,
+      user: 0.95,
+      task_result: 0.8,
+      task: 0.85,
+      agent_inference: 0.6,
+      broker_v2: 0.75,
+      memory_controller: 0.7,
+      system_default: 0.4,
+      extracted: 0.65,
+      unknown: 0.3,
+    }
+    base = sourceQuality[normalized] ?? 0.6
   }
 
-  const normalized = provenance.toLowerCase().trim()
-  return sourceQuality[normalized] ?? 0.4
+  // Actor type bonus (BP-06)
+  if (actorType === "user") return Math.min(1, base + 0.05)
+  if (actorType === "system") return Math.max(0.3, base - 0.1)
+  if (actorType === "agent") return base + 0.02
+  if (actorType === "tool") return Math.max(0.3, base - 0.05)
+
+  return base
 }
 
 // =============================================================================
@@ -400,4 +417,76 @@ function estimateTokens(item: unknown): number {
   // Rough estimation: 1 token ≈ 4 characters for English
   const json = JSON.stringify(item)
   return Math.ceil(json.length / 4)
+}
+
+// =============================================================================
+// BP-03: Multi-Scope Memory Ranking
+// =============================================================================
+
+export interface MemoryScope {
+  userId?: string
+  sessionId?: string
+  agentId?: string
+  global?: boolean
+}
+
+export interface ScopedRetrievalResult {
+  userMemories: RankedItem<any>[]
+  sessionMemories: RankedItem<any>[]
+  agentMemories: RankedItem<any>[]
+  globalMemories: RankedItem<any>[]
+  composed: RankedItem<any>[]
+}
+
+/**
+ * Rank candidates by memory scope (user/session/agent/global).
+ * Each scope gets a different weight boost.
+ */
+export function rankByScope(candidates: RankedItem<any>[], scope: MemoryScope): ScopedRetrievalResult {
+  const byScope = {
+    user: [] as RankedItem<any>[],
+    session: [] as RankedItem<any>[],
+    agent: [] as RankedItem<any>[],
+    global: [] as RankedItem<any>[],
+  }
+
+  for (const candidate of candidates) {
+    const item = candidate.item as any
+    let itemScope: "user" | "session" | "agent" | "global" = "global"
+
+    // Determine scope based on matching IDs
+    if (scope.userId && item.user_id === scope.userId) {
+      itemScope = "user"
+    } else if (scope.sessionId && item.session_id === scope.sessionId) {
+      itemScope = "session"
+    } else if (scope.agentId && item.agent_id === scope.agentId) {
+      itemScope = "agent"
+    }
+
+    byScope[itemScope].push(candidate)
+  }
+
+  // Compose with scope weighting (BP-03)
+  // User memories get highest boost, then session, then agent, then global
+  const scopeWeights = {
+    user: 1.0, // No penalty for matching user scope
+    session: 0.85, // Slight penalty for non-user scope
+    agent: 0.7, // More penalty for non-user, non-session
+    global: 0.5, // Heavy penalty for global (non-scoped) memories
+  }
+
+  const composed = [
+    ...byScope.user.map((c) => ({ ...c, score: c.score * scopeWeights.user })),
+    ...byScope.session.map((c) => ({ ...c, score: c.score * scopeWeights.session })),
+    ...byScope.agent.map((c) => ({ ...c, score: c.score * scopeWeights.agent })),
+    ...byScope.global.map((c) => ({ ...c, score: c.score * scopeWeights.global })),
+  ].sort((a, b) => b.score - a.score)
+
+  return {
+    userMemories: byScope.user,
+    sessionMemories: byScope.session,
+    agentMemories: byScope.agent,
+    globalMemories: byScope.global,
+    composed,
+  }
 }

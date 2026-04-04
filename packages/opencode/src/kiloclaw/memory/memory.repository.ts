@@ -196,7 +196,10 @@ export const WorkingMemoryRepo = {
     const conditions = [eq(WorkingStateTable.tenant_id, tenantId)]
     if (userId) conditions.push(eq(WorkingStateTable.user_id, userId))
 
-    const rows = await db().select({ id: WorkingStateTable.id }).from(WorkingStateTable).where(and(...conditions))
+    const rows = await db()
+      .select({ id: WorkingStateTable.id })
+      .from(WorkingStateTable)
+      .where(and(...conditions))
     return rows.length
   },
 
@@ -325,7 +328,10 @@ export const EpisodicMemoryRepo = {
     const conditions = [eq(EpisodeTable.tenant_id, tenantId)]
     if (userId) conditions.push(eq(EpisodeTable.user_id, userId))
 
-    const rows = await db().select({ id: EpisodeTable.id }).from(EpisodeTable).where(and(...conditions))
+    const rows = await db()
+      .select({ id: EpisodeTable.id })
+      .from(EpisodeTable)
+      .where(and(...conditions))
     return rows.length
   },
 
@@ -333,7 +339,10 @@ export const EpisodicMemoryRepo = {
     const conditions = [eq(MemoryEventTable.tenant_id, tenantId)]
     if (userId) conditions.push(eq(MemoryEventTable.user_id, userId))
 
-    const rows = await db().select({ id: MemoryEventTable.id }).from(MemoryEventTable).where(and(...conditions))
+    const rows = await db()
+      .select({ id: MemoryEventTable.id })
+      .from(MemoryEventTable)
+      .where(and(...conditions))
     return rows.length
   },
 
@@ -395,6 +404,11 @@ export const SemanticMemoryRepo = {
       predicate?: string
       minConfidence?: number
       includeExpired?: boolean
+      // BP-09: Metadata filtering
+      actorType?: string
+      actorId?: string
+      since?: number
+      until?: number
     },
   ): Promise<Fact[]> {
     const conditions = [eq(FactTable.tenant_id, tenantId)]
@@ -403,6 +417,14 @@ export const SemanticMemoryRepo = {
     if (options?.subject) conditions.push(like(FactTable.subject, `%${options.subject}%`))
     if (options?.predicate) conditions.push(like(FactTable.predicate, `%${options.predicate}%`))
     if (options?.minConfidence) conditions.push(sql`${FactTable.confidence} >= ${options.minConfidence}`)
+
+    // BP-09: Actor filtering
+    if (options?.actorType) conditions.push(eq(FactTable.actor_type, options.actorType))
+    if (options?.actorId) conditions.push(eq(FactTable.actor_id, options.actorId))
+
+    // BP-09: Time range filtering
+    if (options?.since) conditions.push(sql`${FactTable.created_at} >= ${options.since}`)
+    if (options?.until) conditions.push(sql`${FactTable.created_at} <= ${options.until}`)
 
     // Exclude expired by default
     if (!options?.includeExpired) {
@@ -425,7 +447,10 @@ export const SemanticMemoryRepo = {
     const conditions = [eq(FactTable.tenant_id, tenantId)]
     if (userId) conditions.push(eq(FactTable.user_id, userId))
 
-    const rows = await db().select({ id: FactTable.id }).from(FactTable).where(and(...conditions))
+    const rows = await db()
+      .select({ id: FactTable.id })
+      .from(FactTable)
+      .where(and(...conditions))
     return rows.length
   },
 
@@ -558,7 +583,10 @@ export const ProceduralMemoryRepo = {
     const conditions = [eq(ProcedureTable.tenant_id, tenantId)]
     if (userId) conditions.push(eq(ProcedureTable.user_id, userId))
 
-    const rows = await db().select({ id: ProcedureTable.id }).from(ProcedureTable).where(and(...conditions))
+    const rows = await db()
+      .select({ id: ProcedureTable.id })
+      .from(ProcedureTable)
+      .where(and(...conditions))
     return rows.length
   },
 }

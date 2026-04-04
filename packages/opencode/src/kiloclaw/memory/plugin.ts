@@ -5,6 +5,7 @@ import { Session } from "@/session"
 import { MessageV2 } from "@/session/message-v2"
 import type { Hooks, PluginInput } from "@kilocode/plugin"
 import { MemoryBrokerV2 } from "./memory.broker.v2"
+import { MemoryWriteback } from "./memory.writeback"
 
 const log = Log.create({ service: "kiloclaw.memory.plugin" })
 
@@ -27,31 +28,12 @@ export async function createMemoryContextPlugin(_input: PluginInput): Promise<Ho
       if (!text) return
       console.log("[MEMORY-PLUGIN] chat.message hook fired", { sessionID: input.sessionID, textLength: text.length })
 
-      const ts = Date.now()
-      const body = clip(text, 1200)
-
-      await MemoryBrokerV2.write({
-        layer: "working",
-        key: `session:${input.sessionID}:last_user_query`,
-        value: { text: body, at: ts },
-        ttlMs: 6 * 60 * 60 * 1000,
-      }).catch((err) => {
-        log.debug("working memory write skipped", { err: String(err) })
-      })
-
-      await MemoryBrokerV2.write({
-        layer: "episodic",
-        key: `session:${input.sessionID}:user_turn:${input.messageID ?? "none"}`,
-        value: {
-          taskDescription: body,
-          outcome: "user_input",
-          correlationId: input.messageID,
-          startedAt: ts,
-          completedAt: ts,
-          agentId: input.agent,
-        },
-      }).catch((err) => {
-        log.debug("episodic memory write skipped", { err: String(err) })
+      // Non-blocking async writeback with selective extraction
+      MemoryWriteback.recordUserTurn({
+        sessionId: input.sessionID,
+        messageID: input.messageID ?? undefined,
+        agent: input.agent,
+        text: text,
       })
     },
 

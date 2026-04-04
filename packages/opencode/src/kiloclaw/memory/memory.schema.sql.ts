@@ -69,6 +69,8 @@ export const MemoryEventTable = sqliteTable(
     event_type: text().notNull(), // task_start, task_complete, tool_call, etc.
     payload: text({ mode: "json" }).notNull(),
     sensitivity: text().notNull().default("medium"),
+    actor_type: text(), // 'user', 'agent', 'system', 'tool'
+    actor_id: text(),
     ts: integer()
       .notNull()
       .$default(() => Date.now()),
@@ -80,6 +82,7 @@ export const MemoryEventTable = sqliteTable(
     index("event_tenant_user_ts_idx").on(table.tenant_id, table.user_id, table.ts),
     index("event_correlation_idx").on(table.correlation_id),
     index("event_type_idx").on(table.event_type),
+    index("event_actor_idx").on(table.actor_type, table.actor_id),
   ],
 )
 
@@ -99,6 +102,8 @@ export const EpisodeTable = sqliteTable(
     correlation_id: text(),
     agency_id: text(),
     agent_id: text(),
+    actor_type: text(), // 'user', 'agent', 'system', 'tool'
+    actor_id: text(),
     source_event_ids: text({ mode: "json" }).$type<string[]>().default([]),
     artifacts: text({ mode: "json" }).$type<Record<string, unknown>>(),
     confidence: integer().notNull().default(80), // 0-100
@@ -112,6 +117,7 @@ export const EpisodeTable = sqliteTable(
     index("episode_correlation_idx").on(table.correlation_id),
     index("episode_expires_idx").on(table.expires_at),
     index("episode_completed_idx").on(table.completed_at),
+    index("episode_actor_idx").on(table.actor_type, table.actor_id),
   ],
 )
 
@@ -132,6 +138,9 @@ export const FactTable = sqliteTable(
     object: text({ mode: "json" }).notNull(),
     confidence: integer().notNull().default(50), // 0-100 scale
     provenance: text(), // Source reference
+    extraction_source: text(), // 'extracted', 'user_direct', 'broker_v2'
+    actor_type: text(), // 'user', 'agent', 'system'
+    actor_id: text(),
     source_event_ids: text({ mode: "json" }).$type<string[]>().default([]),
     valid_from: integer()
       .notNull()
@@ -150,6 +159,7 @@ export const FactTable = sqliteTable(
     index("fact_predicate_idx").on(table.predicate),
     index("fact_confidence_idx").on(table.confidence),
     index("fact_valid_to_idx").on(table.valid_to), // null = current
+    index("fact_actor_idx").on(table.actor_type, table.actor_id),
   ],
 )
 
@@ -195,6 +205,10 @@ export const ProcedureTable = sqliteTable(
     current_version: text().notNull().default("1.0.0"),
     success_rate: integer().notNull().default(0), // 0-100
     usage_count: integer().notNull().default(0),
+    // BP-07: Enhanced procedural memory fields
+    pattern_tags: text({ mode: "json" }).$type<string[]>(), // JSON array of pattern tags
+    steps: text({ mode: "json" }).$type<string[]>(), // JSON array of steps
+    prerequisites: text({ mode: "json" }).$type<string[]>(), // JSON array of prerequisites
     created_at: integer()
       .notNull()
       .$default(() => Date.now()),
