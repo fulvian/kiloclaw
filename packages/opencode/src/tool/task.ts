@@ -40,8 +40,8 @@ export const TaskTool = Tool.define("task", async (ctx) => {
     ...flexibleAgents
       .filter((a) => a.mode !== "primary")
       .map((a) => ({
-        name: a.name,
-        description: a.description ?? `Flexible agent: ${a.id}`,
+        name: a.id,
+        description: a.description ?? `Flexible agent: ${a.name}`,
         mode: "subagent" as const,
       })),
   ]
@@ -89,6 +89,9 @@ export const TaskTool = Tool.define("task", async (ctx) => {
         throw new Error(`Unknown agent type: ${params.subagent_type} is not a valid agent type`)
       }
 
+      const agentName = agent?.name ?? flexibleAgent!.id
+      const agentTitle = agent?.name ?? flexibleAgent!.name
+
       // Get permissions - prefer flexible agent's permissions if available
       const agentPermission = flexibleAgent?.permission ?? agent!.permission
       const allowsTask = agentPermission.some((rule) => rule.permission === "task" && rule.action === "allow") // kilocode_change
@@ -101,7 +104,7 @@ export const TaskTool = Tool.define("task", async (ctx) => {
 
         return await Session.create({
           parentID: ctx.sessionID,
-          title: params.description + ` (@${agent.name} subagent)`,
+          title: params.description + ` (@${agentTitle} subagent)`,
           permission: [
             {
               permission: "todowrite",
@@ -133,7 +136,7 @@ export const TaskTool = Tool.define("task", async (ctx) => {
       const msg = await MessageV2.get({ sessionID: ctx.sessionID, messageID: ctx.messageID })
       if (msg.info.role !== "assistant") throw new Error("Not an assistant message")
 
-      const model = agent.model ?? {
+      const model = agent?.model ?? {
         modelID: msg.info.modelID,
         providerID: msg.info.providerID,
       }
@@ -162,7 +165,7 @@ export const TaskTool = Tool.define("task", async (ctx) => {
           modelID: model.modelID,
           providerID: model.providerID,
         },
-        agent: agent.name,
+        agent: agentName,
         tools: {
           todowrite: false,
           todoread: false,

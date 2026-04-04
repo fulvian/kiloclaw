@@ -9,77 +9,147 @@
 
 When users attempted to invoke subagents via the Task tool (e.g., `researcher`, `coder`, `debugger`), the system threw an error indicating the agent type was unknown, even though these agents were properly defined in `agency-definitions.ts`.
 
-## Root Cause
+## Root Cause (Multi-Layer Analysis)
 
-The `FlexibleAgentRegistry` maintains internal state (a `Map`) where flexible agents are registered via `registerFlexibleAgents()`. This registration function is called **only** within the `AgencyCatalog` constructor.
+Four issues compounded to cause the failure:
 
-`AgencyCatalog` is a **lazy singleton** - it's only instantiated when `getCatalog()` is called explicitly. However, `getCatalog()` was only being called in explicit CLI commands (`list-agencies`, `info`, etc.), **NOT** during:
-- Normal interactive chat CLI usage
-- When the TaskTool is invoked to execute a subagent
+### Issue 1: Lazy Catalog Bootstrap
 
-This meant the `FlexibleAgentRegistry` was empty when users tried to invoke subagents, causing the "Unknown agent type" error.
+`AgencyCatalog` is a lazy singleton - it was only instantiated when `getCatalog()` was called explicitly. The `FlexibleAgentRegistry` (where flexible agents are registered) was populated only during `bootstrapDefaultCatalog()`, which was called manually in CLI commands like `list-agencies`.
 
-## Solution
-
-Added explicit initialization of the `AgencyCatalog` before accessing the `FlexibleAgentRegistry` in two locations:
-
-### 1. `packages/opencode/src/tool/task.ts`
+**Fix**: Modified `getCatalog()` to auto-bootstrap on first access:
 
 ```typescript
-import { getCatalog } from "../kiloclaw/agency/catalog"
-
-async execute(params: z.infer<typeof parameters>, ctx) {
-  const config = await Config.get()
-
-  // Ensure flexible agents are registered before attempting to use them
-  getCatalog()
-  // ... rest of execute
+let defaultCatalogBootstrapped = false
+export function getCatalog(): AgencyCatalog {
+  if (!catalogInstance) {
+    catalogInstance = new AgencyCatalog()
+  }
+  if (!defaultCatalogBootstrapped) {
+    catalogInstance.bootstrapDefaultCatalog()
+    defaultCatalogBootstrapped = true
+  }
+  return catalogInstance
 }
 ```
 
-### 2. `packages/opencode/src/agent/agent.ts`
+### Issue 2: TaskTool Assumed Native Agent Always Existed
+
+Even when `flexibleAgent` was found in `FlexibleAgentRegistry`, the code used `agent.name` and `agent.model` which were undefined for flexible-only agents. This caused `TypeError: undefined is not an object (evaluating 'agent.name')` and `agent.variant`.
+
+**Fix**: TaskTool now handles flexible-only agents correctly:
 
 ```typescript
-import { getCatalog } from "../kiloclaw/agency/catalog" // kilocode_change
+const flexibleAgent = FlexibleAgentRegistry.getAgent(params.subagent_type)
+const agent = await Agent.get(params.subagent_type)
+if (!agent && !flexibleAgent) {
+  throw new Error(`Unknown agent type: ${params.subagent_type}...`)
+}
 
-export async function list() {
-  // ...
-  // Ensure catalog is initialized first to register all flexible agents
+// Safe access for both native and flexible-only agents
+const agentName = agent?.name ?? flexibleAgent!.id
+const agentTitle = agent?.name ?? flexibleAgent!.name
+const agentPermission = flexibleAgent?.permission ?? agent!.permission
+const model = agent?.model ?? {
+  modelID: msg.info.modelID,
+  providerID: msg.info.providerID,
+}
+```
+
+### Issue 3: Subagent Listing Used Wrong Field
+
+The TaskTool description listed subagents using `a.name` (display name like "Researcher") instead of `a.id` (identifier like "researcher"). Since `subagent_type` expects IDs, this caused a mismatch.
+
+**Fix**: Changed listing to use `a.id` for the name field:
+
+```typescript
+flexibleAgents
+  .filter((a) => a.mode !== "primary")
+  .map((a) => ({
+    name: a.id, // Use ID, not display name
+    description: a.description ?? `Flexible agent: ${a.name}`,
+    mode: "subagent" as const,
+  }))
+```
+
+### Issue 4: Agent.get() Didn't Know About Flexible Agents
+
+`Agent.get()` only looked in native agent state, never checking `FlexibleAgentRegistry`. Added fallback:
+
+```typescript
+export async function get(agent: string) {
+  const effectiveAgent = agent === "build" ? "code" : agent
+  const nativeAgent = await state().then((x) => x[effectiveAgent])
+  if (nativeAgent) return nativeAgent
+
+  // Fallback: check FlexibleAgentRegistry
   getCatalog()
-  const flexibleAgents = FlexibleAgentRegistry.getAllAgents()
-  // ...
+  const flexibleAgent = FlexibleAgentRegistry.getAgent(effectiveAgent)
+  if (!flexibleAgent) return nativeAgent // return undefined if not found anywhere
+
+  // Return compatible Agent.Info object
+  return {
+    name: flexibleAgent.id,
+    displayName: flexibleAgent.name,
+    description: flexibleAgent.description ?? `Flexible agent: ${flexibleAgent.id}`,
+    mode: (flexibleAgent.mode ?? "subagent") as "primary" | "subagent" | "all",
+    native: false,
+    hidden: false,
+    deprecated: false,
+    permission: flexibleAgent.permission ?? [],
+    topP: undefined,
+    temperature: undefined,
+    color: undefined,
+    model: undefined,
+    variant: undefined,
+    prompt: flexibleAgent.prompt,
+    options: {},
+    steps: undefined,
+  }
 }
 ```
 
 ## Files Modified
 
-| File | Change |
-|------|--------|
-| `packages/opencode/src/tool/task.ts` | Added `getCatalog()` call in `execute()` |
-| `packages/opencode/src/agent/agent.ts` | Added `getCatalog()` call in `list()` |
-
-## Available Flexible Agents
-
-| Agent ID | Name | Primary Agency | Capabilities |
-|----------|------|---------------|--------------|
-| `researcher` | Researcher | knowledge | search, synthesis, information_gathering, web-search, academic-research, fact-checking |
-| `coder` | Coder | development | coding, debugging, refactoring, code-generation, code-modification, bug-fixing |
-| `debugger` | Debugger | development | debugging, root-cause-analysis, troubleshooting |
-| `planner` | Planner | development | task-planning, code-planning, roadmapping |
-| `code-reviewer` | Code Reviewer | development | code-review, quality-assurance |
-| `analyst` | Analyst | knowledge | data-analysis, comparison, evaluation |
-| `educator` | Educator | knowledge | explanation, summarization, teaching |
-| `nutritionist` | Nutritionist | nutrition | nutrition-analysis, food-analysis, dietary-assessment |
-| `weather-current` | Weather | weather | weather-query, current-weather |
-| `forecaster` | Forecaster | weather | weather-forecast, weather-prediction |
-| `recipe-searcher` | Recipe Searcher | nutrition | recipe-search, meal-ideas |
-| `diet-planner` | Diet Planner | nutrition | meal-planning, diet-generation, nutrition-planning |
-| `alerter` | Alerter | weather | weather-alerts, notifications |
+| File                                               | Change                                                                                      |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `packages/opencode/src/kiloclaw/agency/catalog.ts` | Auto-bootstrap catalog on `getCatalog()` first call                                         |
+| `packages/opencode/src/tool/task.ts`               | Handle flexible-only agents; use `a.id` for subagent names                                  |
+| `packages/opencode/src/agent/agent.ts`             | `Agent.get()` falls back to FlexibleAgentRegistry; `Agent.list()` initializes catalog first |
 
 ## Verification
 
-- TypeScript typecheck: ✅ PASS
-- Test suite: ✅ 1848 pass, 11 skip, 210 fail (pre-existing failures unrelated to routing)
+```bash
+bun run --cwd packages/opencode --conditions=browser src/index.ts run \
+  "Use the Task tool with subagent_type 'researcher' and prompt 'Reply with ok'."
+```
+
+**Result**: ✅ SUCCESS
+
+```
+> router · MiniMax-M2.7
+• Simple researcher task Researcher Agent
+✓ Simple researcher task Researcher Agent
+The researcher agent replied with: ok
+```
+
+## Available Flexible Agents
+
+| Agent ID          | Name            | Primary Agency | Capabilities                                                                           |
+| ----------------- | --------------- | -------------- | -------------------------------------------------------------------------------------- |
+| `researcher`      | Researcher      | knowledge      | search, synthesis, information_gathering, web-search, academic-research, fact-checking |
+| `coder`           | Coder           | development    | coding, debugging, refactoring, code-generation, code-modification, bug-fixing         |
+| `debugger`        | Debugger        | development    | debugging, root-cause-analysis, troubleshooting                                        |
+| `planner`         | Planner         | development    | task-planning, code-planning, roadmapping                                              |
+| `code-reviewer`   | Code Reviewer   | development    | code-review, quality-assurance                                                         |
+| `analyst`         | Analyst         | knowledge      | data-analysis, comparison, evaluation                                                  |
+| `educator`        | Educator        | knowledge      | explanation, summarization, teaching                                                   |
+| `nutritionist`    | Nutritionist    | nutrition      | nutrition-analysis, food-analysis, dietary-assessment                                  |
+| `weather-current` | Weather         | weather        | weather-query, current-weather                                                         |
+| `forecaster`      | Forecaster      | weather        | weather-forecast, weather-prediction                                                   |
+| `recipe-searcher` | Recipe Searcher | nutrition      | recipe-search, meal-ideas                                                              |
+| `diet-planner`    | Diet Planner    | nutrition      | meal-planning, diet-generation, nutrition-planning                                     |
+| `alerter`         | Alerter         | weather        | weather-alerts, notifications                                                          |
 
 ## Related Files
 

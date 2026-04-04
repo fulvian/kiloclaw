@@ -543,7 +543,32 @@ export namespace Agent {
   export async function get(agent: string) {
     // kilocode_change start -  Treat "build" as "code" for backward compatibility
     const effectiveAgent = agent === "build" ? "code" : agent
-    return state().then((x) => x[effectiveAgent])
+    const nativeAgent = await state().then((x) => x[effectiveAgent])
+    if (nativeAgent) return nativeAgent
+
+    // Ensure catalog is initialized first to register all flexible agents
+    getCatalog()
+    const flexibleAgent = FlexibleAgentRegistry.getAgent(effectiveAgent)
+    if (!flexibleAgent) return nativeAgent
+
+    return {
+      name: flexibleAgent.id,
+      displayName: flexibleAgent.name,
+      description: flexibleAgent.description ?? `Flexible agent: ${flexibleAgent.id}`,
+      mode: (flexibleAgent.mode ?? "subagent") as "primary" | "subagent" | "all",
+      native: false,
+      hidden: false,
+      deprecated: false,
+      permission: flexibleAgent.permission ?? [],
+      topP: undefined,
+      temperature: undefined,
+      color: undefined,
+      model: undefined,
+      variant: undefined,
+      prompt: flexibleAgent.prompt,
+      options: {},
+      steps: undefined,
+    }
     // kilocode_change end
   }
 
@@ -564,7 +589,8 @@ export namespace Agent {
       flexibleAgents.map((a) => [
         a.id,
         {
-          name: a.name,
+          name: a.id,
+          displayName: a.name,
           description: a.description ?? `Flexible agent: ${a.id}`,
           mode: (a.mode ?? "subagent") as "primary" | "subagent" | "all",
           native: false,

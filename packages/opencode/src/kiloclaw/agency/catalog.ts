@@ -1068,10 +1068,15 @@ export class AgencyCatalog {
 
 // Singleton instance
 let catalogInstance: AgencyCatalog | null = null
+let defaultCatalogBootstrapped = false
 
 export function getCatalog(): AgencyCatalog {
   if (!catalogInstance) {
     catalogInstance = new AgencyCatalog()
+  }
+  if (!defaultCatalogBootstrapped) {
+    catalogInstance.bootstrapDefaultCatalog()
+    defaultCatalogBootstrapped = true
   }
   return catalogInstance
 }
