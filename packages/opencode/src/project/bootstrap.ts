@@ -28,9 +28,21 @@ export async function InstanceBootstrap() {
 
   // kilocode_change start - initialize memory persistence if enabled
   if (MemoryDb.isEnabled()) {
-    const dbPath = `${Instance.directory}/.kilocode/memory.db`
-    await MemoryDb.init(dbPath)
-    Log.Default.info("memory persistence initialized", { dbPath })
+    try {
+      // Use Instance.directory if available, otherwise fallback to cwd
+      let dbBasePath: string
+      try {
+        dbBasePath = Instance.directory
+      } catch {
+        // Instance.directory not available yet, use current working directory
+        dbBasePath = process.cwd()
+      }
+      const dbPath = `${dbBasePath}/.kilocode/memory.db`
+      await MemoryDb.init(dbPath)
+      Log.Default.info("memory persistence initialized", { dbPath })
+    } catch (err) {
+      Log.Default.error("memory persistence init failed, continuing without persistence", { err })
+    }
   }
   // kilocode_change end
 

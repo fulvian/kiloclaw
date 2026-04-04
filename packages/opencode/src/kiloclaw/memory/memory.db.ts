@@ -10,6 +10,8 @@ import { Log } from "@/util/log"
 import { Flag } from "@/flag/flag"
 import { initMemoryRepository } from "./memory.repository.js"
 import { MemoryRetention } from "./memory.retention.js"
+import { mkdir } from "fs/promises"
+import { dirname } from "path"
 
 const log = Log.create({ service: "kiloclaw.memory.db" })
 
@@ -239,6 +241,15 @@ export namespace MemoryDb {
     const path = dbPath ?? MEMORY_DB_PATH
 
     log.info("initializing memory database", { path })
+
+    // Ensure directory exists before opening database
+    try {
+      const dir = dirname(path)
+      await mkdir(dir, { recursive: true })
+    } catch (err) {
+      log.warn("failed to create memory db directory", { dir: dirname(path), err })
+      // Continue anyway - SQLite might still work
+    }
 
     // Open SQLite database
     const sqlite = new BunDatabase(path, { create: true })
