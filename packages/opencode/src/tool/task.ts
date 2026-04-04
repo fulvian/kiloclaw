@@ -10,6 +10,7 @@ import { iife } from "@/util/iife"
 import { defer } from "@/util/defer"
 import { Config } from "../config/config"
 import { PermissionNext } from "@/permission/next"
+import { FlexibleAgentRegistry } from "../kiloclaw/agency/registry/agent-registry"
 
 const parameters = z.object({
   description: z.string().describe("A short (3-5 words) description of the task"),
@@ -25,13 +26,30 @@ const parameters = z.object({
 })
 
 export const TaskTool = Tool.define("task", async (ctx) => {
-  const agents = await Agent.list().then((x) => x.filter((a) => a.mode !== "primary"))
+  // Get native agents (filter out primary agents)
+  const nativeAgents = await Agent.list().then((x) => x.filter((a) => a.mode !== "primary"))
+
+  // Get flexible agents from FlexibleAgentRegistry (Phase 3: Eliminazione Nativi)
+  const flexibleAgents = FlexibleAgentRegistry.getAllAgents()
+
+  // Build combined list of accessible subagents
+  // Flexible agents with mode "primary" are excluded from the list
+  const allSubagents = [
+    ...nativeAgents,
+    ...flexibleAgents
+      .filter((a) => a.mode !== "primary")
+      .map((a) => ({
+        name: a.name,
+        description: a.description ?? `Flexible agent: ${a.id}`,
+        mode: "subagent" as const,
+      })),
+  ]
 
   // Filter agents by permissions if agent provided
   const caller = ctx?.agent
   const accessibleAgents = caller
-    ? agents.filter((a) => PermissionNext.evaluate("task", a.name, caller.permission).action !== "deny")
-    : agents
+    ? allSubagents.filter((a) => PermissionNext.evaluate("task", a.name, caller.permission).action !== "deny")
+    : allSubagents
 
   const description = DESCRIPTION.replace(
     "{agents}",
@@ -58,10 +76,18 @@ export const TaskTool = Tool.define("task", async (ctx) => {
         })
       }
 
-      const agent = await Agent.get(params.subagent_type)
-      if (!agent) throw new Error(`Unknown agent type: ${params.subagent_type} is not a valid agent type`)
+      // Phase 3: Try FlexibleAgentRegistry first (for flexible agents with prompt/permission)
+      const flexibleAgent = FlexibleAgentRegistry.getAgent(params.subagent_type)
 
-      const allowsTask = agent.permission.some((rule) => rule.permission === "task" && rule.action === "allow") // kilocode_change
+      // Use native agent as base
+      const agent = await Agent.get(params.subagent_type)
+      if (!agent && !flexibleAgent) {
+        throw new Error(`Unknown agent type: ${params.subagent_type} is not a valid agent type`)
+      }
+
+      // Get permissions - prefer flexible agent's permissions if available
+      const agentPermission = flexibleAgent?.permission ?? agent!.permission
+      const allowsTask = agentPermission.some((rule) => rule.permission === "task" && rule.action === "allow") // kilocode_change
 
       const session = await iife(async () => {
         if (params.task_id) {

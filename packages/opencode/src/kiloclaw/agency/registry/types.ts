@@ -6,6 +6,9 @@ import z from "zod"
 // Re-export SemanticVersion for convenience
 export { type SemanticVersion } from "../../types"
 
+// PermissionNext.Rule import for agent permissions
+import { PermissionNext } from "@/permission/next"
+
 // SkillDefinition - versioned capability with capability tags
 export const SkillDefinitionSchema = z.object({
   id: z.string().min(1),
@@ -83,6 +86,7 @@ export const AgentConstraintsSchema = z.object({
 export type AgentConstraints = z.infer<typeof AgentConstraintsSchema>
 
 // AgentDefinition - capability bundle (flexible, replaces legacy)
+// Extended with prompt, permission, mode, description for full agent integration
 export const FlexibleAgentDefinitionSchema = z.object({
   id: z.string().min(1),
   name: z.string(),
@@ -92,6 +96,13 @@ export const FlexibleAgentDefinitionSchema = z.object({
   skills: z.array(z.string()).default([]),
   constraints: AgentConstraintsSchema.default({}),
   version: z.string().regex(/^\d+\.\d+\.\d+$/, "Must be semver format (x.y.z)"),
+
+  // Extended fields for agent integration (Phase 1: Eliminazione Nativi)
+  // Made all optional to maintain backward compatibility during migration
+  description: z.string().optional(),
+  prompt: z.string().optional(),
+  permission: PermissionNext.Ruleset.optional(),
+  mode: z.enum(["primary", "subagent"]).optional(),
 })
 
 export type FlexibleAgentDefinition = z.infer<typeof FlexibleAgentDefinitionSchema>

@@ -14,6 +14,7 @@ import PROMPT_DEBUG from "./prompt/debug.txt"
 import PROMPT_EXPLORE from "./prompt/explore.txt"
 import PROMPT_ASK from "./prompt/ask.txt"
 import PROMPT_ORCHESTRATOR from "./prompt/orchestrator.txt"
+import PROMPT_ROUTER from "./prompt/router.txt"
 import PROMPT_SUMMARY from "./prompt/summary.txt"
 import PROMPT_TITLE from "./prompt/title.txt"
 
@@ -27,6 +28,7 @@ import { Plugin } from "@/plugin"
 import { Skill } from "../skill"
 
 import { Telemetry } from "@kilocode/kilo-telemetry" // kilocode_change
+import { FlexibleAgentRegistry } from "../kiloclaw/agency/registry/agent-registry" // kilocode_change
 
 export namespace Agent {
   export const Info = z
@@ -206,6 +208,7 @@ export namespace Agent {
 
     const result: Record<string, Info> = {
       // kilocode_change start
+      // kilocode_change start - code agent deprecated, use flexible "coder" instead
       code: {
         name: "code",
         description: "The default agent. Executes tools based on configured permissions.",
@@ -221,6 +224,8 @@ export namespace Agent {
         ),
         mode: "primary",
         native: true,
+        deprecated: true, // kilocode_change - use flexible "coder" agent instead
+        hidden: true, // kilocode_change - hide deprecated agent
       },
       plan: {
         name: "plan",
@@ -245,6 +250,8 @@ export namespace Agent {
         ),
         mode: "primary",
         native: true,
+        deprecated: true, // kilocode_change - use flexible "planner" agent instead
+        hidden: true, // kilocode_change - hide deprecated agent
       },
       // kilocode_change start - add debug, orchestrator, and ask agents
       debug: {
@@ -262,6 +269,8 @@ export namespace Agent {
         ),
         mode: "primary",
         native: true,
+        deprecated: true, // kilocode_change - use flexible "debugger" agent instead
+        hidden: true, // kilocode_change - hide deprecated agent
       },
       orchestrator: {
         name: "orchestrator",
@@ -300,6 +309,40 @@ export namespace Agent {
         native: true,
         deprecated: true,
       },
+      // kilocode_change start - router agent for capability-based routing
+      router: {
+        name: "router",
+        description:
+          "Automatically routes tasks to specialized agents based on intent classification and capability matching.",
+        prompt: PROMPT_ROUTER,
+        options: {},
+        permission: PermissionNext.merge(
+          defaults,
+          PermissionNext.fromConfig({
+            "*": "deny",
+            read: "allow",
+            grep: "allow",
+            glob: "allow",
+            list: "allow",
+            bash: "allow", // Allow bash for routing decisions
+            question: "allow",
+            task: "allow",
+            todoread: "allow",
+            todowrite: "allow",
+            webfetch: "allow",
+            websearch: "allow",
+            codesearch: "allow",
+            codebase_search: "allow",
+            external_directory: {
+              [Truncate.GLOB]: "allow",
+            },
+          }),
+          user,
+        ),
+        mode: "primary",
+        native: true,
+      },
+      // kilocode_change end
       ask: {
         name: "ask",
         description: "Get answers and explanations without making changes to the codebase.",
@@ -334,6 +377,8 @@ export namespace Agent {
         ),
         mode: "primary",
         native: true,
+        deprecated: true, // kilocode_change - use flexible "researcher" or "educator" agents instead
+        hidden: true, // kilocode_change - hide deprecated agent
       },
       // kilocode_change end
       general: {
@@ -350,6 +395,8 @@ export namespace Agent {
         options: {},
         mode: "subagent",
         native: true,
+        deprecated: true, // kilocode_change - use flexible agents instead
+        hidden: true, // kilocode_change - hide deprecated agent
       },
       explore: {
         name: "explore",
@@ -381,6 +428,8 @@ export namespace Agent {
         options: {},
         mode: "subagent",
         native: true,
+        deprecated: true, // kilocode_change - functionality integrated into flexible agents
+        hidden: true, // kilocode_change - hide deprecated agent
       },
       compaction: {
         name: "compaction",
@@ -497,9 +546,35 @@ export namespace Agent {
 
   export async function list() {
     const cfg = await Config.get()
+
+    // Get native agents from state
+    const nativeAgents = await state()
+
+    // Get all flexible agents from FlexibleAgentRegistry (Phase 4: Unify List)
+    const flexibleAgents = FlexibleAgentRegistry.getAllAgents()
+
+    // Convert flexible agents to Agent.Info format
+    // Flexible agents can override native agents with same ID
+    const flexibleAsInfo = Object.fromEntries(
+      flexibleAgents.map((a) => [
+        a.id,
+        {
+          name: a.name,
+          description: a.description ?? `Flexible agent: ${a.id}`,
+          mode: a.mode ?? "subagent",
+          native: false,
+          hidden: false,
+          permission: a.permission ?? [],
+          prompt: a.prompt,
+        },
+      ]),
+    )
+
+    // Merge native and flexible agents (flexible overwrites native with same id)
+    const mergedAgents = { ...nativeAgents, ...flexibleAsInfo }
+
     return pipe(
-      await state(),
-      values(),
+      values(mergedAgents),
       sortBy([(x) => (cfg.default_agent ? x.name === cfg.default_agent : x.name === "code"), "desc"]), // kilocode_change - renamed from "build" to "code"
     )
   }
@@ -518,6 +593,14 @@ export namespace Agent {
       if (agent.hidden === true) throw new Error(`default agent "${cfg.default_agent}" is hidden`)
       return agent.name
     }
+
+    // kilocode_change start - router is the default for Kiloclaw capability-based routing
+    // Use router if it exists and is a valid primary agent
+    const routerAgent = agents["router"]
+    if (routerAgent && routerAgent.mode !== "subagent") {
+      return "router"
+    }
+    // kilocode_change end
 
     const primaryVisible = Object.values(agents).find((a) => a.mode !== "subagent" && a.hidden !== true)
     if (!primaryVisible) throw new Error("no primary visible agent found")

@@ -8,6 +8,7 @@ import type { Agent } from "../agent"
 import type { Skill } from "../skill"
 import type { Tool } from "../tool"
 import { KeyManager, type RateLimitConfig } from "./key-pool"
+import { registerFlexibleAgents } from "./agency-definitions"
 
 // Default rate limits per provider
 // Firecrawl: 500 credits/month on free tier, ~16 req/day average, burst allowed
@@ -370,6 +371,9 @@ export class AgencyCatalog {
       skills: this.skills.size,
       providers: this.providers.size,
     })
+
+    // Register flexible agents with prompt and permissions (Phase 2: Eliminazione Nativi)
+    registerFlexibleAgents()
   }
 
   private bootstrapKnowledgeProviders(): void {
