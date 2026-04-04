@@ -65,6 +65,16 @@ export { MemoryConsolidation } from "./memory.consolidation.js"
 export { MemoryShadow } from "./memory.shadow.js"
 export { MemoryMetrics } from "./memory.metrics.js"
 
+// BP-12: Memory Maintenance
+export { MemoryMaintenance } from "./memory.maintenance.js"
+
+// BP-14: Memory Packaging
+export { MemoryPackager } from "./memory.packager.js"
+
+// BP-15: Tiered Architecture
+export { MemoryTierManager, MemoryTier, TIER_CONFIGS } from "./memory.tier.js"
+export type { TierConfig, TierStats, TierHealth } from "./memory.tier.js"
+
 // Schema types - only re-export types that don't conflict with types.js
 import type {
   WorkingState,
