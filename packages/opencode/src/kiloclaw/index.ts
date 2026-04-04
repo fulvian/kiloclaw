@@ -45,5 +45,11 @@ export type {
 export { MemoryLifecycle, memoryLifecycle } from "./memory/lifecycle.js"
 export { workingMemory, episodicMemory, semanticMemory, proceduralMemory } from "./memory/index.js"
 
+// Memory persistence (ADR-005) - exports for V2 feature
+export { MemoryDb } from "./memory/memory.db.js"
+export { MemoryState, ensureMemoryInit } from "./memory/memory.state.js"
+export { MemoryBrokerV2 } from "./memory/memory.broker.v2.js"
+export { getOrchestratorMemory, writeEntry, readEntries, purgeEntry } from "./memory.adapter.js"
+
 // Skills (Wave 1 - Development and Knowledge agencies)
 export * from "./skills"

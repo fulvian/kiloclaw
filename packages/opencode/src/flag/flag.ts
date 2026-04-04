@@ -55,6 +55,8 @@ export namespace Flag {
   export const KILO_EXPERIMENTAL_PLAN_MODE = KILO_EXPERIMENTAL || truthy("KILO_EXPERIMENTAL_PLAN_MODE")
   export const KILO_EXPERIMENTAL_WORKSPACES_TUI = KILO_EXPERIMENTAL || truthy("KILO_EXPERIMENTAL_WORKSPACES_TUI")
   export const KILO_EXPERIMENTAL_MARKDOWN = !falsy("KILO_EXPERIMENTAL_MARKDOWN")
+  // kilocode_change - memory V2 enabled by default, disable with KILO_EXPERIMENTAL_MEMORY_V2=false
+  export const KILO_EXPERIMENTAL_MEMORY_V2 = !falsy("KILO_EXPERIMENTAL_MEMORY_V2")
   export const KILO_MODELS_URL = process.env["KILO_MODELS_URL"]
   export const KILO_MODELS_PATH = process.env["KILO_MODELS_PATH"]
   export const KILO_SKIP_MIGRATIONS = truthy("KILO_SKIP_MIGRATIONS")

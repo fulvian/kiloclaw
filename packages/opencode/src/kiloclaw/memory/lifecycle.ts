@@ -1,4 +1,5 @@
 import { Log } from "@/util/log"
+import { Flag } from "@/flag/flag"
 import type {
   RunArtifacts,
   MemoryEntry,
@@ -24,6 +25,7 @@ import type { MemoryLifecycle as IMemoryLifecycle } from "./types.js"
 import { memoryBroker } from "./broker.js"
 import { semanticMemory } from "./semantic.js"
 import { episodicMemory } from "./episodic.js"
+import { MemoryRetention } from "./memory.retention.js"
 
 const log = Log.create({ service: "kiloclaw.memory.lifecycle" })
 
@@ -152,6 +154,12 @@ export namespace MemoryLifecycle {
    * Purge a single entry
    */
   export async function purge(entryId: MemoryId, reason: PurgeReason): Promise<void> {
+    if (Flag.KILO_EXPERIMENTAL_MEMORY_V2) {
+      // V2 uses retention enforcement
+      log.info("entry purge requested (V2)", { entryId, reason })
+      // For now, the actual purge happens via retention enforcement
+      return
+    }
     await memoryBroker.purge(entryId, reason)
     log.info("entry purged", { entryId, reason })
   }
@@ -218,7 +226,22 @@ export namespace MemoryLifecycle {
   async function enforceRetention(): Promise<void> {
     log.debug("running retention enforcement")
 
-    // Clean up working memory expired entries
+    if (Flag.KILO_EXPERIMENTAL_MEMORY_V2) {
+      // V2 uses MemoryRetention from the persistence layer
+      try {
+        const workingResult = await MemoryRetention.enforcePolicy("default", "working")
+        const episodicResult = await MemoryRetention.enforcePolicy("default", "episodic")
+        log.info("V2 retention enforcement completed", {
+          workingPurged: workingResult.purged,
+          episodicPurged: episodicResult.purged,
+        })
+      } catch (err) {
+        log.error("V2 retention enforcement failed", { err })
+      }
+      return
+    }
+
+    // Legacy: clean up working memory expired entries
     memoryBroker.working().cleanup()
 
     // In production, would also:

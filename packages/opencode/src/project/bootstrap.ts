@@ -12,6 +12,7 @@ import { Log } from "@/util/log"
 import { KiloSessions } from "@/kilo-sessions/kilo-sessions" // kilocode_change
 import { Snapshot } from "../snapshot"
 import { Truncate } from "../tool/truncation"
+import { MemoryDb } from "../kiloclaw/memory/memory.db" // kilocode_change - memory persistence
 
 export async function InstanceBootstrap() {
   Log.Default.info("bootstrapping", { directory: Instance.directory })
@@ -24,6 +25,14 @@ export async function InstanceBootstrap() {
   Vcs.init()
   Snapshot.init()
   Truncate.init()
+
+  // kilocode_change start - initialize memory persistence if enabled
+  if (MemoryDb.isEnabled()) {
+    const dbPath = `${Instance.directory}/.kilocode/memory.db`
+    await MemoryDb.init(dbPath)
+    Log.Default.info("memory persistence initialized", { dbPath })
+  }
+  // kilocode_change end
 
   Bus.subscribe(Command.Event.Executed, async (payload) => {
     if (payload.properties.name === Command.Default.INIT) {

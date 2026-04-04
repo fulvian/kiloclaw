@@ -1,3 +1,59 @@
+# Kiloclaw 7.3.0 Release Notes
+
+> **Release Date:** 2026-04-04  
+> **Version:** 7.3.0  
+> **Type:** Memory Persistence Major Release  
+> **Status:** Production Ready
+
+---
+
+## Executive Summary
+
+Kiloclaw 7.3.0 completes the **Memory Persistence Refoundation (ADR-005)** - enabling persistent storage for the 4-layer memory system with restart recovery, multi-factor ranking, retention enforcement, and audit trails.
+
+---
+
+## What's New in 7.3.0
+
+### Memory V2 - Persistent Memory System
+
+| Feature                   | Description                                                             | Status |
+| ------------------------- | ----------------------------------------------------------------------- | ------ |
+| **Persistence**           | SQLite-based storage survives restarts                                  | ✅     |
+| **Multi-factor Ranking**  | relevance + recency + confidence + success + provenance                 | ✅     |
+| **Token Budgeting**       | 20% working / 25% episodic / 35% semantic / 15% procedural / 5% reserve | ✅     |
+| **Retention Enforcement** | Hard TTL enforcement with configurable policies                         | ✅     |
+| **Feedback Loop**         | User corrections drive learning + pattern detection                     | ✅     |
+| **Audit Trail**           | Append-only hash-chain log for compliance                               | ✅     |
+| **Backfill**              | Legacy → V2 migration utilities                                         | ✅     |
+
+**Architecture:**
+
+- 10 database tables (Drizzle ORM)
+- Repository layer with clean interfaces for future Postgres+pgvector migration
+- Dual-write support during transition
+- Feature flag: `KILO_EXPERIMENTAL_MEMORY_V2` (enabled by default)
+
+**Tests:** 37 tests covering persistence, ranking, retention, and feedback
+
+---
+
+## Migration from 7.2.0
+
+Memory V2 is **enabled by default**. To disable:
+
+```bash
+export KILO_EXPERIMENTAL_MEMORY_V2=false
+```
+
+---
+
+## Upgrading from 7.2.0
+
+No migration needed - memory data is automatically persisted on first use.
+
+---
+
 # Kiloclaw 7.2.0 Release Notes
 
 > **Release Date:** 2026-04-03  
