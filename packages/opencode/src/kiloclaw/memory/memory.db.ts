@@ -60,6 +60,8 @@ CREATE TABLE IF NOT EXISTS memory_events (
   event_type TEXT NOT NULL,
   payload TEXT NOT NULL,
   sensitivity TEXT NOT NULL DEFAULT 'medium',
+  actor_type TEXT,
+  actor_id TEXT,
   ts INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
   created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
 );
@@ -67,6 +69,7 @@ CREATE TABLE IF NOT EXISTS memory_events (
 CREATE INDEX IF NOT EXISTS event_tenant_user_ts_idx ON memory_events(tenant_id, user_id, ts DESC);
 CREATE INDEX IF NOT EXISTS event_correlation_idx ON memory_events(correlation_id);
 CREATE INDEX IF NOT EXISTS event_type_idx ON memory_events(event_type);
+CREATE INDEX IF NOT EXISTS event_actor_idx ON memory_events(actor_type, actor_id);
 
 -- Episodes
 CREATE TABLE IF NOT EXISTS episodes (
@@ -81,6 +84,8 @@ CREATE TABLE IF NOT EXISTS episodes (
   correlation_id TEXT,
   agency_id TEXT,
   agent_id TEXT,
+  actor_type TEXT,
+  actor_id TEXT,
   source_event_ids TEXT DEFAULT '[]',
   artifacts TEXT,
   confidence INTEGER NOT NULL DEFAULT 80,
@@ -92,6 +97,7 @@ CREATE INDEX IF NOT EXISTS episode_tenant_user_idx ON episodes(tenant_id, user_i
 CREATE INDEX IF NOT EXISTS episode_correlation_idx ON episodes(correlation_id);
 CREATE INDEX IF NOT EXISTS episode_expires_idx ON episodes(expires_at);
 CREATE INDEX IF NOT EXISTS episode_completed_idx ON episodes(completed_at);
+CREATE INDEX IF NOT EXISTS episode_actor_idx ON episodes(actor_type, actor_id);
 
 -- Facts
 CREATE TABLE IF NOT EXISTS facts (
@@ -103,6 +109,9 @@ CREATE TABLE IF NOT EXISTS facts (
   object TEXT NOT NULL,
   confidence INTEGER NOT NULL DEFAULT 50,
   provenance TEXT,
+  extraction_source TEXT,
+  actor_type TEXT,
+  actor_id TEXT,
   source_event_ids TEXT DEFAULT '[]',
   valid_from INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
   valid_to INTEGER,
@@ -115,6 +124,7 @@ CREATE INDEX IF NOT EXISTS fact_subject_idx ON facts(subject);
 CREATE INDEX IF NOT EXISTS fact_predicate_idx ON facts(predicate);
 CREATE INDEX IF NOT EXISTS fact_confidence_idx ON facts(confidence DESC);
 CREATE INDEX IF NOT EXISTS fact_valid_to_idx ON facts(valid_to);
+CREATE INDEX IF NOT EXISTS fact_actor_idx ON facts(actor_type, actor_id);
 
 -- Fact vectors
 CREATE TABLE IF NOT EXISTS fact_vectors (
@@ -142,6 +152,9 @@ CREATE TABLE IF NOT EXISTS procedures (
   current_version TEXT NOT NULL DEFAULT '1.0.0',
   success_rate INTEGER NOT NULL DEFAULT 0,
   usage_count INTEGER NOT NULL DEFAULT 0,
+  pattern_tags TEXT DEFAULT '[]',
+  steps TEXT DEFAULT '[]',
+  prerequisites TEXT DEFAULT '[]',
   created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
   updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
 );
