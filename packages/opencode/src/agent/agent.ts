@@ -308,6 +308,7 @@ export namespace Agent {
         mode: "primary",
         native: true,
         deprecated: true,
+        hidden: true, // kilocode_change - deprecated, use router instead
       },
       // kilocode_change start - router agent for capability-based routing
       router: {
@@ -341,6 +342,7 @@ export namespace Agent {
         ),
         mode: "primary",
         native: true,
+        hidden: true, // kilocode_change - system agent, not user-facing
       },
       // kilocode_change end
       ask: {
