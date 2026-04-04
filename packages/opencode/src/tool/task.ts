@@ -11,6 +11,7 @@ import { defer } from "@/util/defer"
 import { Config } from "../config/config"
 import { PermissionNext } from "@/permission/next"
 import { FlexibleAgentRegistry } from "../kiloclaw/agency/registry/agent-registry"
+import { getCatalog } from "../kiloclaw/agency/catalog"
 
 const parameters = z.object({
   description: z.string().describe("A short (3-5 words) description of the task"),
@@ -62,6 +63,9 @@ export const TaskTool = Tool.define("task", async (ctx) => {
     parameters,
     async execute(params: z.infer<typeof parameters>, ctx) {
       const config = await Config.get()
+
+      // Ensure flexible agents are registered before attempting to use them
+      getCatalog()
 
       // Skip permission check when user explicitly invoked via @ or command subtask
       if (!ctx.extra?.bypassAgentCheck) {

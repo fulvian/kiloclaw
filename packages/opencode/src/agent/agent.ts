@@ -29,6 +29,7 @@ import { Skill } from "../skill"
 
 import { Telemetry } from "@kilocode/kilo-telemetry" // kilocode_change
 import { FlexibleAgentRegistry } from "../kiloclaw/agency/registry/agent-registry" // kilocode_change
+import { getCatalog } from "../kiloclaw/agency/catalog" // kilocode_change
 
 export namespace Agent {
   export const Info = z
@@ -553,6 +554,8 @@ export namespace Agent {
     const nativeAgents = await state()
 
     // Get all flexible agents from FlexibleAgentRegistry (Phase 4: Unify List)
+    // Ensure catalog is initialized first to register all flexible agents
+    getCatalog()
     const flexibleAgents = FlexibleAgentRegistry.getAllAgents()
 
     // Convert flexible agents to Agent.Info format
