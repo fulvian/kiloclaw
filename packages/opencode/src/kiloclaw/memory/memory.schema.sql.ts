@@ -166,7 +166,7 @@ export const FactVectorTable = sqliteTable(
       .references(() => FactTable.id, { onDelete: "cascade" }),
     content: text().notNull(), // Original text content
     embedding: text().notNull(), // JSON array of floats (128 dimensions for MVP)
-    model: text().notNull().default("hash-based"), // embedding model identifier
+    model: text().notNull().default("text-embedding-mxbai-embed-large-v1"), // embedding model identifier
     norm: integer(), // Pre-computed norm for cosine similarity
     metadata_json: text({ mode: "json" }).$type<Record<string, unknown>>(),
     created_at: integer()

@@ -145,7 +145,10 @@ export const WorkingMemoryRepo = {
   async getMany(tenantId: string, keys: string[], userId?: string): Promise<Record<string, unknown>> {
     const now = Date.now()
 
-    const conditions = [eq(WorkingStateTable.tenant_id, tenantId), inArray(WorkingStateTable.key, keys)]
+    const conditions = [eq(WorkingStateTable.tenant_id, tenantId)]
+    if (keys.length > 0) {
+      conditions.push(inArray(WorkingStateTable.key, keys))
+    }
 
     if (userId) {
       conditions.push(eq(WorkingStateTable.user_id, userId))
@@ -187,6 +190,26 @@ export const WorkingMemoryRepo = {
     }
 
     return count
+  },
+
+  async count(tenantId: string, userId?: string): Promise<number> {
+    const conditions = [eq(WorkingStateTable.tenant_id, tenantId)]
+    if (userId) conditions.push(eq(WorkingStateTable.user_id, userId))
+
+    const rows = await db().select({ id: WorkingStateTable.id }).from(WorkingStateTable).where(and(...conditions))
+    return rows.length
+  },
+
+  async listOldest(tenantId: string, limit: number, userId?: string): Promise<Array<{ id: string; key: string }>> {
+    const conditions = [eq(WorkingStateTable.tenant_id, tenantId)]
+    if (userId) conditions.push(eq(WorkingStateTable.user_id, userId))
+
+    return db()
+      .select({ id: WorkingStateTable.id, key: WorkingStateTable.key })
+      .from(WorkingStateTable)
+      .where(and(...conditions))
+      .orderBy(WorkingStateTable.created_at)
+      .limit(limit)
   },
 }
 
@@ -297,6 +320,42 @@ export const EpisodicMemoryRepo = {
 
     return count
   },
+
+  async count(tenantId: string, userId?: string): Promise<number> {
+    const conditions = [eq(EpisodeTable.tenant_id, tenantId)]
+    if (userId) conditions.push(eq(EpisodeTable.user_id, userId))
+
+    const rows = await db().select({ id: EpisodeTable.id }).from(EpisodeTable).where(and(...conditions))
+    return rows.length
+  },
+
+  async countEvents(tenantId: string, userId?: string): Promise<number> {
+    const conditions = [eq(MemoryEventTable.tenant_id, tenantId)]
+    if (userId) conditions.push(eq(MemoryEventTable.user_id, userId))
+
+    const rows = await db().select({ id: MemoryEventTable.id }).from(MemoryEventTable).where(and(...conditions))
+    return rows.length
+  },
+
+  async listOldest(tenantId: string, limit: number, userId?: string): Promise<Array<{ id: string }>> {
+    const conditions = [eq(EpisodeTable.tenant_id, tenantId)]
+    if (userId) conditions.push(eq(EpisodeTable.user_id, userId))
+
+    return db()
+      .select({ id: EpisodeTable.id })
+      .from(EpisodeTable)
+      .where(and(...conditions))
+      .orderBy(EpisodeTable.completed_at)
+      .limit(limit)
+  },
+
+  async deleteEvent(eventId: string): Promise<void> {
+    await db().delete(MemoryEventTable).where(eq(MemoryEventTable.id, eventId))
+  },
+
+  async deleteEpisode(episodeId: string): Promise<void> {
+    await db().delete(EpisodeTable).where(eq(EpisodeTable.id, episodeId))
+  },
 }
 
 // =============================================================================
@@ -307,6 +366,11 @@ export const SemanticMemoryRepo = {
   async assertFact(input: NewFact): Promise<string> {
     await db().insert(FactTable).values(input)
     return input.id as string
+  },
+
+  async deleteFact(factId: string): Promise<void> {
+    await db().delete(FactTable).where(eq(FactTable.id, factId))
+    await db().delete(FactVectorTable).where(eq(FactVectorTable.fact_id, factId))
   },
 
   async retractFact(factId: string): Promise<void> {
@@ -355,6 +419,14 @@ export const SemanticMemoryRepo = {
   async getFact(factId: string): Promise<Fact | null> {
     const result = await db().select().from(FactTable).where(eq(FactTable.id, factId)).limit(1)
     return result[0] ?? null
+  },
+
+  async count(tenantId: string, userId?: string): Promise<number> {
+    const conditions = [eq(FactTable.tenant_id, tenantId)]
+    if (userId) conditions.push(eq(FactTable.user_id, userId))
+
+    const rows = await db().select({ id: FactTable.id }).from(FactTable).where(and(...conditions))
+    return rows.length
   },
 
   async storeVector(input: NewFactVector): Promise<string> {
@@ -406,6 +478,21 @@ export const ProceduralMemoryRepo = {
   async register(input: NewProcedure): Promise<string> {
     await db().insert(ProcedureTable).values(input)
     return input.id as string
+  },
+
+  async deleteByUser(tenantId: string, userId: string): Promise<number> {
+    const rows = await db()
+      .select({ id: ProcedureTable.id })
+      .from(ProcedureTable)
+      .where(and(eq(ProcedureTable.tenant_id, tenantId), eq(ProcedureTable.user_id, userId)))
+
+    if (rows.length === 0) return 0
+
+    await db()
+      .delete(ProcedureTable)
+      .where(and(eq(ProcedureTable.tenant_id, tenantId), eq(ProcedureTable.user_id, userId)))
+
+    return rows.length
   },
 
   async get(procedureId: string): Promise<Procedure | null> {
@@ -466,6 +553,14 @@ export const ProceduralMemoryRepo = {
       .where(eq(ProcedureVersionTable.procedure_id, procedureId))
       .orderBy(desc(ProcedureVersionTable.created_at))
   },
+
+  async count(tenantId: string, userId?: string): Promise<number> {
+    const conditions = [eq(ProcedureTable.tenant_id, tenantId)]
+    if (userId) conditions.push(eq(ProcedureTable.user_id, userId))
+
+    const rows = await db().select({ id: ProcedureTable.id }).from(ProcedureTable).where(and(...conditions))
+    return rows.length
+  },
 }
 
 // =============================================================================
@@ -515,6 +610,21 @@ export const UserProfileRepo = {
       .limit(1)
     return result[0] ?? null
   },
+
+  async delete(tenantId: string, userId: string): Promise<number> {
+    const rows = await db()
+      .select({ id: UserProfileTable.id })
+      .from(UserProfileTable)
+      .where(and(eq(UserProfileTable.tenant_id, tenantId), eq(UserProfileTable.user_id, userId)))
+
+    if (rows.length === 0) return 0
+
+    await db()
+      .delete(UserProfileTable)
+      .where(and(eq(UserProfileTable.tenant_id, tenantId), eq(UserProfileTable.user_id, userId)))
+
+    return rows.length
+  },
 }
 
 // =============================================================================
@@ -525,6 +635,21 @@ export const FeedbackRepo = {
   async record(input: NewFeedbackEvent): Promise<string> {
     await db().insert(FeedbackEventTable).values(input)
     return input.id as string
+  },
+
+  async deleteByUser(tenantId: string, userId: string): Promise<number> {
+    const rows = await db()
+      .select({ id: FeedbackEventTable.id })
+      .from(FeedbackEventTable)
+      .where(and(eq(FeedbackEventTable.tenant_id, tenantId), eq(FeedbackEventTable.user_id, userId)))
+
+    if (rows.length === 0) return 0
+
+    await db()
+      .delete(FeedbackEventTable)
+      .where(and(eq(FeedbackEventTable.tenant_id, tenantId), eq(FeedbackEventTable.user_id, userId)))
+
+    return rows.length
   },
 
   async getByTarget(targetType: string, targetId: string): Promise<FeedbackEvent[]> {

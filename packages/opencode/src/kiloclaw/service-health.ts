@@ -12,6 +12,8 @@ import { Log } from "@/util/log"
 import { Flag } from "@/flag/flag"
 import { access, mkdir } from "fs/promises"
 import { dirname } from "path"
+import { HealthCheck as LMStudioHealth } from "@/kiloclaw/lmstudio/health"
+import { AutoStart as LMStudioAutoStart } from "@/kiloclaw/lmstudio/autostart"
 
 const log = Log.create({ service: "kiloclaw.service.health" })
 
@@ -144,6 +146,53 @@ export namespace ServiceHealth {
   }
 
   /**
+   * Check LM Studio embeddings endpoint (required for production vector retrieval)
+   */
+  async function checkLMStudioEmbeddings(): Promise<CheckResult> {
+    if (!Flag.KILO_EXPERIMENTAL_MEMORY_V2) {
+      return {
+        name: "lmstudio-embeddings",
+        status: "healthy",
+        message: "Memory V2 disabled, embeddings not required",
+        canStartup: true,
+        requiresStartup: false,
+      }
+    }
+
+    const baseURL = process.env["KILO_MEMORY_LMSTUDIO_BASE_URL"] ?? "http://127.0.0.1:1234"
+    const health = await LMStudioHealth.check(baseURL, { timeout: 3000, retries: 1 })
+    if (health.reachable) {
+      return {
+        name: "lmstudio-embeddings",
+        status: "healthy",
+        message: `LM Studio reachable (${baseURL})`,
+        canStartup: true,
+        requiresStartup: false,
+      }
+    }
+
+    const start = await LMStudioAutoStart.startDaemon(baseURL)
+    if (start.success) {
+      return {
+        name: "lmstudio-embeddings",
+        status: "healthy",
+        message: `LM Studio auto-started (${baseURL})`,
+        canStartup: true,
+        requiresStartup: true,
+      }
+    }
+
+    return {
+      name: "lmstudio-embeddings",
+      status: "unavailable",
+      message: "LM Studio unavailable and auto-start failed",
+      error: start.error ?? health.error,
+      canStartup: false,
+      requiresStartup: true,
+    }
+  }
+
+  /**
    * Check database connectivity (for future Postgres+pgvector)
    */
   async function checkDatabase(): Promise<CheckResult> {
@@ -152,20 +201,6 @@ export namespace ServiceHealth {
       name: "database",
       status: "healthy",
       message: "Using embedded SQLite (MVP)",
-      canStartup: true,
-      requiresStartup: false,
-    }
-  }
-
-  /**
-   * Check LSP server availability
-   */
-  async function checkLSP(): Promise<CheckResult> {
-    // LSP is optional - it will be started on-demand if needed
-    return {
-      name: "lsp",
-      status: "unknown",
-      message: "LSP will be started on-demand",
       canStartup: true,
       requiresStartup: false,
     }
@@ -181,14 +216,14 @@ export namespace ServiceHealth {
       check: checkMemoryPersistence,
     },
     {
+      name: "lmstudio-embeddings",
+      required: Flag.KILO_EXPERIMENTAL_MEMORY_V2,
+      check: checkLMStudioEmbeddings,
+    },
+    {
       name: "database",
       required: false,
       check: checkDatabase,
-    },
-    {
-      name: "lsp",
-      required: false,
-      check: checkLSP,
     },
   ]
 

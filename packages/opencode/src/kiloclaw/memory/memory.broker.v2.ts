@@ -1,10 +1,5 @@
 /**
- * MemoryBrokerV2 - Persistent Memory Broker with dual-write support
- *
- * Provides persistent storage while maintaining backward compatibility
- * with the legacy in-memory broker. Uses feature flag to enable.
- *
- * ADR-005: Memory Persistence Refoundation
+ * MemoryBrokerV2 - Persistent Memory Broker with production retrieval path
  */
 
 import { Log } from "@/util/log"
@@ -22,31 +17,31 @@ import {
 } from "./memory.repository"
 import { rank, applyBudget, DEFAULT_BUDGET, DEFAULT_WEIGHTS, DEFAULT_THRESHOLDS } from "./memory.ranking"
 import type { RankedItem, TokenBudget } from "./memory.ranking"
+import { MemoryEmbedding } from "./memory.embedding"
+import { MemoryMetrics } from "./memory.metrics"
 
 const log = Log.create({ service: "kiloclaw.memory.broker.v2" })
 
+const TENANT = "default"
+
 export interface MemoryBrokerV2 {
-  // Working memory
   working(): {
     set(key: string, value: unknown, ttlMs?: number): Promise<void>
     get(key: string): Promise<unknown | null>
     delete(key: string): Promise<void>
   }
 
-  // Episodic memory
   episodic(): {
-    record(event: { type: string; data: Record<string, unknown>; correlationId?: string }): Promise<string>
+    record(event: { type: string; data: Record<string, unknown>; correlationId?: string; userId?: string }): Promise<string>
     getRecent(count: number, since?: number): Promise<any[]>
   }
 
-  // Semantic memory
   semantic(): {
     assert(subject: string, predicate: string, object: unknown, confidence?: number): Promise<string>
     query(pattern?: string): Promise<any[]>
     similaritySearch(text: string, k?: number): Promise<any[]>
   }
 
-  // Unified operations
   write(entry: {
     layer: "working" | "episodic" | "semantic" | "procedural"
     key: string
@@ -61,9 +56,9 @@ export interface MemoryBrokerV2 {
     sensitivityMax?: string
   }): Promise<any[]>
 
-  // Ranking and retrieval
   retrieve(options: {
     query?: string
+    userId?: string
     limit?: number
     budget?: Partial<TokenBudget>
     weights?: typeof DEFAULT_WEIGHTS
@@ -72,7 +67,6 @@ export interface MemoryBrokerV2 {
     tokenUsage: number
   }>
 
-  // Feedback
   feedback(vote: "up" | "down", reason: string, targetId: string, correction?: string): Promise<void>
 }
 
@@ -81,22 +75,14 @@ export const MemoryBrokerV2: MemoryBrokerV2 = {
     return {
       async set(key: string, value: unknown, ttlMs?: number): Promise<void> {
         if (!Flag.KILO_EXPERIMENTAL_MEMORY_V2) {
-          // Legacy mode
           legacyBroker.working().set(key, value, ttlMs)
           return
         }
 
-        // Dual-write: write to both legacy and persistent
-        legacyBroker.working().set(key, value, ttlMs)
-
-        try {
-          await WorkingMemoryRepo.set("default", key, value, {
-            sensitivity: "medium",
-            ttlMs,
-          })
-        } catch (err) {
-          log.error("working memory persist failed", { key, err })
-        }
+        await WorkingMemoryRepo.set(TENANT, key, value, {
+          sensitivity: "medium",
+          ttlMs,
+        })
       },
 
       async get(key: string): Promise<unknown | null> {
@@ -104,15 +90,7 @@ export const MemoryBrokerV2: MemoryBrokerV2 = {
           return legacyBroker.working().get(key) ?? null
         }
 
-        // Try persistent first, fallback to legacy
-        try {
-          const persistent = await WorkingMemoryRepo.get("default", key)
-          if (persistent !== null) return persistent
-        } catch (err) {
-          log.error("working memory persist read failed", { key, err })
-        }
-
-        return legacyBroker.working().get(key) ?? null
+        return WorkingMemoryRepo.get(TENANT, key)
       },
 
       async delete(key: string): Promise<void> {
@@ -121,59 +99,45 @@ export const MemoryBrokerV2: MemoryBrokerV2 = {
           return
         }
 
-        legacyBroker.working().remove(key)
-
-        try {
-          await WorkingMemoryRepo.delete("default", key)
-        } catch (err) {
-          log.error("working memory persist delete failed", { key, err })
-        }
+        await WorkingMemoryRepo.delete(TENANT, key)
       },
     }
   },
 
   episodic() {
     return {
-      async record(event: { type: string; data: Record<string, unknown>; correlationId?: string }): Promise<string> {
+      async record(event: { type: string; data: Record<string, unknown>; correlationId?: string; userId?: string }): Promise<string> {
         if (!Flag.KILO_EXPERIMENTAL_MEMORY_V2) {
-          // Legacy mode - just log
-          log.debug("episodic event (legacy)", { type: event.type })
           return `legacy_${Date.now()}`
         }
 
-        // Dual-write
         const id = `ev_${crypto.randomUUID()}`
+        await EpisodicMemoryRepo.recordEvent({
+          id,
+          tenant_id: TENANT,
+          user_id: event.userId ?? null,
+          correlation_id: event.correlationId ?? null,
+          event_type: event.type,
+          payload: event.data,
+          sensitivity: "medium",
+          ts: Date.now(),
+          created_at: Date.now(),
+        })
 
-        try {
-          await EpisodicMemoryRepo.recordEvent({
-            id,
-            tenant_id: "default",
-            correlation_id: event.correlationId ?? null,
-            event_type: event.type,
-            payload: JSON.stringify(event.data),
-            sensitivity: "medium",
-            ts: Date.now(),
-            created_at: Date.now(),
-          })
-
-          // Log to audit
-          await AuditRepo.log({
-            id: crypto.randomUUID(),
-            actor: "system",
-            action: "create",
-            target_type: "event",
-            target_id: id,
-            reason: `episodic_record:${event.type}`,
-            correlation_id: event.correlationId ?? null,
-            previous_hash: "",
-            hash: "",
-            metadata_json: { eventType: event.type },
-            ts: Date.now(),
-            created_at: Date.now(),
-          })
-        } catch (err) {
-          log.error("episodic event persist failed", { id, err })
-        }
+        await AuditRepo.log({
+          id: crypto.randomUUID(),
+          actor: "system",
+          action: "create",
+          target_type: "event",
+          target_id: id,
+          reason: `episodic_record:${event.type}`,
+          correlation_id: event.correlationId ?? null,
+          previous_hash: "",
+          hash: "",
+          metadata_json: { eventType: event.type },
+          ts: Date.now(),
+          created_at: Date.now(),
+        })
 
         return id
       },
@@ -183,12 +147,7 @@ export const MemoryBrokerV2: MemoryBrokerV2 = {
           return legacyBroker.episodic().getRecentEpisodes(count, since ? new Date(since) : undefined)
         }
 
-        try {
-          return await EpisodicMemoryRepo.getRecentEpisodes("default", count, since)
-        } catch (err) {
-          log.error("episodic getRecent failed", { err })
-          return legacyBroker.episodic().getRecentEpisodes(count, since ? new Date(since) : undefined)
-        }
+        return EpisodicMemoryRepo.getRecentEpisodes(TENANT, count, since)
       },
     }
   },
@@ -197,50 +156,58 @@ export const MemoryBrokerV2: MemoryBrokerV2 = {
     return {
       async assert(subject: string, predicate: string, object: unknown, confidence = 80): Promise<string> {
         if (!Flag.KILO_EXPERIMENTAL_MEMORY_V2) {
-          // Legacy mode
-          const fact = await legacyBroker.semantic().assert({
+          return legacyBroker.semantic().assert({
             subject,
             predicate,
             object,
             confidence,
             source: "legacy",
           })
-          return fact
         }
 
         const id = `fact_${crypto.randomUUID()}`
+        const objText = typeof object === "string" ? object : JSON.stringify(object)
 
-        try {
-          await SemanticMemoryRepo.assertFact({
-            id,
-            tenant_id: "default",
-            subject,
-            predicate,
-            object: JSON.stringify(object),
-            confidence,
-            provenance: "broker_v2",
-            source_event_ids: [],
-            valid_from: Date.now(),
-            created_at: Date.now(),
-            updated_at: Date.now(),
-          })
+        await SemanticMemoryRepo.assertFact({
+          id,
+          tenant_id: TENANT,
+          subject,
+          predicate,
+          object: objText,
+          confidence,
+          provenance: "broker_v2",
+          source_event_ids: [],
+          valid_from: Date.now(),
+          created_at: Date.now(),
+          updated_at: Date.now(),
+        })
 
-          await AuditRepo.log({
-            id: crypto.randomUUID(),
-            actor: "system",
-            action: "create",
-            target_type: "fact",
-            target_id: id,
-            reason: "semantic_assert",
-            previous_hash: "",
-            hash: "",
-            metadata_json: { subject, predicate },
-            ts: Date.now(),
-            created_at: Date.now(),
-          })
-        } catch (err) {
-          log.error("semantic assert persist failed", { id, err })
-        }
+        const content = `${subject} ${predicate} ${objText}`
+        const embedding = await MemoryEmbedding.embed(content)
+        await SemanticMemoryRepo.storeVector({
+          id: `vec_${crypto.randomUUID()}`,
+          fact_id: id,
+          content,
+          embedding: JSON.stringify(embedding),
+          model: MemoryEmbedding.model(),
+          norm: Math.round(vectorNorm(embedding) * 1000000),
+          metadata_json: { source: "semantic.assert" },
+          created_at: Date.now(),
+        })
+
+        await AuditRepo.log({
+          id: crypto.randomUUID(),
+          actor: "system",
+          action: "create",
+          target_type: "fact",
+          target_id: id,
+          reason: "semantic_assert",
+          previous_hash: "",
+          hash: "",
+          metadata_json: { subject, predicate },
+          ts: Date.now(),
+          created_at: Date.now(),
+        })
 
         return id
       },
@@ -250,44 +217,21 @@ export const MemoryBrokerV2: MemoryBrokerV2 = {
           return legacyBroker.semantic().query(pattern)
         }
 
-        try {
-          return await SemanticMemoryRepo.queryFacts("default", {
-            subject: pattern,
-            minConfidence: 30,
-          })
-        } catch (err) {
-          log.error("semantic query failed", { err })
-          return legacyBroker.semantic().query(pattern)
-        }
+        return SemanticMemoryRepo.queryFacts(TENANT, {
+          subject: pattern,
+          minConfidence: 30,
+        })
       },
 
       async similaritySearch(text: string, k = 5): Promise<any[]> {
         if (!Flag.KILO_EXPERIMENTAL_MEMORY_V2) {
-          // Legacy: use broker.search which handles text->embedding conversion
           const results = await legacyBroker.search({ text, k })
-          return results.map((r) => ({
-            fact: r.entry.value,
-            similarity: r.score,
-          }))
+          return results.map((r) => ({ fact: r.entry.value, similarity: r.score }))
         }
 
-        try {
-          // Generate embedding for query
-          const queryEmbedding = textToEmbedding(text)
-          const results = await SemanticMemoryRepo.similaritySearch(queryEmbedding, k, "default")
-          return results.map((r) => ({
-            fact: r.fact,
-            similarity: r.similarity,
-          }))
-        } catch (err) {
-          log.error("similarity search failed", { err })
-          // Fallback to legacy on error
-          const results = await legacyBroker.search({ text, k })
-          return results.map((r) => ({
-            fact: r.entry.value,
-            similarity: r.score,
-          }))
-        }
+        const queryEmbedding = await MemoryEmbedding.embed(text)
+        const results = await SemanticMemoryRepo.similaritySearch(queryEmbedding, k, TENANT)
+        return results.map((r) => ({ fact: r.fact, similarity: r.similarity }))
       },
     }
   },
@@ -300,7 +244,6 @@ export const MemoryBrokerV2: MemoryBrokerV2 = {
     ttlMs?: number
   }): Promise<void> {
     if (!Flag.KILO_EXPERIMENTAL_MEMORY_V2) {
-      // Cast id to MemoryId type
       const id = `mem_${crypto.randomUUID()}` as MemoryId
       await legacyBroker.write({
         id,
@@ -315,23 +258,39 @@ export const MemoryBrokerV2: MemoryBrokerV2 = {
       return
     }
 
-    // V2 mode - use appropriate repo
-    switch (entry.layer) {
-      case "working":
-        await this.working().set(entry.key, entry.value, entry.ttlMs)
-        break
-      case "episodic":
-        await this.episodic().record({
-          type: "memory_write",
-          data: { key: entry.key, value: entry.value },
-        })
-        break
-      case "semantic":
-        await this.semantic().assert(entry.key, "value", entry.value)
-        break
-      default:
-        log.warn("write to procedural not implemented in v2", { layer: entry.layer })
+    if (entry.layer === "working") {
+      await this.working().set(entry.key, entry.value, entry.ttlMs)
+      return
     }
+
+    if (entry.layer === "episodic") {
+      await this.episodic().record({
+        type: "memory_write",
+        data: { key: entry.key, value: entry.value },
+      })
+      return
+    }
+
+    if (entry.layer === "semantic") {
+      await this.semantic().assert(entry.key, "value", entry.value)
+      return
+    }
+
+    const val = entry.value as Record<string, unknown>
+    await ProceduralMemoryRepo.register({
+      id: `proc_${crypto.randomUUID()}`,
+      tenant_id: TENANT,
+      user_id: (val.userId as string | undefined) ?? null,
+      scope: (val.scope as string | undefined) ?? "global",
+      name: entry.key,
+      description: (val.description as string | undefined) ?? null,
+      status: (val.status as string | undefined) ?? "active",
+      current_version: (val.version as string | undefined) ?? "1.0.0",
+      success_rate: Number((val.successRate as number | undefined) ?? 50),
+      usage_count: Number((val.usageCount as number | undefined) ?? 0),
+      created_at: Date.now(),
+      updated_at: Date.now(),
+    })
   },
 
   async read(query: {
@@ -347,9 +306,8 @@ export const MemoryBrokerV2: MemoryBrokerV2 = {
       })
     }
 
-    // V2 mode
     if (query.layer === "working") {
-      const items = await WorkingMemoryRepo.getMany("default", [])
+      const items = await WorkingMemoryRepo.getMany(TENANT, [])
       return Object.entries(items).map(([key, value]) => ({
         id: key,
         layer: "working",
@@ -366,128 +324,146 @@ export const MemoryBrokerV2: MemoryBrokerV2 = {
       return this.semantic().query()
     }
 
+    if (query.layer === "procedural") {
+      return ProceduralMemoryRepo.list(TENANT, { status: "active" })
+    }
+
     return []
   },
 
   async retrieve(options: {
     query?: string
+    userId?: string
     limit?: number
     budget?: Partial<TokenBudget>
     weights?: typeof DEFAULT_WEIGHTS
   }): Promise<{ items: RankedItem<any>[]; tokenUsage: number }> {
+    const started = performance.now()
     const limit = options.limit ?? 50
     const budget = { ...DEFAULT_BUDGET, ...options.budget }
     const weights = options.weights ?? DEFAULT_WEIGHTS
 
     if (!Flag.KILO_EXPERIMENTAL_MEMORY_V2) {
-      // Legacy mode - use broker search
-      const results = await legacyBroker.search({
-        text: options.query,
-        k: limit,
-      })
+      throw new Error("MemoryBrokerV2.retrieve requires KILO_EXPERIMENTAL_MEMORY_V2=true")
+    }
 
-      // Map legacy factors to new ScoreFactors format
-      const rankedItems: RankedItem<any>[] = results.map((r) => ({
-        item: r.entry,
-        score: r.score,
+    const candidates: RankedItem<any>[] = []
+    const now = Date.now()
+    const q = (options.query ?? "").trim()
+
+    const profile = options.userId ? await UserProfileRepo.get(TENANT, options.userId).catch(() => null) : null
+    const prefMatch = computePreferenceMatch(profile?.preferences_json, q)
+
+    const workingItems = await WorkingMemoryRepo.getMany(TENANT, [])
+    for (const [key, value] of Object.entries(workingItems)) {
+      const relevance = lexicalRelevance(q, `${key} ${toText(value)}`)
+      candidates.push({
+        item: { id: key, layer: "working", key, value, timestamp: now },
+        score: 0,
         factors: {
-          relevanceVector: r.factors.relevance,
-          recencyNorm: r.factors.recency,
-          confidence: r.factors.confidence,
-          successSignal: 0.5,
-          provenanceQuality: r.factors.provenance,
-          userPreferenceMatch: 0.5,
-          sensitivityPenalty: r.factors.sensitivity,
+          relevanceVector: relevance,
+          recencyNorm: 1,
+          confidence: 1,
+          successSignal: 0.8,
+          provenanceQuality: 0.8,
+          userPreferenceMatch: prefMatch,
+          sensitivityPenalty: 0,
           contradictionPenalty: 0,
         },
-        explain: [],
+        explain: ["working_candidate"],
+      })
+    }
+
+    const episodes = await EpisodicMemoryRepo.getRecentEpisodes(TENANT, Math.max(limit * 2, 50))
+    for (const ep of episodes) {
+      const text = `${ep.task_description} ${ep.outcome}`
+      const relevance = lexicalRelevance(q, text)
+      candidates.push({
+        item: { layer: "episodic" as const, ...ep },
+        score: 0,
+        factors: {
+          relevanceVector: relevance,
+          recencyNorm: recencyNorm(now, ep.completed_at),
+          confidence: normalize100(ep.confidence),
+          successSignal: ep.outcome === "success" ? 1 : ep.outcome === "partial" ? 0.5 : 0.2,
+          provenanceQuality: 0.8,
+          userPreferenceMatch: prefMatch,
+          sensitivityPenalty: 0,
+          contradictionPenalty: 0,
+        },
+        explain: ["episodic_candidate"],
+      })
+    }
+
+    let semanticVec: Array<{ fact: any; similarity: number }> = []
+    if (q.length > 0) {
+      try {
+        const emb = await MemoryEmbedding.embed(q)
+        semanticVec = await SemanticMemoryRepo.similaritySearch(emb, Math.max(limit * 2, 50), TENANT)
+      } catch (err) {
+        log.error("semantic vector retrieval failed", { err })
+      }
+    }
+
+    if (semanticVec.length === 0) {
+      const facts = await SemanticMemoryRepo.queryFacts(TENANT, { minConfidence: 30 })
+      semanticVec = facts.map((f) => ({
+        fact: f,
+        similarity: lexicalRelevance(q, `${f.subject} ${f.predicate} ${f.object}`),
       }))
-
-      return {
-        items: rankedItems,
-        tokenUsage: 0,
-      }
     }
 
-    // V2 mode - hybrid retrieval
-    const candidates: RankedItem<any>[] = []
-
-    try {
-      // Get working memory
-      const workingItems = await WorkingMemoryRepo.getMany("default", [])
-      for (const [key, value] of Object.entries(workingItems)) {
-        candidates.push({
-          item: { id: key, layer: "working", key, value },
-          score: 0.8,
-          factors: {
-            relevanceVector: 0.5,
-            recencyNorm: 0.5,
-            confidence: 0.9,
-            successSignal: 0.5,
-            provenanceQuality: 0.5,
-            userPreferenceMatch: 0.5,
-            sensitivityPenalty: 0,
-            contradictionPenalty: 0,
-          },
-          explain: ["working_memory"],
-        })
-      }
-
-      // Get episodic
-      const episodes = await EpisodicMemoryRepo.getRecentEpisodes("default", 20)
-      for (const ep of episodes) {
-        candidates.push({
-          item: { layer: "episodic" as const, ...ep },
-          score: 0.6,
-          factors: {
-            relevanceVector: 0.5,
-            recencyNorm: 0.5,
-            confidence: ep.confidence / 100,
-            successSignal: 0.5,
-            provenanceQuality: 0.5,
-            userPreferenceMatch: 0.5,
-            sensitivityPenalty: 0,
-            contradictionPenalty: 0,
-          },
-          explain: ["episodic_memory"],
-        })
-      }
-
-      // Get semantic
-      const facts = await SemanticMemoryRepo.queryFacts("default", { minConfidence: 30 })
-      for (const fact of facts) {
-        candidates.push({
-          item: { layer: "semantic" as const, ...fact },
-          score: fact.confidence / 100,
-          factors: {
-            relevanceVector: 0.5,
-            recencyNorm: 0.5,
-            confidence: fact.confidence / 100,
-            successSignal: 0.5,
-            provenanceQuality: 0.5,
-            userPreferenceMatch: 0.5,
-            sensitivityPenalty: 0,
-            contradictionPenalty: 0,
-          },
-          explain: ["semantic_fact"],
-        })
-      }
-
-      // Rank all candidates
-      const ranked = rank(candidates, weights, DEFAULT_THRESHOLDS)
-
-      // Apply budget
-      const maxTokens = limit * 100 // rough estimate
-      const result = applyBudget(ranked, budget, maxTokens)
-
-      return {
-        items: result.selected,
-        tokenUsage: result.tokenUsage,
-      }
-    } catch (err) {
-      log.error("retrieve failed", { err })
-      return { items: [], tokenUsage: 0 }
+    for (const row of semanticVec) {
+      const fact = row.fact
+      candidates.push({
+        item: { layer: "semantic" as const, ...fact },
+        score: 0,
+        factors: {
+          relevanceVector: row.similarity,
+          recencyNorm: recencyNorm(now, fact.updated_at ?? fact.created_at ?? now),
+          confidence: normalize100(fact.confidence),
+          successSignal: 0.8,
+          provenanceQuality: provenanceQuality(fact.provenance),
+          userPreferenceMatch: prefMatch,
+          sensitivityPenalty: 0,
+          contradictionPenalty: 0,
+        },
+        explain: ["semantic_candidate"],
+      })
     }
+
+    const procs = await ProceduralMemoryRepo.list(TENANT, { status: "active" })
+    for (const proc of procs) {
+      const text = `${proc.name} ${proc.description ?? ""} ${proc.scope}`
+      const relevance = lexicalRelevance(q, text)
+      candidates.push({
+        item: { layer: "procedural" as const, ...proc },
+        score: 0,
+        factors: {
+          relevanceVector: relevance,
+          recencyNorm: recencyNorm(now, proc.updated_at ?? proc.created_at ?? now),
+          confidence: normalize100(proc.success_rate),
+          successSignal: normalize100(proc.success_rate),
+          provenanceQuality: 0.75,
+          userPreferenceMatch: prefMatch,
+          sensitivityPenalty: 0,
+          contradictionPenalty: 0,
+        },
+        explain: ["procedural_candidate"],
+      })
+    }
+
+    const ranked = rank(candidates, weights, DEFAULT_THRESHOLDS)
+    const maxTokens = limit * 100
+    const result = applyBudget(ranked, budget, maxTokens)
+
+    const out = {
+      items: result.selected,
+      tokenUsage: result.tokenUsage,
+    }
+
+    MemoryMetrics.observeRetrieval(performance.now() - started, out.tokenUsage, out.items.length)
+    return out
   },
 
   async feedback(vote: "up" | "down", reason: string, targetId: string, correction?: string): Promise<void> {
@@ -496,54 +472,93 @@ export const MemoryBrokerV2: MemoryBrokerV2 = {
       return
     }
 
-    try {
-      await FeedbackRepo.record({
-        id: crypto.randomUUID(),
-        tenant_id: "default",
-        target_type: "memory",
-        target_id: targetId,
-        vote,
-        reason,
-        correction_text: correction ?? null,
-        ts: Date.now(),
-        created_at: Date.now(),
-      })
+    await FeedbackRepo.record({
+      id: crypto.randomUUID(),
+      tenant_id: TENANT,
+      target_type: "memory",
+      target_id: targetId,
+      vote,
+      reason,
+      correction_text: correction ?? null,
+      ts: Date.now(),
+      created_at: Date.now(),
+    })
 
-      await AuditRepo.log({
-        id: crypto.randomUUID(),
-        actor: "user",
-        action: vote === "up" ? "feedback_positive" : "feedback_negative",
-        target_type: "memory",
-        target_id: targetId,
-        reason: `feedback:${reason}`,
-        previous_hash: "",
-        hash: "",
-        metadata_json: { vote, reason, correction },
-        ts: Date.now(),
-        created_at: Date.now(),
-      })
-    } catch (err) {
-      log.error("feedback record failed", { err })
-    }
+    await AuditRepo.log({
+      id: crypto.randomUUID(),
+      actor: "user",
+      action: vote === "up" ? "feedback_positive" : "feedback_negative",
+      target_type: "memory",
+      target_id: targetId,
+      reason: `feedback:${reason}`,
+      previous_hash: "",
+      hash: "",
+      metadata_json: { vote, reason, correction },
+      ts: Date.now(),
+      created_at: Date.now(),
+    })
   },
 }
 
-// Simple text to embedding (same as in broker.ts)
-function textToEmbedding(text: string): number[] {
-  const dimension = 128
-  const embedding = new Array(dimension).fill(0)
+function normalize100(value: number | null | undefined): number {
+  const n = Number(value ?? 0)
+  if (!Number.isFinite(n)) return 0
+  return Math.max(0, Math.min(1, n / 100))
+}
 
-  let hash = 0
-  for (let i = 0; i < text.length; i++) {
-    hash = ((hash << 5) - hash + text.charCodeAt(i)) | 0
+function recencyNorm(now: number, ts: number): number {
+  const age = Math.max(0, now - ts)
+  const halfLifeMs = 7 * 24 * 60 * 60 * 1000
+  const decay = Math.exp(-(age / halfLifeMs) * Math.LN2)
+  return Math.max(0, Math.min(1, decay))
+}
+
+function lexicalRelevance(query: string, content: string): number {
+  const q = query.trim().toLowerCase()
+  if (!q) return 0.5
+  const words = q.split(/\s+/).filter(Boolean)
+  if (words.length === 0) return 0.5
+
+  const c = content.toLowerCase()
+  let hits = 0
+  for (const w of words) {
+    if (c.includes(w)) hits++
   }
 
-  const seed = Math.abs(hash)
-  for (let i = 0; i < dimension; i++) {
-    const nextSeed = (seed * 1103515245 + 12345) & 0x7fffffff
-    embedding[i] = (nextSeed % 1000) / 1000 - 0.5
-  }
+  return Math.max(0, Math.min(1, hits / words.length))
+}
 
-  const norm = Math.sqrt(embedding.reduce((sum, v) => sum + v * v, 0))
-  return norm > 0 ? embedding.map((v) => v / norm) : embedding
+function computePreferenceMatch(preferences: Record<string, unknown> | null | undefined, query: string): number {
+  if (!preferences || query.trim().length === 0) return 0.7
+
+  const preferred = preferences["topics"]
+  if (!Array.isArray(preferred)) return 0.7
+
+  const q = query.toLowerCase()
+  const has = preferred.some((x) => typeof x === "string" && q.includes(x.toLowerCase()))
+  return has ? 1 : 0.6
+}
+
+function provenanceQuality(provenance: string | null | undefined): number {
+  if (!provenance) return 0.6
+  const p = provenance.toLowerCase()
+  if (p.includes("user")) return 0.95
+  if (p.includes("task")) return 0.85
+  if (p.includes("broker")) return 0.75
+  return 0.65
+}
+
+function toText(value: unknown): string {
+  if (typeof value === "string") return value
+  try {
+    return JSON.stringify(value)
+  } catch {
+    return String(value)
+  }
+}
+
+function vectorNorm(v: number[]): number {
+  let sum = 0
+  for (const x of v) sum += x * x
+  return Math.sqrt(sum)
 }

@@ -122,7 +122,7 @@ CREATE TABLE IF NOT EXISTS fact_vectors (
   fact_id TEXT NOT NULL REFERENCES facts(id) ON DELETE CASCADE,
   content TEXT NOT NULL,
   embedding TEXT NOT NULL,
-  model TEXT NOT NULL DEFAULT 'hash-based',
+  model TEXT NOT NULL DEFAULT 'text-embedding-mxbai-embed-large-v1',
   norm INTEGER,
   metadata_json TEXT,
   created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)

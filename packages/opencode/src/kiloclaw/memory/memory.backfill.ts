@@ -123,7 +123,7 @@ export namespace MemoryBackfill {
       },
       ts: Date.now(),
       created_at: Date.now(),
-      hash: "placeholder",
+      hash: "",
     })
 
     log.info("memory backfill completed", {
@@ -136,7 +136,7 @@ export namespace MemoryBackfill {
   }
 
   /**
-   * Verify migration - check that V2 has data matching legacy
+   * Verify migration - compare legacy and v2 counts per layer
    */
   export async function verifyMigration(options: {
     tenantId: string
@@ -146,12 +146,32 @@ export namespace MemoryBackfill {
 
     log.info("verifying memory migration", options)
 
-    // TODO: Implement actual verification by comparing counts and checksums
-    // between legacy and V2 storage
+    const legacyWorking = workingMemory.stats().size
+    const v2Working = Object.keys(await WorkingMemoryRepo.getMany(options.tenantId, [], options.userId)).length
+    if (legacyWorking !== v2Working) {
+      discrepancies.push(`working mismatch: legacy=${legacyWorking} v2=${v2Working}`)
+    }
 
-    // For now, just return consistent=true with empty discrepancies
+    const legacyEpisodes = (await episodicMemory.getRecentEpisodes(1000)).length
+    const v2Episodes = (await EpisodicMemoryRepo.getRecentEpisodes(options.tenantId, 1000)).length
+    if (legacyEpisodes !== v2Episodes) {
+      discrepancies.push(`episodic mismatch: legacy=${legacyEpisodes} v2=${v2Episodes}`)
+    }
+
+    const legacyFacts = (await semanticMemory.query()).length
+    const v2Facts = (await SemanticMemoryRepo.queryFacts(options.tenantId, { userId: options.userId, includeExpired: true })).length
+    if (legacyFacts !== v2Facts) {
+      discrepancies.push(`semantic mismatch: legacy=${legacyFacts} v2=${v2Facts}`)
+    }
+
+    const legacyProcedures = (await proceduralMemory.list()).length
+    const v2Procedures = (await ProceduralMemoryRepo.list(options.tenantId, { userId: options.userId })).length
+    if (legacyProcedures !== v2Procedures) {
+      discrepancies.push(`procedural mismatch: legacy=${legacyProcedures} v2=${v2Procedures}`)
+    }
+
     return {
-      consistent: true,
+      consistent: discrepancies.length === 0,
       discrepancies,
     }
   }
@@ -164,13 +184,22 @@ export namespace MemoryBackfill {
     legacyCount: number
     v2Count: number
   }> {
-    // For MVP, always return needsBackfill=true to ensure migration runs
-    // A real implementation would compare counts between legacy and V2
+    const legacyCount =
+      workingMemory.stats().size +
+      (await episodicMemory.getRecentEpisodes(1000)).length +
+      (await semanticMemory.query()).length +
+      (await proceduralMemory.list()).length
+
+    const v2Count =
+      Object.keys(await WorkingMemoryRepo.getMany(options.tenantId, [], options.userId)).length +
+      (await EpisodicMemoryRepo.getRecentEpisodes(options.tenantId, 1000)).length +
+      (await SemanticMemoryRepo.queryFacts(options.tenantId, { userId: options.userId, includeExpired: true })).length +
+      (await ProceduralMemoryRepo.list(options.tenantId, { userId: options.userId })).length
 
     return {
-      needsBackfill: true,
-      legacyCount: 0,
-      v2Count: 0,
+      needsBackfill: v2Count < legacyCount,
+      legacyCount,
+      v2Count,
     }
   }
 }

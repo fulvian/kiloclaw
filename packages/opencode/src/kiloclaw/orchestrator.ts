@@ -2,6 +2,7 @@ import { Log } from "@/util/log"
 import { fn } from "@/util/fn"
 import z from "zod"
 import { type Intent, type Action, type PolicyContext, type PolicyResult, type AgencyAssignment } from "./types"
+import { getOrchestratorMemory } from "./memory.adapter"
 
 // Memory broker interface
 export interface MemoryBroker {
@@ -39,7 +40,7 @@ export const CoreOrchestrator = {
   create: fn(z.object({}), () => {
     const log = Log.create({ service: "kiloclaw.orchestrator" })
     const auditLogs: Array<{ event: string; data: Record<string, unknown>; timestamp: number }> = []
-    const store = new Map<string, unknown>()
+    const memory = getOrchestratorMemory()
 
     const orchestrator: CoreOrchestrator = {
       async routeIntent(intent: Intent): Promise<AgencyAssignment> {
@@ -58,20 +59,7 @@ export const CoreOrchestrator = {
         }
       },
       memory(): MemoryBroker {
-        return {
-          async read(key: string): Promise<unknown> {
-            return store.get(key)
-          },
-          async write(key: string, value: unknown): Promise<void> {
-            store.set(key, value)
-          },
-          async delete(key: string): Promise<void> {
-            store.delete(key)
-          },
-          async list(prefix: string): Promise<string[]> {
-            return [...store.keys()].filter((k) => k.startsWith(prefix))
-          },
-        }
+        return memory
       },
       scheduler(): Scheduler {
         const tasks = new Map<string, { id: string; priority: number; run: () => Promise<void> }>()

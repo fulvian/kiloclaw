@@ -22,6 +22,11 @@ export async function InstanceBootstrap() {
   const healthReport = await ServiceHealth.checkAll()
   if (!healthReport.allRequiredHealthy) {
     ServiceHealth.printWarnings(healthReport)
+
+    const hardFail = process.env["KILO_MEMORY_HARD_FAIL_STARTUP"] !== "false"
+    if (hardFail) {
+      throw new Error("Required memory services unavailable at startup")
+    }
   }
   // kilocode_change end
 

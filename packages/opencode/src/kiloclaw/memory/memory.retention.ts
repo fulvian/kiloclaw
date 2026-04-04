@@ -4,7 +4,16 @@
  */
 
 import { Log } from "@/util/log"
-import { WorkingMemoryRepo, EpisodicMemoryRepo, SemanticMemoryRepo, AuditRepo } from "./memory.repository"
+import {
+  WorkingMemoryRepo,
+  EpisodicMemoryRepo,
+  SemanticMemoryRepo,
+  ProceduralMemoryRepo,
+  UserProfileRepo,
+  FeedbackRepo,
+  AuditRepo,
+} from "./memory.repository"
+import { MemoryMetrics } from "./memory.metrics"
 
 const log = Log.create({ service: "kiloclaw.memory.retention" })
 
@@ -105,6 +114,7 @@ export const MemoryRetention = {
       result.errors.push({ id: "", reason: String(err) })
     }
 
+    MemoryMetrics.observePurge(result.purged, result.failed)
     return result
   },
 
@@ -123,6 +133,7 @@ export const MemoryRetention = {
     }
 
     log.info("retention enforcement complete", { tenantId, result: totalResult })
+    MemoryMetrics.observePurge(totalResult.purged, totalResult.failed)
     return totalResult
   },
 
@@ -135,8 +146,39 @@ export const MemoryRetention = {
     const result: PurgeResult = { purged: 0, failed: 0, errors: [] }
 
     try {
-      // Note: Full RTBF requires implementing actual deletion in repository
-      // This is a placeholder that logs the request
+      const workingKeys = await WorkingMemoryRepo.getMany(tenantId, [], userId)
+      const workingIds = Object.keys(workingKeys)
+      for (const key of workingIds) {
+        await WorkingMemoryRepo.delete(tenantId, key, userId)
+      }
+      result.purged += workingIds.length
+
+      const events = await EpisodicMemoryRepo.getEvents(tenantId, { userId })
+      for (const event of events) {
+        await EpisodicMemoryRepo.deleteEvent(event.id)
+      }
+      result.purged += events.length
+
+      const episodes = await EpisodicMemoryRepo.getTimeline(tenantId, { userId })
+      for (const episode of episodes) {
+        await EpisodicMemoryRepo.deleteEpisode(episode.id)
+      }
+      result.purged += episodes.length
+
+      const facts = await SemanticMemoryRepo.queryFacts(tenantId, { userId, includeExpired: true })
+      for (const fact of facts) {
+        await SemanticMemoryRepo.deleteFact(fact.id)
+      }
+      result.purged += facts.length
+
+      const procs = await ProceduralMemoryRepo.deleteByUser(tenantId, userId)
+      result.purged += procs
+
+      const feedback = await FeedbackRepo.deleteByUser(tenantId, userId)
+      result.purged += feedback
+
+      const profile = await UserProfileRepo.delete(tenantId, userId)
+      result.purged += profile
 
       await AuditRepo.log({
         id: crypto.randomUUID(),
@@ -147,18 +189,30 @@ export const MemoryRetention = {
         reason: `right_to_forget: ${reason}`,
         previous_hash: "",
         hash: "",
-        metadata_json: { tenantId, userId, reason },
+        metadata_json: {
+          tenantId,
+          userId,
+          reason,
+          working: workingIds.length,
+          events: events.length,
+          episodes: episodes.length,
+          facts: facts.length,
+          procedures: procs,
+          feedback,
+          profile,
+        },
         ts: Date.now(),
         created_at: Date.now(),
       })
 
-      log.info("right to forget logged for processing", { tenantId, userId })
+      log.info("right to forget completed", { tenantId, userId, purged: result.purged })
     } catch (err) {
       log.error("right to forget failed", { tenantId, userId, err })
       result.failed++
       result.errors.push({ id: userId, reason: String(err) })
     }
 
+    MemoryMetrics.observePurge(result.purged, result.failed)
     return result
   },
 
@@ -173,6 +227,14 @@ export const MemoryRetention = {
 
     for (const entry of entries) {
       try {
+        if (entry.layer === "working") {
+          await WorkingMemoryRepo.delete(tenantId, entry.id)
+        } else if (entry.layer === "episodic") {
+          await EpisodicMemoryRepo.deleteEpisode(entry.id)
+        } else if (entry.layer === "semantic") {
+          await SemanticMemoryRepo.deleteFact(entry.id)
+        }
+
         await AuditRepo.log({
           id: crypto.randomUUID(),
           actor: "system",
@@ -187,7 +249,6 @@ export const MemoryRetention = {
           created_at: Date.now(),
         })
 
-        // Actual deletion would be implemented here based on layer
         result.purged++
         log.debug("entry purged", { tenantId, layer: entry.layer, id: entry.id, reason: entry.reason })
       } catch (err) {
@@ -197,6 +258,7 @@ export const MemoryRetention = {
       }
     }
 
+    MemoryMetrics.observePurge(result.purged, result.failed)
     return result
   },
 
@@ -216,13 +278,15 @@ export const MemoryRetention = {
   > {
     const stats: Record<string, any> = {}
 
-    for (const [layer, policy] of Object.entries(DEFAULT_RETENTION)) {
-      // Placeholder - actual implementation would query repositories
-      stats[layer] = {
-        count: 0,
-        policy,
-      }
-    }
+    const workingCount = await WorkingMemoryRepo.count(tenantId)
+    const episodicCount = await EpisodicMemoryRepo.count(tenantId)
+    const semanticCount = await SemanticMemoryRepo.count(tenantId)
+    const proceduralCount = await ProceduralMemoryRepo.count(tenantId)
+
+    stats.working = { count: workingCount, policy: DEFAULT_RETENTION.working }
+    stats.episodic = { count: episodicCount, policy: DEFAULT_RETENTION.episodic }
+    stats.semantic = { count: semanticCount, policy: DEFAULT_RETENTION.semantic }
+    stats.procedural = { count: proceduralCount, policy: DEFAULT_RETENTION.procedural }
 
     return stats
   },
@@ -238,15 +302,58 @@ async function enforceSizeLimit(
   maxEntries: number,
   result: PurgeResult,
 ): Promise<void> {
-  // This would query the actual count and delete oldest entries if exceeded
-  // Placeholder implementation
-
   log.debug("checking size limit", { tenantId, layer, maxEntries })
 
-  // Actual implementation would:
-  // 1. Query current count for tenant/layer
-  // 2. If count > maxEntries, delete (count - maxEntries) oldest entries
-  // 3. Log each deletion to audit trail
+  if (layer === "working") {
+    const count = await WorkingMemoryRepo.count(tenantId)
+    const excess = Math.max(0, count - maxEntries)
+    if (excess === 0) return
+
+    const oldest = await WorkingMemoryRepo.listOldest(tenantId, excess)
+    for (const row of oldest) {
+      await WorkingMemoryRepo.delete(tenantId, row.key)
+      result.purged++
+      await AuditRepo.log({
+        id: crypto.randomUUID(),
+        actor: "system",
+        action: "purge",
+        target_type: "working",
+        target_id: row.id,
+        reason: "size_limit",
+        previous_hash: "",
+        hash: "",
+        metadata_json: { tenantId, layer },
+        ts: Date.now(),
+        created_at: Date.now(),
+      })
+    }
+    return
+  }
+
+  if (layer === "episodic") {
+    const count = await EpisodicMemoryRepo.count(tenantId)
+    const excess = Math.max(0, count - maxEntries)
+    if (excess === 0) return
+
+    const oldest = await EpisodicMemoryRepo.listOldest(tenantId, excess)
+    for (const row of oldest) {
+      await EpisodicMemoryRepo.deleteEpisode(row.id)
+      result.purged++
+      await AuditRepo.log({
+        id: crypto.randomUUID(),
+        actor: "system",
+        action: "purge",
+        target_type: "episodic",
+        target_id: row.id,
+        reason: "size_limit",
+        previous_hash: "",
+        hash: "",
+        metadata_json: { tenantId, layer },
+        ts: Date.now(),
+        created_at: Date.now(),
+      })
+    }
+  }
 }
 
 // =============================================================================

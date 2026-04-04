@@ -58,6 +58,10 @@ export { MemoryDb } from "./memory.db.js"
 export { MemoryState, ensureMemoryInit } from "./memory.state.js"
 export { MemoryBrokerV2 } from "./memory.broker.v2.js"
 export { MemoryBackfill } from "./memory.backfill.js"
+export { MemoryEmbedding } from "./memory.embedding.js"
+export { MemoryConsolidation } from "./memory.consolidation.js"
+export { MemoryShadow } from "./memory.shadow.js"
+export { MemoryMetrics } from "./memory.metrics.js"
 
 // Schema types - only re-export types that don't conflict with types.js
 import type {

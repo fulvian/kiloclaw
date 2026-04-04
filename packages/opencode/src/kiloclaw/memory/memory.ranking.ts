@@ -194,12 +194,12 @@ function computeFactors(
   now: number,
 ): ScoreFactors {
   return {
-    relevanceVector: clamp(raw.relevanceVector ?? 0.5, 0, 1),
+    relevanceVector: clamp(raw.relevanceVector ?? 0, 0, 1),
     recencyNorm: computeRecencyNorm(now, raw.timestamp, raw.ageMs),
-    confidence: clamp(raw.confidence ?? 0.5, 0, 1),
-    successSignal: clamp(raw.successRate ?? 0.5, 0, 1),
+    confidence: clamp(raw.confidence ?? 0, 0, 1),
+    successSignal: clamp(raw.successRate ?? 0, 0, 1),
     provenanceQuality: computeProvenanceQuality(raw.provenance),
-    userPreferenceMatch: clamp(raw.userPreferenceMatch ?? 0.5, 0, 1),
+    userPreferenceMatch: clamp(raw.userPreferenceMatch ?? 0, 0, 1),
     sensitivityPenalty: raw.sensitivity ? (SENSITIVITY_PENALTY[raw.sensitivity] ?? 0) : 0,
     contradictionPenalty: clamp(raw.contradictions ?? 0, 0, 1),
   }
@@ -211,9 +211,9 @@ function computeRecencyNorm(now: number, timestamp?: number, ageMs?: number): nu
     ageMs = now - timestamp
   }
 
-  // If no age data, assume middle-aged
+  // If no age data, do not boost recency
   if (!ageMs) {
-    return 0.5
+    return 0
   }
 
   // Exponential decay with half-life of 1 hour for working memory
@@ -225,7 +225,7 @@ function computeRecencyNorm(now: number, timestamp?: number, ageMs?: number): nu
 }
 
 function computeProvenanceQuality(provenance?: string): number {
-  if (!provenance) return 0.5
+  if (!provenance) return 0.4
 
   // Source quality scores
   const sourceQuality: Record<string, number> = {
@@ -238,7 +238,7 @@ function computeProvenanceQuality(provenance?: string): number {
   }
 
   const normalized = provenance.toLowerCase().trim()
-  return sourceQuality[normalized] ?? 0.5
+  return sourceQuality[normalized] ?? 0.4
 }
 
 // =============================================================================

@@ -93,7 +93,7 @@ describe("Memory Ranking", () => {
 
       expect(factors.relevanceVector).toBe(0.8)
       expect(factors.confidence).toBe(0.7)
-      expect(factors.recencyNorm).toBeGreaterThan(0)
+      expect(factors.recencyNorm).toBeGreaterThanOrEqual(0)
     })
 
     it("should include explain array in results", () => {
