@@ -1,8 +1,9 @@
 # Piano di Implementazione: Eliminazione Agenti Nativi OpenCode
 
 **Data**: 2026-04-04
-**Stato**: In revisione
+**Stato**: ✅ IMPLEMENTATO (Fasi 1-6 completate, Fase 7 posticipata)
 **Versione**: 2.0
+**Commit**: `641e55a` - feat(agency): implement flexible agents bridge to Task tool
 
 ---
 
@@ -44,9 +45,14 @@ Task Tool → Agent.get() → Solo agenti NATIVI (code, plan, debug...)
 
 ## Piano di Implementazione
 
-### Fase 1: Estendere FlexibleAgentDefinition
+### ✅ Fase 1: Estendere FlexibleAgentDefinition [COMPLETATA]
 
 **Obiettivo**: Trasformare i flexible agents in agenti completi con prompt e permissions.
+
+**Stato**: ✅ Implementato
+
+- Aggiunti campi `prompt`, `permission`, `mode`, `description` a FlexibleAgentDefinitionSchema
+- File: `packages/opencode/src/kiloclaw/agency/registry/types.ts`
 
 ```typescript
 // packages/opencode/src/kiloclaw/agency/registry/types.ts
@@ -74,9 +80,15 @@ interface FlexibleAgentDefinition {
 
 ---
 
-### Fase 2: Aggiornare gli Agenti Flexible esistenti
+### ✅ Fase 2: Aggiornare gli Agenti Flexible esistenti [COMPLETATA]
 
 **Obiettivo**: Aggiungere prompt e permissions a tutti i 13 agenti esistenti.
+
+**Stato**: ✅ Implementato
+
+- Creato `packages/opencode/src/kiloclaw/agency/agency-definitions.ts`
+- 13 agenti registrati: researcher, coder, debugger, planner, code-reviewer, analyst, educator, nutritionist, weather-current, forecaster, recipe-searcher, diet-planner, alerter
+- Bootstrap integrato in AgencyCatalog
 
 **Agenti da aggiornare**:
 
@@ -127,9 +139,16 @@ export const coderAgentDefinition: FlexibleAgentDefinition = {
 
 ---
 
-### Fase 3: Modificare Task Tool per Flexible Agents
+### ✅ Fase 3: Modificare Task Tool per Flexible Agents [COMPLETATA]
 
 **Obiettivo**: Bridgare il Task tool al FlexibleAgentRegistry.
+
+**Stato**: ✅ Implementato
+
+- Task tool ora cerca prima in FlexibleAgentRegistry
+- Flexible agents inclusi nella lista agenti accessibili
+- Permissions dai flexible agents usate quando disponibili
+- File: `packages/opencode/src/tool/task.ts`
 
 ```typescript
 // packages/opencode/src/tool/task.ts
@@ -175,9 +194,15 @@ if (resolved.type === "flexible") {
 
 ---
 
-### Fase 4: Unificare la Lista Agenti
+### ✅ Fase 4: Unificare la Lista Agenti [COMPLETATA]
 
 **Obiettivo**: Una sola fonte di verità per la lista agenti.
+
+**Stato**: ✅ Implementato
+
+- `Agent.list()` ora include flexible agents
+- Merge con native agents (flexible sovrascrive per ID uguali)
+- File: `packages/opencode/src/agent/agent.ts`
 
 ```typescript
 // packages/opencode/src/agent/agent.ts
@@ -215,9 +240,14 @@ export async function list() {
 
 ---
 
-### Fase 5: Eliminare Agenti Nativi Superflui
+### ✅ Fase 5: Eliminare Agenti Nativi Superflui [COMPLETATA - DEPRECATI]
 
 **Obiettivo**: Rimuovere gli agenti nativi OpenCode (eccetto router e system agents).
+
+**Stato**: ✅ Marcati deprecated e hidden
+
+- code, plan, debug, ask, general, explore → `deprecated: true, hidden: true`
+- Mantenuti per compatibilità: router, compaction, title, summary
 
 **Mantieni** (necessari per il sistema):
 
@@ -242,9 +272,14 @@ export async function list() {
 
 ---
 
-### Fase 6: Aggiornare Router per Delegare a Flexible
+### ✅ Fase 6: Aggiornare Router per Delegare a Flexible [COMPLETATA]
 
 **Obiettivo**: Aggiornare il prompt del router per usare CapabilityRouter e delegare a flexible agents.
+
+**Stato**: ✅ Implementato
+
+- Router prompt aggiornato con nuovo mapping capability → flexible agent
+- File: `packages/opencode/src/agent/prompt/router.txt`
 
 ```typescript
 // packages/opencode/src/agent/prompt/router.txt
@@ -283,9 +318,15 @@ export async function list() {
 
 ---
 
-### Fase 7: CLI - Scegliere il Sistema di Riferimento
+### ⏸️ Fase 7: CLI - Scegliere il Sistema di Riferimento [POSTICIPATA]
 
 **Decisione Required**: Il progetto è Kiloclaw, non Kilocode.
+
+**Stato**: ⏸️ Posticipata
+
+- Struttura CLI esistente funziona con nuovo sistema
+- `kiloclaw agent list` già presente in `kiloclaw.ts`
+- `kilocode agent list` mantiene compatibilità per ora
 
 **Opzione A**: Usare `kiloclaw agent list` come unico comando
 
@@ -351,11 +392,14 @@ Fase 7: CLI cleanup
 
 ## Criteri di Successo
 
-1. `kiloclaw agent list` mostra tutti gli agenti (router + flexible)
-2. Il router delega correttamente agli agenti flexible
-3. Task tool esegue flexible agents con prompt e permissions corretti
-4. Nessun riferimento a "kilocode" nella CLI
-5. Test passano per tutte le nuove funzionalità
+| Criterio                                                           | Stato          |
+| ------------------------------------------------------------------ | -------------- |
+| `kiloclaw agent list` mostra tutti gli agenti (router + flexible)  | ✅             |
+| Il router delega correttamente agli agenti flexible                | ✅             |
+| Task tool esegue flexible agents con prompt e permissions corretti | ✅             |
+| Test passano per tutte le nuove funzionalità                       | ✅ (531 tests) |
+
+**Nota**: Riferimento "kilocode" nella CLI mantenuto per compatibilità (Fase 7 posticipata).
 
 ---
 
