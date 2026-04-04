@@ -342,7 +342,7 @@ export namespace Agent {
         ),
         mode: "primary",
         native: true,
-        hidden: true, // kilocode_change - system agent, not user-facing
+        // kilocode_change - router is the main entry point, keep visible
       },
       // kilocode_change end
       ask: {
