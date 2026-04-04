@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, index, primaryKey } from "drizzle-orm/sqlite-core"
+import { sqliteTable, text, integer, index, uniqueIndex } from "drizzle-orm/sqlite-core"
 
 // ID generator using crypto
 function createId(prefix: string): string {
@@ -187,6 +187,62 @@ export const FactVectorTable = sqliteTable(
 )
 
 // =============================================================================
+// Graph Memory - Entity/relation structure for multi-hop retrieval
+// =============================================================================
+
+export const EntityTable = sqliteTable(
+  "memory_entities",
+  {
+    id: text()
+      .primaryKey()
+      .$default(() => createId("ent")),
+    tenant_id: text().notNull(),
+    name: text().notNull(),
+    entity_type: text().notNull(), // user, project, task, technology, concept
+    metadata_json: text({ mode: "json" }).$type<Record<string, unknown>>(),
+    created_at: integer()
+      .notNull()
+      .$default(() => Date.now()),
+    updated_at: integer()
+      .notNull()
+      .$onUpdate(() => Date.now()),
+  },
+  (table) => [
+    index("entity_tenant_type_idx").on(table.tenant_id, table.entity_type),
+    index("entity_name_idx").on(table.name),
+    uniqueIndex("entity_tenant_name_type_uq").on(table.tenant_id, table.name, table.entity_type),
+  ],
+)
+
+export const MemoryEdgeTable = sqliteTable(
+  "memory_edges",
+  {
+    id: text()
+      .primaryKey()
+      .$default(() => createId("edge")),
+    tenant_id: text().notNull(),
+    source_id: text()
+      .notNull()
+      .references(() => EntityTable.id, { onDelete: "cascade" }),
+    relation: text().notNull(), // uses, depends_on, related_to, part_of
+    target_id: text()
+      .notNull()
+      .references(() => EntityTable.id, { onDelete: "cascade" }),
+    weight: integer().notNull().default(100), // 0-100
+    metadata_json: text({ mode: "json" }).$type<Record<string, unknown>>(),
+    created_at: integer()
+      .notNull()
+      .$default(() => Date.now()),
+  },
+  (table) => [
+    index("edge_tenant_source_idx").on(table.tenant_id, table.source_id),
+    index("edge_tenant_target_idx").on(table.tenant_id, table.target_id),
+    index("edge_relation_idx").on(table.relation),
+    uniqueIndex("edge_unique_uq").on(table.tenant_id, table.source_id, table.relation, table.target_id),
+  ],
+)
+
+// =============================================================================
 // Procedural Memory - Operational strategies and preferences
 // =============================================================================
 
@@ -357,6 +413,12 @@ export type NewFact = typeof FactTable.$inferInsert
 
 export type FactVector = typeof FactVectorTable.$inferSelect
 export type NewFactVector = typeof FactVectorTable.$inferInsert
+
+export type Entity = typeof EntityTable.$inferSelect
+export type NewEntity = typeof EntityTable.$inferInsert
+
+export type MemoryEdge = typeof MemoryEdgeTable.$inferSelect
+export type NewMemoryEdge = typeof MemoryEdgeTable.$inferInsert
 
 export type Procedure = typeof ProcedureTable.$inferSelect
 export type NewProcedure = typeof ProcedureTable.$inferInsert

@@ -20,6 +20,7 @@ import type { RankedItem, TokenBudget } from "./memory.ranking"
 import { MemoryEmbedding } from "./memory.embedding"
 import { MemoryMetrics } from "./memory.metrics"
 import { MemoryReranker, type RerankCandidate } from "./memory.reranker"
+import { MemoryGraph } from "./memory.graph"
 
 const log = Log.create({ service: "kiloclaw.memory.broker.v2" })
 
@@ -451,6 +452,7 @@ export const MemoryBrokerV2: MemoryBrokerV2 = {
     }
 
     let semanticVec: Array<{ fact: any; similarity: number }> = []
+    const graphBoost = new Map<string, number>()
     if (q.length > 0) {
       try {
         const emb = await MemoryEmbedding.embed(q)
@@ -466,6 +468,32 @@ export const MemoryBrokerV2: MemoryBrokerV2 = {
         fact: f,
         similarity: lexicalRelevance(q, `${f.subject} ${f.predicate} ${f.object}`),
       }))
+    }
+
+    // BP-02: Graph-assisted expansion and scoring boost (multi-hop)
+    if (q.length > 0) {
+      try {
+        const names = extractGraphTerms(q)
+        if (names.length > 0) {
+          const roots = await MemoryGraph.resolveEntities(names)
+          const rootIds = roots.map((item) => item.id)
+          const traversed = await Promise.all(rootIds.map((id) => MemoryGraph.traverse(id, 2)))
+          const allIds = [...new Set(traversed.flat())]
+          const entities = await MemoryGraph.getEntitiesByIds(allIds)
+
+          for (const entity of entities) {
+            const key = entity.name.toLowerCase()
+            graphBoost.set(key, 0.2)
+          }
+
+          log.debug("graph retrieval boost ready", {
+            roots: roots.length,
+            nodes: entities.length,
+          })
+        }
+      } catch (err) {
+        log.error("graph retrieval boost failed", { err: String(err) })
+      }
     }
 
     // Apply reranking to semantic candidates for better precision
@@ -499,11 +527,12 @@ export const MemoryBrokerV2: MemoryBrokerV2 = {
       if (options.since && (fact.created_at ?? 0) < options.since) continue
       if (options.until && (fact.created_at ?? Infinity) > options.until) continue
 
+      const graphScore = computeGraphBoost(graphBoost, fact)
       candidates.push({
         item: { layer: "semantic" as const, ...fact },
         score: 0,
         factors: {
-          relevanceVector: row.similarity,
+          relevanceVector: Math.min(1, row.similarity + graphScore),
           recencyNorm: recencyNorm(now, fact.updated_at ?? fact.created_at ?? now),
           confidence: normalize100(fact.confidence),
           successSignal: 0.8,
@@ -513,7 +542,8 @@ export const MemoryBrokerV2: MemoryBrokerV2 = {
           sensitivityPenalty: 0,
           contradictionPenalty: 0,
         },
-        explain: ["semantic_candidate"],
+        explain:
+          graphScore > 0 ? ["semantic_candidate", `graph_boost:${graphScore.toFixed(2)}`] : ["semantic_candidate"],
       })
     }
 
@@ -599,6 +629,28 @@ export const MemoryBrokerV2: MemoryBrokerV2 = {
       created_at: Date.now(),
     })
   },
+}
+
+function extractGraphTerms(query: string): string[] {
+  const tokens = query
+    .split(/[^A-Za-z0-9_.-]+/)
+    .map((item) => item.trim())
+    .filter((item) => item.length >= 3)
+
+  const uniq = [...new Set(tokens)]
+  return uniq.slice(0, 10)
+}
+
+function computeGraphBoost(boost: Map<string, number>, fact: any): number {
+  const keys = [String(fact.subject ?? ""), String(fact.predicate ?? ""), String(fact.object ?? "")]
+    .join(" ")
+    .toLowerCase()
+
+  let add = 0
+  for (const [name, val] of boost.entries()) {
+    if (keys.includes(name)) add = Math.max(add, val)
+  }
+  return add
 }
 
 function normalize100(value: number | null | undefined): number {

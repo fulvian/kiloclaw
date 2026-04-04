@@ -140,6 +140,38 @@ CREATE TABLE IF NOT EXISTS fact_vectors (
 
 CREATE INDEX IF NOT EXISTS vector_fact_idx ON fact_vectors(fact_id);
 
+-- Graph entities
+CREATE TABLE IF NOT EXISTS memory_entities (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  entity_type TEXT NOT NULL,
+  metadata_json TEXT,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+  updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+);
+
+CREATE INDEX IF NOT EXISTS entity_tenant_type_idx ON memory_entities(tenant_id, entity_type);
+CREATE INDEX IF NOT EXISTS entity_name_idx ON memory_entities(name);
+CREATE UNIQUE INDEX IF NOT EXISTS entity_tenant_name_type_uq ON memory_entities(tenant_id, name, entity_type);
+
+-- Graph edges
+CREATE TABLE IF NOT EXISTS memory_edges (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL,
+  source_id TEXT NOT NULL REFERENCES memory_entities(id) ON DELETE CASCADE,
+  relation TEXT NOT NULL,
+  target_id TEXT NOT NULL REFERENCES memory_entities(id) ON DELETE CASCADE,
+  weight INTEGER NOT NULL DEFAULT 100,
+  metadata_json TEXT,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+);
+
+CREATE INDEX IF NOT EXISTS edge_tenant_source_idx ON memory_edges(tenant_id, source_id);
+CREATE INDEX IF NOT EXISTS edge_tenant_target_idx ON memory_edges(tenant_id, target_id);
+CREATE INDEX IF NOT EXISTS edge_relation_idx ON memory_edges(relation);
+CREATE UNIQUE INDEX IF NOT EXISTS edge_unique_uq ON memory_edges(tenant_id, source_id, relation, target_id);
+
 -- Procedures
 CREATE TABLE IF NOT EXISTS procedures (
   id TEXT PRIMARY KEY,

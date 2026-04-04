@@ -4,7 +4,7 @@
  * Uses Drizzle with SQLite for MVP
  */
 
-import { eq, and, gt, lt, desc, asc, inArray, like, sql } from "drizzle-orm"
+import { eq, and, or, gt, lt, desc, asc, inArray, like, sql } from "drizzle-orm"
 import { type SQLiteBunDatabase } from "drizzle-orm/bun-sqlite"
 import {
   WorkingStateTable,
@@ -12,6 +12,8 @@ import {
   EpisodeTable,
   FactTable,
   FactVectorTable,
+  EntityTable,
+  MemoryEdgeTable,
   ProcedureTable,
   ProcedureVersionTable,
   UserProfileTable,
@@ -27,6 +29,10 @@ import {
   type NewFact,
   type FactVector,
   type NewFactVector,
+  type Entity,
+  type NewEntity,
+  type MemoryEdge,
+  type NewMemoryEdge,
   type Procedure,
   type NewProcedure,
   type ProcedureVersion,
@@ -492,6 +498,124 @@ export const SemanticMemoryRepo = {
 
     results.sort((a, b) => b.similarity - a.similarity)
     return results.slice(0, k)
+  },
+}
+
+// =============================================================================
+// Graph Memory Repository
+// =============================================================================
+
+export const GraphMemoryRepo = {
+  async upsertEntity(input: NewEntity): Promise<string> {
+    const existing = await db()
+      .select({ id: EntityTable.id })
+      .from(EntityTable)
+      .where(
+        and(
+          eq(EntityTable.tenant_id, input.tenant_id),
+          eq(EntityTable.name, input.name),
+          eq(EntityTable.entity_type, input.entity_type),
+        ),
+      )
+      .limit(1)
+
+    if (existing.length > 0) {
+      await db()
+        .update(EntityTable)
+        .set({
+          metadata_json: input.metadata_json ?? null,
+          updated_at: Date.now(),
+        })
+        .where(eq(EntityTable.id, existing[0].id))
+      return existing[0].id
+    }
+
+    await db().insert(EntityTable).values(input)
+    return input.id as string
+  },
+
+  async addEdge(input: NewMemoryEdge): Promise<string> {
+    await db().insert(MemoryEdgeTable).values(input).onConflictDoNothing()
+    return input.id as string
+  },
+
+  async getConnected(
+    tenantId: string,
+    entityId: string,
+    relation?: string,
+  ): Promise<Array<{ edge: MemoryEdge; entity: Entity }>> {
+    const sourceConditions = [eq(MemoryEdgeTable.tenant_id, tenantId), eq(MemoryEdgeTable.source_id, entityId)]
+    if (relation) sourceConditions.push(eq(MemoryEdgeTable.relation, relation))
+
+    const targetConditions = [eq(MemoryEdgeTable.tenant_id, tenantId), eq(MemoryEdgeTable.target_id, entityId)]
+    if (relation) targetConditions.push(eq(MemoryEdgeTable.relation, relation))
+
+    const outgoing = await db()
+      .select({ edge: MemoryEdgeTable, entity: EntityTable })
+      .from(MemoryEdgeTable)
+      .innerJoin(EntityTable, eq(MemoryEdgeTable.target_id, EntityTable.id))
+      .where(and(...sourceConditions))
+
+    const incoming = await db()
+      .select({ edge: MemoryEdgeTable, entity: EntityTable })
+      .from(MemoryEdgeTable)
+      .innerJoin(EntityTable, eq(MemoryEdgeTable.source_id, EntityTable.id))
+      .where(and(...targetConditions))
+
+    return [...outgoing, ...incoming]
+  },
+
+  async resolveEntities(tenantId: string, names: string[]): Promise<Entity[]> {
+    if (names.length === 0) return []
+
+    const clauses = names.map((name) => sql`lower(${EntityTable.name}) = lower(${name})`)
+    return db()
+      .select()
+      .from(EntityTable)
+      .where(and(eq(EntityTable.tenant_id, tenantId), or(...clauses)))
+  },
+
+  async getEntitiesByIds(tenantId: string, ids: string[]): Promise<Entity[]> {
+    if (ids.length === 0) return []
+
+    return db()
+      .select()
+      .from(EntityTable)
+      .where(and(eq(EntityTable.tenant_id, tenantId), inArray(EntityTable.id, ids)))
+  },
+
+  async traverse(tenantId: string, startEntityId: string, hops: number): Promise<string[]> {
+    const visited = new Set<string>()
+    const maxHops = Math.max(1, hops)
+    const frontier = [startEntityId]
+
+    for (const _ of Array.from({ length: maxHops })) {
+      const next: string[] = []
+      for (const id of frontier) {
+        if (visited.has(id)) continue
+        visited.add(id)
+
+        const edges = await db()
+          .select({ source_id: MemoryEdgeTable.source_id, target_id: MemoryEdgeTable.target_id })
+          .from(MemoryEdgeTable)
+          .where(
+            and(
+              eq(MemoryEdgeTable.tenant_id, tenantId),
+              or(eq(MemoryEdgeTable.source_id, id), eq(MemoryEdgeTable.target_id, id)),
+            ),
+          )
+
+        for (const edge of edges) {
+          next.push(edge.source_id, edge.target_id)
+        }
+      }
+
+      const deduped = [...new Set(next)]
+      frontier.splice(0, frontier.length, ...deduped)
+      if (frontier.length === 0) break
+    }
+
+    return [...visited]
   },
 }
 

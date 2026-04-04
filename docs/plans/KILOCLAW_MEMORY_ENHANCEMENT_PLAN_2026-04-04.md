@@ -3,7 +3,7 @@
 **Date:** 2026-04-04  
 **Last Updated:** 2026-04-05  
 **Type:** Implementation Plan  
-**Status:** Phase 1 & 2 Implemented  
+**Status:** Phase 1, 2 & BP-02 Implemented  
 **Sources:** mem0.ai ECAI 2025 paper, atlan.com, machinelearningmastery.com, 47billion.com, medium.com/@mjgmario  
 **Scope:** All 15 SOTA best practices analyzed against current Kiloclaw 4-layer memory system
 
@@ -51,7 +51,7 @@ The current Kiloclaw 4-layer memory system has a solid architectural foundation 
 ### Critical Gaps (Address First)
 
 - ✅ **Selective extraction** — implemented via `memory.extractor.ts`
-- ❌ **No graph memory** — flat vector store, no entity-relation graph (deferred)
+- ✅ **Graph memory** — entity-relation graph with multi-hop traversal and retrieval boost
 - ✅ **Async writes** — implemented via `memory.writeback.ts` with batching
 - ✅ **Reranking pipeline** — implemented via `memory.reranker.ts`
 - ✅ **Memory controller** — implemented via `memory.controller.ts` with ADD/UPDATE/DELETE/NOOP
@@ -75,7 +75,7 @@ The current Kiloclaw 4-layer memory system has a solid architectural foundation 
 | 07  | Procedural Memory (Enhanced) | 🟡 Med  | 🟡 Med  | P2       | ✅ Implemented |
 | 05  | Progressive Summarization    | 🟡 Med  | 🟡 Med  | P2       | ✅ Implemented |
 | 10  | Background Extraction        | 🟡 Med  | 🟡 Med  | P2       | ✅ Implemented |
-| 02  | Graph Memory                 | 🟡 Med  | 🔴 High | P2       | ⏳ Deferred    |
+| 02  | Graph Memory                 | 🟡 Med  | 🔴 High | P2       | ✅ Implemented |
 | 12  | Memory Maintenance           | 🟢 Low  | 🟡 Med  | P3       | ⏳ Pending     |
 | 15  | Tiered Architecture          | 🟢 Low  | 🔴 High | P3       | ⏳ Pending     |
 

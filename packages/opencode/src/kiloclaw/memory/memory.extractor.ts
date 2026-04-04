@@ -5,6 +5,7 @@
  */
 
 import { Log } from "@/util/log"
+import { MemoryGraph } from "./memory.graph"
 
 const log = Log.create({ service: "kiloclaw.memory.extractor" })
 
@@ -125,6 +126,51 @@ export namespace MemoryExtractor {
     return facts
   }
 
+  export async function persistGraph(content: string, context: ExtractionContext): Promise<void> {
+    const entities = dedupeEntities(extractEntities(content))
+    if (entities.length === 0) return
+
+    const entityIds = new Map<string, string>()
+    for (const entity of entities) {
+      const id = await MemoryGraph.upsertEntity({
+        name: entity.name,
+        type: entity.type,
+        metadata: {
+          sessionId: context.sessionId,
+          agentId: context.agentId,
+          correlationId: context.correlationId,
+          source: "extractor",
+        },
+      })
+      entityIds.set(entityKey(entity), id)
+    }
+
+    const project = await MemoryGraph.upsertEntity({
+      name: "project",
+      type: "project",
+      metadata: {
+        sessionId: context.sessionId,
+      },
+    })
+
+    for (const entity of entities) {
+      if (entity.type !== "technology") continue
+      const targetId = entityIds.get(entityKey(entity))
+      if (!targetId) continue
+      await MemoryGraph.addRelation({
+        sourceId: project,
+        relation: "uses",
+        targetId,
+        weight: 85,
+        metadata: {
+          provenance: `extracted:${context.sessionId}`,
+        },
+      })
+    }
+
+    log.debug("graph persisted", { sessionId: context.sessionId, entities: entities.length })
+  }
+
   /**
    * Check if content is worth extracting (too short or noisy).
    */
@@ -166,5 +212,21 @@ export namespace MemoryExtractor {
     }
 
     return entities
+  }
+
+  function dedupeEntities(input: Array<{ name: string; type: string }>): Array<{ name: string; type: string }> {
+    const seen = new Set<string>()
+    const out: Array<{ name: string; type: string }> = []
+    for (const entity of input) {
+      const key = entityKey(entity)
+      if (seen.has(key)) continue
+      seen.add(key)
+      out.push(entity)
+    }
+    return out
+  }
+
+  function entityKey(entity: { name: string; type: string }): string {
+    return `${entity.type}:${entity.name.toLowerCase()}`
   }
 }

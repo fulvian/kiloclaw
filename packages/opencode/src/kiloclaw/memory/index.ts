@@ -19,6 +19,7 @@ export {
   WorkingMemoryRepo,
   EpisodicMemoryRepo,
   SemanticMemoryRepo,
+  GraphMemoryRepo,
   ProceduralMemoryRepo,
   UserProfileRepo,
   FeedbackRepo,
@@ -59,6 +60,7 @@ export { MemoryState, ensureMemoryInit } from "./memory.state.js"
 export { MemoryBrokerV2 } from "./memory.broker.v2.js"
 export { MemoryBackfill } from "./memory.backfill.js"
 export { MemoryEmbedding } from "./memory.embedding.js"
+export { MemoryGraph } from "./memory.graph.js"
 export { MemoryConsolidation } from "./memory.consolidation.js"
 export { MemoryShadow } from "./memory.shadow.js"
 export { MemoryMetrics } from "./memory.metrics.js"
@@ -75,6 +77,10 @@ import type {
   NewFact,
   FactVector,
   NewFactVector,
+  Entity,
+  NewEntity,
+  MemoryEdge,
+  NewMemoryEdge,
   Procedure,
   NewProcedure,
   ProcedureVersion,
@@ -98,6 +104,10 @@ export type {
   NewFact,
   FactVector,
   NewFactVector,
+  Entity,
+  NewEntity,
+  MemoryEdge,
+  NewMemoryEdge,
   Procedure,
   NewProcedure,
   ProcedureVersion,

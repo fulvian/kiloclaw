@@ -108,6 +108,12 @@ export namespace MemoryWriteback {
           for (const fact of facts) {
             await MemoryBrokerV2.semantic().assert(fact.subject, fact.predicate, fact.object, fact.confidence)
           }
+
+          await MemoryExtractor.persistGraph(params.text, {
+            sessionId: params.sessionId,
+            agentId: params.agent,
+            correlationId: params.messageID,
+          })
         } catch (err) {
           log.error("selective extraction failed", { err: String(err) })
         }
