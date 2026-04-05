@@ -1243,16 +1243,18 @@ export function Session() {
             <SessionFeedbackDialog
               sessionId={getPendingSessionId() ?? route.sessionID}
               onSubmit={async (vote, reason) => {
+                // Get exit action BEFORE clearing
+                const exitAction = getPendingExitAction()
                 await submitSessionFeedback(route.sessionID, vote, reason)
                 clearSessionFeedback()
                 // Execute pending exit action if any
-                const exitAction = getPendingExitAction()
                 if (exitAction) exitAction()
               }}
               onSkip={() => {
+                // Get exit action BEFORE clearing
+                const exitAction = getPendingExitAction()
                 clearSessionFeedback()
                 // Execute pending exit action if any
-                const exitAction = getPendingExitAction()
                 if (exitAction) exitAction()
               }}
             />
