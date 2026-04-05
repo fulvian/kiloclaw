@@ -1,9 +1,9 @@
 # Memory 4-Layer Architecture
 
-> **Status**: Implemented  
-> **Date**: 2026-04-02  
-> **ADR**: ADR-002  
-> **Implementation**: Phase 3
+> **Status**: Implemented + Enhanced  
+> **Date**: 2026-04-05  
+> **ADR**: ADR-002, ADR-005  
+> **Implementation**: Phase 3 (Base) + KILOCLAW_MEMORY_ENHANCEMENT_PLAN (SOTA)
 
 ## Overview
 
@@ -35,22 +35,53 @@ Kiloclaw implements a 4-layer memory architecture as defined in the Blueprint an
 │ In-memory   │ │ Event     │ │ Facts    │ │ Procedures  │
 │ KV store    │ │ store     │ │ Embed-   │ │ Versioned   │
 │ TTL-based   │ │ Episodes  │ │ dings    │ │ registry    │
-│ expiration  │ │ Timeline  │ │ Graph    │ │ Patterns    │
+│ expiration  │ │ Timeline   │ │ Graph    │ │ Patterns    │
 └─────────────┘ └───────────┘ └──────────┘ └─────────────┘
 ```
+
+## SOTA Enhancements (All 15 Best Practices)
+
+The memory system has been enhanced with 15 state-of-the-art best practices across 4 phases:
+
+| BP        | Name                    | Module                      | Description                                                      |
+| --------- | ----------------------- | --------------------------- | ---------------------------------------------------------------- |
+| BP-01     | Unified Error Taxonomy  | `memory.errors.ts`          | `NamedError` hierarchy with structured error codes               |
+| BP-02     | Confidence Scoring      | `memory.confidence.ts`      | Source reliability × evidence quality × staleness decay          |
+| BP-03     | Provenance Tracking     | `memory.provenance.ts`      | Evidence chain from observation to retrieval                     |
+| BP-04     | Privacy Tiers           | `memory.privacy.ts`         | P0-P3 sensitivity with tier-specific handling                    |
+| BP-05     | Privacy Enforcement     | `memory.privacy.ts`         | Automatic redaction, aggregation, filtering by tier              |
+| BP-06     | Cross-Agency Bridging   | `memory.privacy.ts`         | Agency ID + session ID tagging for audit trails                  |
+| BP-07     | Hybrid Storage          | `memory.config.ts`          | SQLite + file backup with automatic fallback                     |
+| BP-08     | Unified API             | `broker.ts`                 | Single `MemoryBroker` interface across all layers                |
+| BP-09     | Vector + Graph Store    | `semantic.ts`               | Hybrid FAISS + NetworkX for semantic retrieval                   |
+| BP-10     | Temporal Decay          | `semantic.ts`               | `1 / (1 + age_in_days * decay_factor)` confidence decay          |
+| BP-11     | Memory Lifecycle        | `lifecycle.ts`              | Capture → Classify → Retain → Consolidate → Purge                |
+| **BP-12** | **Memory Maintenance**  | **`memory.maintenance.ts`** | **Automated deduplication, stale deletion, refresh**             |
+| BP-13     | Retention Policies      | `lifecycle.ts`              | Per-layer TTL, compression, encryption settings                  |
+| BP-14     | Tiered Retrieval        | `semantic.ts`               | BM25 + cosine + Graph traversal fusion                           |
+| **BP-15** | **Tiered Architecture** | **`memory.tier.ts`**        | **5-tier system (Context→Working→Episodic→Semantic→Procedural)** |
 
 ## Module Structure
 
 ```
 src/kiloclaw/memory/
-├── index.ts        # Barrel exports
-├── types.ts        # Type definitions and interfaces
-├── working.ts      # Working memory implementation
-├── episodic.ts     # Episodic memory implementation
-├── semantic.ts     # Semantic memory implementation
-├── procedural.ts   # Procedural memory implementation
-├── broker.ts       # Memory broker (unified interface)
-└── lifecycle.ts    # Lifecycle management
+├── index.ts            # Barrel exports
+├── types.ts            # Type definitions and interfaces
+├── working.ts          # Working memory implementation
+├── episodic.ts         # Episodic memory implementation
+├── semantic.ts         # Semantic memory implementation
+├── procedural.ts       # Procedural memory implementation
+├── broker.ts           # Memory broker (unified interface)
+├── lifecycle.ts        # Lifecycle management (BP-11, BP-13)
+├── errors.ts           # Unified error taxonomy (BP-01)
+├── confidence.ts       # Confidence scoring (BP-02)
+├── provenance.ts       # Provenance tracking (BP-03)
+├── privacy.ts          # Privacy tiers + enforcement (BP-04, BP-05, BP-06)
+├── config.ts           # Hybrid storage config (BP-07)
+├── reranker.ts         # Tiered retrieval with batch embedding + LRU cache (BP-14)
+├── maintenance.ts      # Memory maintenance scheduler (BP-12)
+├── tier.ts             # 5-tier architecture definitions (BP-15)
+└── state.ts            # Instance state with maintenance scheduler + graceful shutdown
 ```
 
 ## Memory Broker
@@ -179,6 +210,124 @@ const procedureId = await ProceduralMemory.register({
 const history = await ProceduralMemory.getVersionHistory(procedureId)
 ```
 
+## Memory Maintenance (BP-12)
+
+The `memory.maintenance.ts` module provides automated maintenance to keep memory healthy:
+
+**Operations:**
+
+- **Deduplication**: Keeps highest confidence fact per subject+predicate
+- **Stale deletion**: Removes old facts with low confidence
+- **Low-confidence refresh**: Boosts high-provenance facts
+- **Health check**: Diagnostic for memory system health
+
+**Usage:**
+
+```typescript
+import { MemoryMaintenance } from "./memory"
+
+// Run maintenance manually
+const result = await MemoryMaintenance.run()
+console.log(result)
+
+// Check scheduled interval
+const schedule = MemoryMaintenance.getSchedule()
+console.log(schedule) // { intervalHours: 6, nextRun: Date }
+
+// Get health diagnostics
+const health = await MemoryMaintenance.healthCheck()
+console.log(health)
+/*
+{
+  deduplication: { removed: 5, remaining: 120 },
+  staleFacts: { removed: 2, remaining: 15 },
+  lowConfidenceFacts: { candidates: 3, refreshed: 1 },
+  score: 0.95,
+  status: "healthy"
+}
+*/
+```
+
+**Automatic Scheduling:**
+
+Maintenance runs automatically via `MemoryState.startMaintenanceScheduler()`:
+
+- Initial run: 5 minutes after startup
+- Interval: Every 6 hours
+- Graceful shutdown stops the scheduler
+
+## Tiered Architecture (BP-15)
+
+The `memory.tier.ts` module defines a 5-tier memory hierarchy:
+
+```typescript
+enum MemoryTier {
+  Tier0_Context = 0, // Active agent context (no persistence)
+  Tier1_Working = 1, // Session-short term (minutes to hours)
+  Tier2_Episodic = 2, // Completed events (days to months)
+  Tier3_Semantic = 3, // Consolidated facts (long-term)
+  Tier4_Procedural = 4, // Procedures (versioned, no auto-expiry)
+}
+```
+
+**Tier Configurations:**
+
+| Tier           | TTL         | Max Items | Embedding | Vector Dim |
+| -------------- | ----------- | --------- | --------- | ---------- |
+| 0 - Context    | None        | Unlimited | No        | N/A        |
+| 1 - Working    | 1h-24h      | 10,000    | No        | N/A        |
+| 2 - Episodic   | 30-180 days | 100,000   | No        | N/A        |
+| 3 - Semantic   | None        | 1,000,000 | Yes       | 1536       |
+| 4 - Procedural | None        | 10,000    | Yes       | 768        |
+
+**Usage:**
+
+```typescript
+import { MemoryTier, TIER_CONFIGS, getTierStats, getTierHealth } from "./memory"
+
+// Get statistics for all tiers
+const stats = await getTierStats()
+console.log(stats)
+/*
+{
+  tiers: {
+    [MemoryTier.Tier0_Context]: { items: 42, ttl: null },
+    [MemoryTier.Tier1_Working]: { items: 128, ttl: "1h" },
+    [MemoryTier.Tier2_Episodic]: { items: 56, ttl: "90d" },
+    [MemoryTier.Tier3_Semantic]: { items: 1024, ttl: null },
+    [MemoryTier.Tier4_Procedural]: { items: 23, ttl: null },
+  },
+  total: 1273
+}
+*/
+
+// Check tier health
+const health = await getTierHealth()
+console.log(health)
+/*
+{
+  scores: {
+    [MemoryTier.Tier0_Context]: 1.0,
+    [MemoryTier.Tier1_Working]: 0.95,
+    [MemoryTier.Tier2_Episodic]: 0.88,
+    [MemoryTier.Tier3_Semantic]: 0.92,
+    [MemoryTier.Tier4_Procedural]: 1.0,
+  },
+  overall: 0.95,
+  status: "healthy"
+}
+*/
+
+// Get recommended actions for underperforming tiers
+const actions = await getRecommendedActions()
+console.log(actions)
+/*
+[
+  { tier: MemoryTier.Tier2_Episodic, action: "compact", reason: "items approaching maxCapacity" },
+]
+*/
+```
+
 ## Lifecycle Management
 
 The `MemoryLifecycle` module handles memory data lifecycle:
@@ -191,7 +340,7 @@ The `MemoryLifecycle` module handles memory data lifecycle:
 - **Consolidate**: Move episodic → semantic/procedural
 - **Purge**: Secure deletion by expiry or policy
 
-**Retention Policies:**
+**Retention Policies (BP-13):**
 
 | Layer      | Default TTL | Encryption | Compression |
 | ---------- | ----------- | ---------- | ----------- |
@@ -199,6 +348,27 @@ The `MemoryLifecycle` module handles memory data lifecycle:
 | Episodic   | 90 days     | Standard   | Yes         |
 | Semantic   | None        | Strong     | No          |
 | Procedural | None        | Strong     | No          |
+
+**Production Integration:**
+
+The `memory.state.ts` module provides production-ready lifecycle management:
+
+```typescript
+import { MemoryState } from "./memory"
+
+// Start the maintenance scheduler (auto-runs after 5 min, then every 6 hours)
+MemoryState.startMaintenanceScheduler()
+
+// Graceful shutdown (stops scheduler, flushes queues, closes DB)
+await MemoryState.memoryShutdown()
+```
+
+**Shutdown Behavior:**
+
+1. Stops the maintenance scheduler
+2. Flushes writeback queue (pending semantic writes)
+3. Drains background embedding queue
+4. Closes SQLite database connection
 
 ## Retrieval Policy
 
@@ -313,5 +483,8 @@ bun test test/kiloclaw/
 ## References
 
 - [ADR-002: Memory 4-Layer Architecture](../adr/ADR-002_Memory_4_Layer.md)
+- [ADR-005: Memory Error Taxonomy](../adr/ADR-005_Memory_Error_Taxonomy.md)
 - [Blueprint Section 4](../foundation/KILOCLAW_BLUEPRINT.md#4-struttura-memoria-4-layer)
 - [Foundation Plan Phase 3](../plans/KILOCLAW_FOUNDATION_PLAN.md#esegui-fase-3-memory-4-layer)
+- [Memory Enhancement Plan (All 15 BPs)](../plans/KILOCLAW_MEMORY_ENHANCEMENT_PLAN_2026-04-04.md)
+- [PostgreSQL + pgvector Migration Plan](../plans/POSTGRES_PGVECTOR_MIGRATION_PLAN.md)
