@@ -9,6 +9,7 @@ import { useSync } from "../../context/sync"
 import { FeedbackProcessor } from "@/kiloclaw/feedback/processor"
 import { FeedbackReasonCode } from "@/kiloclaw/feedback/contract"
 import { MemoryDb } from "@/kiloclaw/memory/memory.db" // kilocode_change - need to initialize MemoryDb
+import { Instance } from "@/project/instance" // kilocode_change - for db path
 
 // kilocode_change - track last message that can receive feedback for keyboard shortcuts
 let lastFeedbackMessageId: string | null = null
@@ -20,19 +21,41 @@ export function clearLastFeedbackMessageId() {
 }
 // kilocode_change end
 
-// kilocode_change - track if MemoryDb is initialized
-let memoryInitialized = false
+// kilocode_change - track if MemoryDb is initialized using Instance.state for persistence
+const memoryState = Instance.state(async () => {
+  return { initialized: false, path: "" }
+})
+
 async function ensureMemoryInitialized() {
-  if (memoryInitialized) return true
+  // Check if already initialized via Instance.state
+  const state = await memoryState()
+  if (state.initialized) {
+    console.log("[FeedbackBar] MemoryDb already initialized (from Instance.state)")
+    return true
+  }
+
   if (!MemoryDb.isEnabled()) {
     console.log("[FeedbackBar] MemoryDb is not enabled")
     return false
   }
+
   try {
-    const dbPath = `${process.cwd()}/.kilocode/memory.db`
+    // Get the project directory for proper db path
+    let dbBasePath: string
+    try {
+      dbBasePath = Instance.directory
+    } catch {
+      dbBasePath = process.cwd()
+    }
+    const dbPath = `${dbBasePath}/.kilocode/memory.db`
+
+    console.log("[FeedbackBar] Initializing MemoryDb at", dbPath)
     await MemoryDb.init(dbPath)
-    memoryInitialized = true
-    console.log("[FeedbackBar] MemoryDb initialized at", dbPath)
+
+    // Mark as initialized in state
+    state.initialized = true
+    state.path = dbPath
+    console.log("[FeedbackBar] MemoryDb initialized successfully")
     return true
   } catch (err) {
     console.error("[FeedbackBar] MemoryDb init failed:", err)
