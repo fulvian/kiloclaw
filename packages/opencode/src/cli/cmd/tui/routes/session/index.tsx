@@ -82,16 +82,22 @@ import { DialogExportOptions } from "../../ui/dialog-export-options"
 import { formatTranscript } from "../../util/transcript"
 import { UI } from "@/cli/ui.ts"
 import { useTuiConfig } from "../../context/tui-config"
-import { FeedbackBar } from "./feedback-bar" // kilocode_change
+import {
+  FeedbackBar,
+  setPendingFeedback,
+  getLastFeedbackableMessageId,
+  requestSessionFeedback,
+  clearSessionFeedback,
+  hasPendingSessionFeedback,
+  getPendingSessionId,
+  SessionFeedbackDialog,
+  submitSessionFeedback,
+} from "./feedback-bar" // kilocode_change
 
 import { formatMarkdownTables } from "../../util/markdown" // kilocode_change
 import { bell } from "@/kilocaw-legacy/bell" // kilocode_change
 
 addDefaultParsers(parsers.parsers)
-
-// kilocode_change start - feedback tracking for keyboard shortcuts
-let lastFeedbackMessageId: string | null = null
-// kilocode_change end
 
 class CustomSpeedScroll implements ScrollAcceleration {
   constructor(private speed: number) {}
@@ -1220,6 +1226,8 @@ export function Session() {
                 }}
                 disabled={permissions().length > 0 || questions().length > 0}
                 onSubmit={() => {
+                  // kilocode_change - track follow-up to hide previous feedback pollice
+                  setPendingFeedback(getLastFeedbackableMessageId() ?? "pending")
                   toBottom()
                 }}
                 sessionID={route.sessionID}

@@ -1,15 +1,14 @@
 /**
  * FeedbackBar - Inline feedback UI for CLI
  *
- * Features:
- * - Thumbs up/down for quick feedback
- * - Categorical negative feedback (no free text)
- * - Feedback confirmation UI
- * - Session-level feedback option
- * - Proper event handling to prevent bubbling
+ * Behavior:
+ * - Pollice inline visible until user gives feedback OR sends follow-up
+ * - Click registers feedback immediately (no confirmation needed)
+ * - No timeout - stays visible until interaction
+ * - Session feedback asked ONLY on exit commands (Ctrl+D, /exit, /new, /sessions)
  */
 
-import { createSignal, Show } from "solid-js"
+import { createSignal, createEffect, onCleanup, Show } from "solid-js"
 import { useTheme } from "../../context/theme"
 import { useSync } from "../../context/sync"
 import { FeedbackProcessor } from "@/kiloclaw/feedback/processor"
@@ -19,33 +18,40 @@ import { Log } from "@/util/log"
 
 const log = Log.create({ service: "kiloclaw.feedback.ui" })
 
-// kilocode_change - feedback tracking for keyboard shortcuts
-let lastFeedbackMessageId: string | null = null
-export function getLastFeedbackMessageId() {
-  return lastFeedbackMessageId
-}
-export function clearLastFeedbackMessageId() {
-  lastFeedbackMessageId = null
-}
+// kilocode_change - reason codes for categorical feedback
+const NEGATIVE_REASONS = [
+  { code: "wrong_fact", label: "Info sbagliata", icon: "❌" },
+  { code: "irrelevant", label: "Non pertinente", icon: "↩️" },
+  { code: "too_verbose", label: "Troppo lungo", icon: "📏" },
+  { code: "task_partial", label: "Incompleto", icon: "⬜" },
+  { code: "style_mismatch", label: "Stile non adatto", icon: "✏️" },
+  { code: "task_failed", label: "Task fallito", icon: "❗" },
+  { code: "expectation_mismatch", label: "Non come previsto", icon: "❓" },
+] as const
 
-// kilocode_change - singleton MemoryDb init flag
+// kilocode_change - session feedback reasons
+const SESSION_NEGATIVE_REASONS = [
+  { code: "wrong_fact", label: "Info sbagliata", icon: "❌" },
+  { code: "irrelevant", label: "Non pertinente", icon: "↩️" },
+  { code: "too_verbose", label: "Troppo lungo", icon: "📏" },
+  { code: "style_mismatch", label: "Stile non adatto", icon: "✏️" },
+  { code: "task_failed", label: "Task fallito", icon: "❗" },
+  { code: "confusing", label: "Confusionante", icon: "🔀" },
+  { code: "other", label: "Altro", icon: "📝" },
+] as const
+
+// kilocode_change - singleton MemoryDb init
 let memoryInitPromise: Promise<boolean> | null = null
 
 async function ensureMemoryInitialized(): Promise<boolean> {
-  // If already initialized, return immediately
   if (MemoryDb.isEnabled()) {
     try {
-      MemoryDb.getDb() // Will throw if not initialized
+      MemoryDb.getDb()
       return true
-    } catch {
-      // Not initialized, continue
-    }
+    } catch {}
   }
 
-  // If init is in progress, wait for it
-  if (memoryInitPromise) {
-    return memoryInitPromise
-  }
+  if (memoryInitPromise) return memoryInitPromise
 
   memoryInitPromise = (async () => {
     try {
@@ -65,97 +71,167 @@ async function ensureMemoryInitialized(): Promise<boolean> {
   return memoryInitPromise
 }
 
-// kilocode_change - reason codes for categorical feedback
-const NEGATIVE_REASONS = [
-  { code: "wrong_fact", label: "Info sbagliata", icon: "❌" },
-  { code: "irrelevant", label: "Non pertinente", icon: "↩️" },
-  { code: "too_verbose", label: "Troppo lungo", icon: "📏" },
-  { code: "task_partial", label: "Incompleto", icon: "⬜" },
-  { code: "style_mismatch", label: "Stile non adatto", icon: "✏️" },
-  { code: "task_failed", label: "Task fallito", icon: "❗" },
-  { code: "expectation_mismatch", label: "Non come previsto", icon: "❓" },
-] as const
+// kilocode_change - track last feedbackable message
+let lastFeedbackableMessageId: string | null = null
+let pendingFeedbackMessageId: string | null = null
+
+export function getLastFeedbackableMessageId() {
+  return lastFeedbackableMessageId
+}
+
+export function setPendingFeedback(messageId: string) {
+  pendingFeedbackMessageId = messageId
+}
+
+export function clearPendingFeedback() {
+  pendingFeedbackMessageId = null
+}
+
+// kilocode_change - session feedback state
+let sessionFeedbackPending = false
+let pendingSessionId: string | null = null
+
+export function requestSessionFeedback(sessionId: string) {
+  sessionFeedbackPending = true
+  pendingSessionId = sessionId
+  log.info("session feedback requested", { sessionId })
+}
+
+export function clearSessionFeedback() {
+  sessionFeedbackPending = false
+  pendingSessionId = null
+}
+
+export function hasPendingSessionFeedback() {
+  return sessionFeedbackPending && pendingSessionId !== null
+}
+
+export function getPendingSessionId(): string | null {
+  return pendingSessionId
+}
+
+// kilocode_change - submit feedback for a response
+async function submitResponseFeedback(
+  messageId: string,
+  sessionId: string,
+  vote: "up" | "down",
+  reason?: FeedbackReasonCode,
+): Promise<boolean> {
+  const memOk = await ensureMemoryInitialized()
+  if (!memOk) {
+    log.error("MemoryDb not available")
+    return false
+  }
+
+  const tenantId = "local"
+  const userId = "anonymous"
+  const feedbackId = crypto.randomUUID()
+
+  log.info("submitting feedback", { feedbackId, vote, reason, messageId })
+
+  const result = await FeedbackProcessor.process({
+    feedback: {
+      id: feedbackId,
+      tenantId,
+      userId,
+      sessionId,
+      target: {
+        type: "response",
+        id: messageId,
+      },
+      vote,
+      reason,
+      ts: Date.now(),
+    },
+  })
+
+  if (result.success) {
+    log.info("feedback recorded successfully", { feedbackId })
+    return true
+  } else {
+    log.error("feedback processing failed", { errors: result.errors })
+    return false
+  }
+}
+
+// kilocode_change - submit feedback for a session
+export async function submitSessionFeedback(
+  sessionId: string,
+  vote: "up" | "down",
+  reason?: FeedbackReasonCode,
+): Promise<boolean> {
+  const memOk = await ensureMemoryInitialized()
+  if (!memOk) {
+    log.error("MemoryDb not available")
+    return false
+  }
+
+  const tenantId = "local"
+  const userId = "anonymous"
+  const feedbackId = crypto.randomUUID()
+
+  log.info("submitting session feedback", { feedbackId, vote, reason, sessionId })
+
+  const result = await FeedbackProcessor.process({
+    feedback: {
+      id: feedbackId,
+      tenantId,
+      userId,
+      sessionId,
+      target: {
+        type: "session",
+        id: sessionId,
+      },
+      vote,
+      reason,
+      ts: Date.now(),
+    },
+  })
+
+  if (result.success) {
+    log.info("session feedback recorded successfully", { feedbackId })
+    return true
+  } else {
+    log.error("session feedback processing failed", { errors: result.errors })
+    return false
+  }
+}
+
+// =============================================================================
+// Response Feedback Bar Component
+// =============================================================================
 
 interface FeedbackBarProps {
   messageId: string
   sessionId: string
-  onFeedbackSent?: () => void
 }
 
 export function FeedbackBar(props: FeedbackBarProps) {
   const { theme } = useTheme()
-  const sync = useSync()
 
   // UI State
   const [showNegativeReasons, setShowNegativeReasons] = createSignal(false)
   const [submitted, setSubmitted] = createSignal(false)
-  const [loading, setLoading] = createSignal(false)
-  const [confirmed, setConfirmed] = createSignal(false)
-  const [lastVote, setLastVote] = createSignal<"up" | "down" | null>(null)
+  const [reason, setReason] = createSignal<FeedbackReasonCode | null>(null)
 
-  // Track this feedback bar
-  lastFeedbackMessageId = props.messageId
+  // Track this message as feedbackable
+  lastFeedbackableMessageId = props.messageId
 
-  const submitFeedback = async (vote: "up" | "down", reason?: FeedbackReasonCode) => {
-    if (loading()) return
-    setLoading(true)
-
-    try {
-      const memOk = await ensureMemoryInitialized()
-      if (!memOk) {
-        log.error("MemoryDb not available, cannot submit feedback")
-        return
-      }
-
-      const tenantId = "local"
-      const userId = (sync.data as any).user?.id ?? "anonymous"
-      const feedbackId = crypto.randomUUID()
-
-      log.info("submitting feedback", { feedbackId, vote, reason, messageId: props.messageId })
-
-      const result = await FeedbackProcessor.process({
-        feedback: {
-          id: feedbackId,
-          tenantId,
-          userId,
-          sessionId: props.sessionId,
-          target: {
-            type: "response",
-            id: props.messageId,
-          },
-          vote,
-          reason,
-          ts: Date.now(),
-        },
-      })
-
-      if (result.success) {
-        log.info("feedback recorded successfully", { feedbackId })
-        setLastVote(vote)
-        setSubmitted(true)
-
-        // Show confirmation
-        setConfirmed(true)
-        props.onFeedbackSent?.()
-
-        // Auto-hide confirmation after 3 seconds
-        setTimeout(() => {
-          setConfirmed(false)
-        }, 3000)
-      } else {
-        log.error("feedback processing failed", { errors: result.errors })
-      }
-    } catch (err) {
-      log.error("feedback submission failed", { err })
-    } finally {
-      setLoading(false)
+  // Hide pollice if another message is now pending feedback
+  createEffect(() => {
+    if (pendingFeedbackMessageId && pendingFeedbackMessageId !== props.messageId) {
+      setSubmitted(true)
     }
-  }
+  })
 
-  const handleThumbsUp = (e: any) => {
+  const handleThumbsUp = async (e: any) => {
     e.stopPropagation?.()
     e.preventDefault?.()
-    submitFeedback("up")
+
+    if (submitted()) return
+    setSubmitted(true)
+
+    await submitResponseFeedback(props.messageId, props.sessionId, "up")
   }
 
   const handleThumbsDown = (e: any) => {
@@ -164,112 +240,172 @@ export function FeedbackBar(props: FeedbackBarProps) {
     setShowNegativeReasons(true)
   }
 
-  const handleSelectReason = (reason: FeedbackReasonCode) => {
-    submitFeedback("down", reason)
+  const handleSelectReason = async (r: FeedbackReasonCode) => {
+    if (submitted()) return
+    setSubmitted(true)
+
+    await submitResponseFeedback(props.messageId, props.sessionId, "down", r)
   }
 
   const handleSkip = () => {
     setShowNegativeReasons(false)
   }
 
-  const handleSessionFeedback = () => {
-    // For session-level feedback, use the sessionId as target
-    // This is a simplified version - could be enhanced
-    submitFeedback("down", "other")
-  }
-
   return (
-    <box marginTop={1} paddingLeft={3} flexDirection="column" gap={1}>
-      {/* Confirmation message */}
-      <Show when={confirmed() && lastVote()}>
-        <box flexDirection="row" gap={1} alignItems="center">
-          <text fg={theme.success}>✓ Feedback registrato</text>
-          <text fg={theme.textMuted}> - Grazie!</text>
-        </box>
-      </Show>
+    <Show when={!submitted()}>
+      <box marginTop={1} paddingLeft={3} flexDirection="column" gap={1}>
+        <Show when={!showNegativeReasons()}>
+          <box flexDirection="row" gap={2} alignItems="center">
+            <text fg={theme.textMuted}>Utile?</text>
 
-      {/* Main feedback UI */}
-      <Show when={!submitted() || confirmed()}>
-        <box flexDirection="row" gap={2} alignItems="center">
-          <text fg={theme.textMuted}>Questa risposta è stata utile?</text>
-
-          {/* Thumbs up */}
-          <box onMouseUp={handleThumbsUp} paddingX={2} paddingY={1} backgroundColor={theme.backgroundElement}>
-            <text fg={theme.success}>👍 Sì</text>
-          </box>
-
-          {/* Thumbs down */}
-          <Show when={!showNegativeReasons()}>
-            <box onMouseUp={handleThumbsDown} paddingX={2} paddingY={1} backgroundColor={theme.backgroundElement}>
-              <text fg={theme.error}>👎 No</text>
+            <box onMouseUp={handleThumbsUp} paddingX={2} paddingY={1} backgroundColor={theme.backgroundElement}>
+              <text fg={theme.success}>👍</text>
             </box>
-          </Show>
-        </box>
-      </Show>
 
-      {/* Negative feedback - categorical reasons */}
-      <Show when={showNegativeReasons() && !submitted()}>
-        <box flexDirection="column" gap={1} marginTop={1}>
-          <text fg={theme.textMuted}>Perché non è stata utile?</text>
+            <box onMouseUp={handleThumbsDown} paddingX={2} paddingY={1} backgroundColor={theme.backgroundElement}>
+              <text fg={theme.error}>👎</text>
+            </box>
+          </box>
+        </Show>
 
-          {/* Reason buttons in a row */}
-          <box flexDirection="row" gap={1}>
-            {NEGATIVE_REASONS.map((r) => (
+        <Show when={showNegativeReasons()}>
+          <box flexDirection="column" gap={1}>
+            <text fg={theme.textMuted}>Perché?</text>
+
+            <box flexDirection="row" gap={1}>
+              {NEGATIVE_REASONS.map((r) => (
+                <box
+                  onMouseUp={(e: any) => {
+                    e.stopPropagation?.()
+                    e.preventDefault?.()
+                    handleSelectReason(r.code as FeedbackReasonCode)
+                  }}
+                  paddingX={2}
+                  paddingY={1}
+                  backgroundColor={theme.backgroundElement}
+                >
+                  <text fg={theme.error}>{r.icon}</text>
+                </box>
+              ))}
+            </box>
+
+            <box marginTop={1}>
               <box
                 onMouseUp={(e: any) => {
                   e.stopPropagation?.()
                   e.preventDefault?.()
-                  handleSelectReason(r.code as FeedbackReasonCode)
+                  handleSkip()
                 }}
                 paddingX={2}
                 paddingY={1}
-                backgroundColor={theme.backgroundElement}
+                backgroundColor={theme.backgroundPanel}
               >
-                <text fg={theme.error}>
-                  {r.icon} {r.label}
-                </text>
+                <text fg={theme.textMuted}>Annulla</text>
               </box>
-            ))}
+            </box>
           </box>
+        </Show>
+      </box>
+    </Show>
+  )
+}
 
-          {/* Skip button */}
-          <box marginTop={1}>
+// =============================================================================
+// Session Feedback Dialog Component
+// =============================================================================
+
+interface SessionFeedbackDialogProps {
+  sessionId: string
+  onSubmit: (vote: "up" | "down", reason?: FeedbackReasonCode) => void
+  onSkip: () => void
+}
+
+export function SessionFeedbackDialog(props: SessionFeedbackDialogProps) {
+  const { theme } = useTheme()
+
+  const [showReasons, setShowReasons] = createSignal(false)
+  const [selectedReason, setSelectedReason] = createSignal<FeedbackReasonCode | null>(null)
+
+  const handleUp = async (e: any) => {
+    e.stopPropagation?.()
+    e.preventDefault?.()
+    await props.onSubmit("up")
+  }
+
+  const handleDown = (e: any) => {
+    e.stopPropagation?.()
+    e.preventDefault?.()
+    setShowReasons(true)
+  }
+
+  const handleSelectReason = async (r: FeedbackReasonCode) => {
+    setSelectedReason(r)
+    await props.onSubmit("down", r)
+  }
+
+  const handleSkip = () => {
+    props.onSkip()
+  }
+
+  return (
+    <box
+      position="absolute"
+      top={5}
+      left={3}
+      padding={2}
+      backgroundColor={theme.backgroundPanel}
+      borderStyle="rounded"
+      borderColor={theme.primary}
+      flexDirection="column"
+      gap={1}
+    >
+      <text fg={theme.text}>Feedback sulla sessione</text>
+      <text fg={theme.textMuted}>Com'è andata la sessione?</text>
+
+      <Show when={!showReasons()}>
+        <box flexDirection="row" gap={2} marginTop={1}>
+          <box onMouseUp={handleUp} paddingX={2} paddingY={1} backgroundColor={theme.backgroundElement}>
+            <text fg={theme.success}>👍</text>
+          </box>
+          <box onMouseUp={handleDown} paddingX={2} paddingY={1} backgroundColor={theme.backgroundElement}>
+            <text fg={theme.error}>👎</text>
+          </box>
+        </box>
+      </Show>
+
+      <Show when={showReasons()}>
+        <box flexDirection="row" gap={1} marginTop={1}>
+          {SESSION_NEGATIVE_REASONS.map((r) => (
             <box
               onMouseUp={(e: any) => {
                 e.stopPropagation?.()
                 e.preventDefault?.()
-                handleSkip()
+                handleSelectReason(r.code as FeedbackReasonCode)
               }}
               paddingX={2}
               paddingY={1}
-              backgroundColor={theme.backgroundPanel}
+              backgroundColor={theme.backgroundElement}
             >
-              <text fg={theme.textMuted}>Annulla</text>
+              <text fg={theme.error}>{r.icon}</text>
             </box>
-          </box>
+          ))}
         </box>
       </Show>
 
-      {/* Session feedback option - shown after submission */}
-      <Show when={submitted() && !confirmed()}>
-        <text fg={theme.textMuted} marginTop={1}>
-          Vuoi lasciare un feedback sulla sessione?
-        </text>
-        <box flexDirection="row" gap={1}>
-          <box
-            onMouseUp={(e: any) => {
-              e.stopPropagation?.()
-              e.preventDefault?.()
-              handleSessionFeedback()
-            }}
-            paddingX={2}
-            paddingY={1}
-            backgroundColor={theme.primary}
-          >
-            <text fg={theme.text}>Sessione</text>
-          </box>
+      <box marginTop={1}>
+        <box
+          onMouseUp={(e: any) => {
+            e.stopPropagation?.()
+            e.preventDefault?.()
+            handleSkip()
+          }}
+          paddingX={2}
+          paddingY={1}
+          backgroundColor={theme.backgroundPanel}
+        >
+          <text fg={theme.textMuted}>Salta</text>
         </box>
-      </Show>
+      </box>
     </box>
   )
 }
