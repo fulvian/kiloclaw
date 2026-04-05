@@ -533,15 +533,14 @@ export function Prompt(props: PromptProps) {
     if (!store.prompt.input) return
     const trimmed = store.prompt.input.trim()
     if (trimmed === "exit" || trimmed === "quit" || trimmed === ":q") {
-      // kilocode_change start - TEMPORARILY DISABLED for testing
-      // const sessionId = props.sessionID
-      // const doExit = () => exit()
-      // if (sessionId) {
-      //   requestSessionFeedback(sessionId, doExit)
-      // } else {
-      //   doExit()
-      // }
-      exit()
+      // kilocode_change start - request session feedback before exit
+      const sessionId = props.sessionID
+      const doExit = () => exit()
+      if (sessionId) {
+        requestSessionFeedback(sessionId, doExit)
+      } else {
+        doExit()
+      }
       // kilocode_change end
       return
     }
@@ -881,8 +880,7 @@ export function Prompt(props: PromptProps) {
                 }
                 if (keybind.match("app_exit", e)) {
                   if (store.prompt.input === "") {
-                    // kilocode_change start - TEMPORARILY DISABLED for testing
-                    // double ctrl+c to exit, single ctrl+d exits immediately
+                    // kilocode_change start - double ctrl+c to exit, single ctrl+d exits immediately
                     const doExit = () => {
                       exit()
                       e.preventDefault()
@@ -894,14 +892,25 @@ export function Prompt(props: PromptProps) {
                       }, 1000)
                       if (store.exitPress >= 2) {
                         // Request session feedback before exit
-                        exit()
+                        const sessionId = props.sessionID
+                        if (sessionId) {
+                          requestSessionFeedback(sessionId, doExit)
+                        } else {
+                          doExit()
+                        }
                         return
                       }
                       e.preventDefault()
                       return
                     }
                     // kilocode_change end
-                    exit()
+                    // Request session feedback before exit
+                    const sessionId = props.sessionID
+                    if (sessionId) {
+                      requestSessionFeedback(sessionId, doExit)
+                    } else {
+                      doExit()
+                    }
                     e.preventDefault()
                     return
                   }

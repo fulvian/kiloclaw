@@ -391,17 +391,16 @@ function App() {
         aliases: ["resume", "continue"],
       },
       onSelect: () => {
-        // kilocode_change start - TEMPORARILY DISABLED for testing
-        // const sessionId = route.data.type === "session" ? route.data.sessionID : undefined
-        // const showSessionList = () => {
-        //   dialog.replace(() => <DialogSessionList />)
-        // }
-        // if (sessionId) {
-        //   requestSessionFeedback(sessionId, showSessionList)
-        // } else {
-        //   showSessionList()
-        // }
-        dialog.replace(() => <DialogSessionList />)
+        // kilocode_change start - request session feedback before switching sessions
+        const sessionId = route.data.type === "session" ? route.data.sessionID : undefined
+        const showSessionList = () => {
+          dialog.replace(() => <DialogSessionList />)
+        }
+        if (sessionId) {
+          requestSessionFeedback(sessionId, showSessionList)
+        } else {
+          showSessionList()
+        }
         // kilocode_change end
       },
     },
@@ -435,25 +434,20 @@ function App() {
         const current = promptRef.current
         // Don't require focus - if there's any text, preserve it
         const currentPrompt = current?.current?.input ? current.current : undefined
-        // kilocode_change start - TEMPORARILY DISABLED for testing
-        // const sessionId = route.data.type === "session" ? route.data.sessionID : undefined
-        // const navigateAndClear = () => {
-        //   route.navigate({
-        //     type: "home",
-        //     initialPrompt: currentPrompt,
-        //   })
-        //   dialog.clear()
-        // }
-        // if (sessionId) {
-        //   requestSessionFeedback(sessionId, navigateAndClear)
-        // } else {
-        //   navigateAndClear()
-        // }
-        route.navigate({
-          type: "home",
-          initialPrompt: currentPrompt,
-        })
-        dialog.clear()
+        // kilocode_change start - request session feedback before new session
+        const sessionId = route.data.type === "session" ? route.data.sessionID : undefined
+        const navigateAndClear = () => {
+          route.navigate({
+            type: "home",
+            initialPrompt: currentPrompt,
+          })
+          dialog.clear()
+        }
+        if (sessionId) {
+          requestSessionFeedback(sessionId, navigateAndClear)
+        } else {
+          navigateAndClear()
+        }
         // kilocode_change end
       },
     },
@@ -635,16 +629,15 @@ function App() {
         name: "exit",
         aliases: ["quit", "q"],
       },
-      // kilocode_change start - TEMPORARILY DISABLED for testing
-      // onSelect: () => {
-      //   const sessionId = route.data.type === "session" ? route.data.sessionID : undefined
-      //   if (sessionId) {
-      //     requestSessionFeedback(sessionId, () => exit())
-      //   } else {
-      //     exit()
-      //   }
-      // },
-      onSelect: () => exit(),
+      // kilocode_change start - request session feedback before exit
+      onSelect: () => {
+        const sessionId = route.data.type === "session" ? route.data.sessionID : undefined
+        if (sessionId) {
+          requestSessionFeedback(sessionId, () => exit())
+        } else {
+          exit()
+        }
+      },
       // kilocode_change end
       category: "System",
     },

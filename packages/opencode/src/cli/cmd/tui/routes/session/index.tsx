@@ -1238,8 +1238,8 @@ export function Session() {
           <Toast />
           {/* kilocode_change */}
           <Footer />
-          {/* Session feedback dialog - TEMPORARILY DISABLED for testing */}
-          {/* <Show when={hasPendingSessionFeedback()}>
+          {/* Session feedback dialog - shown when exit is triggered */}
+          <Show when={hasPendingSessionFeedback()}>
             <SessionFeedbackDialog
               sessionId={getPendingSessionId() ?? route.sessionID}
               onSubmit={async (vote, reason) => {
@@ -1247,18 +1247,18 @@ export function Session() {
                 const exitAction = getPendingExitAction()
                 await submitSessionFeedback(route.sessionID, vote, reason)
                 clearSessionFeedback()
-                // Execute pending exit action if any
-                if (exitAction) exitAction()
+                // Execute pending exit action AFTER DOM updates (defer to next tick)
+                if (exitAction) queueMicrotask(() => exitAction())
               }}
               onSkip={() => {
                 // Get exit action BEFORE clearing
                 const exitAction = getPendingExitAction()
                 clearSessionFeedback()
-                // Execute pending exit action if any
-                if (exitAction) exitAction()
+                // Execute pending exit action AFTER DOM updates (defer to next tick)
+                if (exitAction) queueMicrotask(() => exitAction())
               }}
             />
-          </Show> */}
+          </Show>
         </box>
         <Show when={sidebarVisible()}>
           <Switch>
