@@ -82,11 +82,16 @@ import { DialogExportOptions } from "../../ui/dialog-export-options"
 import { formatTranscript } from "../../util/transcript"
 import { UI } from "@/cli/ui.ts"
 import { useTuiConfig } from "../../context/tui-config"
+import { FeedbackBar } from "./feedback-bar" // kilocode_change
 
 import { formatMarkdownTables } from "../../util/markdown" // kilocode_change
 import { bell } from "@/kilocaw-legacy/bell" // kilocode_change
 
 addDefaultParsers(parsers.parsers)
+
+// kilocode_change start - feedback tracking for keyboard shortcuts
+let lastFeedbackMessageId: string | null = null
+// kilocode_change end
 
 class CustomSpeedScroll implements ScrollAcceleration {
   constructor(private speed: number) {}
@@ -1423,6 +1428,11 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
         />
         {/* kilocode_change end */}
       </Show>
+      {/* kilocode_change start - Feedback bar for last completed assistant message */}
+      <Show when={props.last && props.message.time.completed}>
+        <FeedbackBar messageId={props.message.id} sessionId={props.message.sessionID} />
+      </Show>
+      {/* kilocode_change end */}
       <Switch>
         <Match when={props.last || final() || props.message.error?.name === "MessageAbortedError"}>
           <box paddingLeft={3}>

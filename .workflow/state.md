@@ -4,7 +4,7 @@
 
 ## Started: 2026-04-02T12:21:02+02:00
 
-## Last Updated: 2026-04-05T18:15:00+02:00
+## Last Updated: 2026-04-05T20:45:00+02:00
 
 ## PRD: docs/plans/KILOCLAW_PROACTIVE_CONTINUATIVE_AUTOLEARNING_PLAN_2026-04-05.md (NEW)
 
@@ -388,6 +388,30 @@ docs/plans/
 2. Feedback processor persistente
 3. Scheduler store + dispatcher + retry
 4. Gate budget/risk/hitl
+
+### Fase 6 - CLI Feedback UI (COMPLETED ✅)
+
+**Data:** 2026-04-05
+
+| Deliverable            | Status      | Details                               |
+| ---------------------- | ----------- | ------------------------------------- |
+| FeedbackBar component  | ✅ DONE     | `feedback-bar.tsx` con thumbs up/down |
+| Session integration    | ✅ DONE     | Integrato in AssistantMessage         |
+| Negative feedback flow | ✅ DONE     | Input reason opzionale                |
+| Backend integration    | ✅ DONE     | FeedbackProcessor.process()           |
+| Keyboard shortcuts     | ⚠️ DEFERRED | OpenTUI KeyEvent non espone `alt`     |
+
+**Files Created:**
+
+- `packages/opencode/src/cli/cmd/tui/routes/session/feedback-bar.tsx`
+
+**Files Modified:**
+
+- `packages/opencode/src/cli/cmd/tui/routes/session/index.tsx` (integrazione FeedbackBar)
+
+**Reference:**
+
+- `docs/plans/CLI_FEEDBACK_UI_PLAN_2026-04-05.md`
 
 ---
 
