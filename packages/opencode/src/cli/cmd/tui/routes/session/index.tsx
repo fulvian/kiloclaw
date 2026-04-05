@@ -90,6 +90,7 @@ import {
   clearSessionFeedback,
   hasPendingSessionFeedback,
   getPendingSessionId,
+  getPendingExitAction,
   SessionFeedbackDialog,
   submitSessionFeedback,
 } from "./feedback-bar" // kilocode_change
@@ -1237,6 +1238,25 @@ export function Session() {
           <Toast />
           {/* kilocode_change */}
           <Footer />
+          {/* Session feedback dialog - shown when exit is triggered */}
+          <Show when={hasPendingSessionFeedback()}>
+            <SessionFeedbackDialog
+              sessionId={getPendingSessionId() ?? route.sessionID}
+              onSubmit={async (vote, reason) => {
+                await submitSessionFeedback(route.sessionID, vote, reason)
+                clearSessionFeedback()
+                // Execute pending exit action if any
+                const exitAction = getPendingExitAction()
+                if (exitAction) exitAction()
+              }}
+              onSkip={() => {
+                clearSessionFeedback()
+                // Execute pending exit action if any
+                const exitAction = getPendingExitAction()
+                if (exitAction) exitAction()
+              }}
+            />
+          </Show>
         </box>
         <Show when={sidebarVisible()}>
           <Switch>

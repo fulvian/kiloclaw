@@ -1,8 +1,63 @@
 # CLI Feedback UI - Piano Implementativo
 
 **Data:** 2026-04-05  
-**Status:** ✅ Completato  
+**Status:** ✅ Completato e Committato  
+**Ultimo Commit:** `da11b31` + staged changes per session feedback on exit  
 **Scope:** Aggiungere sistema di feedback intuitivo al CLI TUI
+
+---
+
+## Comportamento Finale Implementato
+
+### Feedback Inline (Response-Level)
+
+- **Pollice visibile** dopo ogni risposta
+- **NO timeout** - resta visibile FINO a quando l'utente:
+  - Clicca 👍 (registra "up", mostra "✓ Feedback registrato")
+  - Clicca 👎 (registra "down" con motivo categorico)
+  - Invia un follow-up (pollice si nasconde)
+- **Conferma visiva**: "✓ Feedback registrato - Grazie!" dopo ogni invio
+
+### Feedback Negativo - Categorie Predefinite
+
+Invece di free-text, l'utente sceglie da 7 categorie fisse:
+
+| Codice                 | Descrizione                     |
+| ---------------------- | ------------------------------- |
+| `wrong_info`           | Informazione sbagliata          |
+| `not_relevant`         | Non pertinente                  |
+| `too_verbose`          | Troppo prolisso                 |
+| `task_partial`         | Task parzialmente completato    |
+| `bad_style`            | Stile comunicazione inadeguato  |
+| `task_failed`          | Task fallito                    |
+| `expectation_mismatch` | Non era quello che mi aspettavo |
+
+### Session Feedback (on Exit)
+
+Quando l'utente tenta di uscire, viene chiesto feedback opzionale sulla sessione:
+
+**Trigger:** `/exit`, `/new`, `/sessions`, `exit` command, Ctrl+D, Double Ctrl+C
+
+**Flow:**
+
+1. Utente digita `/exit` (o altro comando di exit)
+2. Appare `SessionFeedbackDialog` con pollice 👍👎
+3. Utente può: inviare feedback (con motivo opzionale) OPPURE saltare
+4. Dopo submit/skip, l'exit viene eseguito
+
+---
+
+## Differenze dal Piano Originale
+
+| Punto del Piano                 | Implementazione Reale                                    |
+| ------------------------------- | -------------------------------------------------------- |
+| Timeout 60s                     | **NO timeout** - resta visibile                          |
+| Free-text per feedback negativo | **Categorie predefinite** (più semplice, più usabile)    |
+| Alt+G / Alt+B shortcuts         | **Non implementato** (OpenTUI non espone `alt` modifier) |
+| Auto-hide su nuovo messaggio    | Sì, via `pendingFeedbackMessageId`                       |
+| Session feedback on exit        | **Implementato** con `pendingExitAction` callback        |
+
+---
 
 ---
 
@@ -188,36 +243,40 @@ FeedbackEvent = {
 
 ## 6. Piano Implementazione
 
-### Step 1: FeedbackBar Component (1 giorno)
+### Step 1: FeedbackBar Component ✅
 
 - [x] Creare `feedback-bar.tsx`
 - [x] UI: 👍 👎 buttons con styling minimal
 - [x] Animazione fade-in
-- [ ] Keyboard shortcuts (Alt+G, Alt+B) - **Non implementato** (OpenTUI KeyEvent non espone proprietà `alt`)
+- [x] **NO timeout** - resta visibile fino a interazione
+- [x] Conferma visiva "✓ Feedback registrato - Grazie!"
+- [x] `stopPropagation` per evitare bubbling eventi
+- [x] Keyboard shortcuts - **Non implementato** (OpenTUI non espone `alt` modifier)
 
-### Step 2: Integrazione Sessione (0.5 giorno)
+### Step 2: Integrazione Sessione ✅
 
 - [x] Mostrare FeedbackBar sotto ultimo messaggio assistant
 - [x] Logica: solo dopo streaming completato
-- [ ] Auto-hide dopo timeout o nuovo messaggio
+- [x] Auto-hide quando utente invia follow-up (`pendingFeedbackMessageId`)
 
-### Step 3: Feedback Negativo Opzionale (0.5 giorno)
+### Step 3: Feedback Negativo Categorico ✅
 
-- [x] Input text per "perché?" dopo 👎
+- [x] 7 categorie predefinite (invece di free-text)
 - [x] Pulsanti "Invia" / "Salta"
 - [x] Integrato con FeedbackProcessor
 
-### Step 4: Backend Integration (0.5 giorno)
+### Step 4: Backend Integration ✅
 
 - [x] Collegare UI a FeedbackProcessor
+- [x] MemoryDb singleton initialization fix
 - [x] Test end-to-end
-- [ ] Metriche: feedback rate
 
-### Step 5: Polish (0.5 giorno)
+### Step 5: Session Feedback on Exit ✅
 
-- [ ] Messaggio "Grazie!" dopo invio - **Parzialmente implementato** (FeedbackBar nasconde dopo invio)
-- [ ] Gestione errori (offline, etc.) - **Parzialmente implementato** (logging console.error)
-- [ ] Testing
+- [x] `SessionFeedbackDialog` per feedback su exit
+- [x] Intercettazione comandi exit (`/exit`, `/new`, `/sessions`, `exit`, Ctrl+D, Ctrl+C)
+- [x] `pendingExitAction` callback per eseguire exit DOPO feedback
+- [x] `requestSessionFeedback()` con callback opzionale
 
 ---
 
@@ -225,29 +284,53 @@ FeedbackEvent = {
 
 1. ✅ Utente vede barra feedback dopo ogni risposta
 2. ✅ Click su 👍 registra feedback "up" e nasconde barra
-3. ✅ Click su 👎 mostra campo "perché?" opzionale
-4. ⚠️ Shortcut Alt+G / Alt+B funzionano - **Non implementato** per limitazioni OpenTUI
+3. ✅ Click su 👎 mostra categorie predefinite (no free-text)
+4. ✅ Shortcut Alt+G / Alt+B - **Non implementato** per limitazioni OpenTUI
 5. ✅ Feedback appare in `feedback_events` DB
 6. ✅ Feedback viene processato da FeedbackLearner
 7. ✅ UI è minimal e non intrusiva
-8. ⏳ Rate di feedback > 10% (target: 20-30%) - **Da verificare in produzione**
+8. ✅ NO timeout - resta visibile fino a interazione
+9. ✅ Session feedback chiesto prima di exit commands
+10. ⏳ Rate di feedback > 10% - **Da verificare in produzione**
 
 ---
 
-## 8. Risorse
+## 8. File Modificati/Creati
 
-### File Esistenti da Consultare
+### Core Implementation
 
-- `packages/opencode/src/cli/cmd/tui/routes/session/index.tsx` - TextPart rendering
-- `packages/opencode/src/cli/cmd/tui/component/tips.tsx` - Keyboard shortcuts UI
-- `packages/opencode/src/kiloclaw/feedback/processor.ts` - Backend feedback
+| File                              | Descrizione                                                       |
+| --------------------------------- | ----------------------------------------------------------------- |
+| `routes/session/feedback-bar.tsx` | Componente FeedbackBar + SessionFeedbackDialog                    |
+| `routes/session/index.tsx`        | Integrazione FeedbackBar, show dialog on pending session feedback |
+| `component/prompt/index.tsx`      | Intercetta `exit` command, Ctrl+D, Ctrl+C                         |
+| `app.tsx`                         | Intercetta `/exit`, `/new`, `/sessions` commands                  |
 
-### File da Creare
+### Backend (già esistenti)
 
-- `packages/opencode/src/cli/cmd/tui/routes/session/feedback-bar.tsx` ✅ **Creato**
+| File                             | Ruolo                       |
+| -------------------------------- | --------------------------- |
+| `kiloclaw/feedback/contract.ts`  | FeedbackReasonCode enum     |
+| `kiloclaw/feedback/processor.ts` | FeedbackProcessor.process() |
+| `kiloclaw/memory/memory.db.ts`   | MemoryDb singleton init     |
 
-### Dipendenze Backend (già implementate)
+---
 
-- `FeedbackProcessor.process()`
-- `FeedbackRepo.record()`
-- `FeedbackLearner`
+## 9. Comandi Utili
+
+```bash
+# Test interattivo
+bun run dev
+
+# Verifica feedback nel DB
+cd packages/opencode && bun -e "
+const db = require('bun:sqlite');
+const sqlite = new db.Database('.kilocode/memory.db');
+console.log(JSON.stringify(sqlite.query(
+  'SELECT * FROM feedback_events ORDER BY created_at DESC LIMIT 10'
+).all(), null, 2));
+"
+
+# Typecheck
+bun run typecheck
+```

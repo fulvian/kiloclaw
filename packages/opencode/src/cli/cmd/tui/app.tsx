@@ -46,6 +46,7 @@ import { registerKiloCommands } from "@/kilocaw-legacy/kilo-commands" // kilocod
 import { initializeTUIDependencies } from "@kilocode/kilo-gateway/tui" // kilocode_change
 import { TuiConfigProvider } from "./context/tui-config"
 import { TuiConfig } from "@/config/tui"
+import { requestSessionFeedback } from "./routes/session/feedback-bar" // kilocode_change
 
 async function getTerminalBackgroundColor(): Promise<"dark" | "light"> {
   // can't set raw mode if not a TTY
@@ -390,7 +391,17 @@ function App() {
         aliases: ["resume", "continue"],
       },
       onSelect: () => {
-        dialog.replace(() => <DialogSessionList />)
+        // kilocode_change start - request session feedback before switching sessions
+        const sessionId = route.data.type === "session" ? route.data.sessionID : undefined
+        const showSessionList = () => {
+          dialog.replace(() => <DialogSessionList />)
+        }
+        if (sessionId) {
+          requestSessionFeedback(sessionId, showSessionList)
+        } else {
+          showSessionList()
+        }
+        // kilocode_change end
       },
     },
     ...(Flag.KILO_EXPERIMENTAL_WORKSPACES_TUI
@@ -423,11 +434,21 @@ function App() {
         const current = promptRef.current
         // Don't require focus - if there's any text, preserve it
         const currentPrompt = current?.current?.input ? current.current : undefined
-        route.navigate({
-          type: "home",
-          initialPrompt: currentPrompt,
-        })
-        dialog.clear()
+        // kilocode_change start - request session feedback before new session
+        const sessionId = route.data.type === "session" ? route.data.sessionID : undefined
+        const navigateAndClear = () => {
+          route.navigate({
+            type: "home",
+            initialPrompt: currentPrompt,
+          })
+          dialog.clear()
+        }
+        if (sessionId) {
+          requestSessionFeedback(sessionId, navigateAndClear)
+        } else {
+          navigateAndClear()
+        }
+        // kilocode_change end
       },
     },
     {
@@ -608,7 +629,16 @@ function App() {
         name: "exit",
         aliases: ["quit", "q"],
       },
-      onSelect: () => exit(),
+      // kilocode_change start - request session feedback before exit
+      onSelect: () => {
+        const sessionId = route.data.type === "session" ? route.data.sessionID : undefined
+        if (sessionId) {
+          requestSessionFeedback(sessionId, () => exit())
+        } else {
+          exit()
+        }
+      },
+      // kilocode_change end
       category: "System",
     },
     {

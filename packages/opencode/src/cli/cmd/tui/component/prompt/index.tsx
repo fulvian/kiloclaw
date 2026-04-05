@@ -18,6 +18,7 @@ import { DialogStash } from "../dialog-stash"
 import { type AutocompleteRef, Autocomplete } from "./autocomplete"
 import { useCommandDialog } from "../dialog-command"
 import { useRenderer } from "@opentui/solid"
+import { requestSessionFeedback } from "../../routes/session/feedback-bar" // kilocode_change
 import { Editor } from "@tui/util/editor"
 import { useExit } from "../../context/exit"
 import { Clipboard } from "../../util/clipboard"
@@ -532,7 +533,15 @@ export function Prompt(props: PromptProps) {
     if (!store.prompt.input) return
     const trimmed = store.prompt.input.trim()
     if (trimmed === "exit" || trimmed === "quit" || trimmed === ":q") {
-      exit()
+      // kilocode_change start - request session feedback before exit
+      const sessionId = props.sessionID
+      const doExit = () => exit()
+      if (sessionId) {
+        requestSessionFeedback(sessionId, doExit)
+      } else {
+        doExit()
+      }
+      // kilocode_change end
       return
     }
     const selectedModel = local.model.current()
@@ -872,22 +881,36 @@ export function Prompt(props: PromptProps) {
                 if (keybind.match("app_exit", e)) {
                   if (store.prompt.input === "") {
                     // kilocode_change start - double ctrl+c to exit, single ctrl+d exits immediately
+                    const doExit = () => {
+                      exit()
+                      e.preventDefault()
+                    }
                     if (e.ctrl && e.name === "c") {
                       setStore("exitPress", store.exitPress + 1)
                       setTimeout(() => {
                         setStore("exitPress", 0)
                       }, 1000)
                       if (store.exitPress >= 2) {
-                        await exit()
-                        e.preventDefault()
+                        // Request session feedback before exit
+                        const sessionId = props.sessionID
+                        if (sessionId) {
+                          requestSessionFeedback(sessionId, doExit)
+                        } else {
+                          doExit()
+                        }
                         return
                       }
                       e.preventDefault()
                       return
                     }
                     // kilocode_change end
-                    await exit()
-                    // Don't preventDefault - let textarea potentially handle the event
+                    // Request session feedback before exit
+                    const sessionId = props.sessionID
+                    if (sessionId) {
+                      requestSessionFeedback(sessionId, doExit)
+                    } else {
+                      doExit()
+                    }
                     e.preventDefault()
                     return
                   }

@@ -90,16 +90,19 @@ export function clearPendingFeedback() {
 // kilocode_change - session feedback state
 let sessionFeedbackPending = false
 let pendingSessionId: string | null = null
+let pendingExitAction: (() => void) | null = null
 
-export function requestSessionFeedback(sessionId: string) {
+export function requestSessionFeedback(sessionId: string, onExit?: () => void) {
   sessionFeedbackPending = true
   pendingSessionId = sessionId
+  pendingExitAction = onExit ?? null
   log.info("session feedback requested", { sessionId })
 }
 
 export function clearSessionFeedback() {
   sessionFeedbackPending = false
   pendingSessionId = null
+  pendingExitAction = null
 }
 
 export function hasPendingSessionFeedback() {
@@ -108,6 +111,10 @@ export function hasPendingSessionFeedback() {
 
 export function getPendingSessionId(): string | null {
   return pendingSessionId
+}
+
+export function getPendingExitAction(): (() => void) | null {
+  return pendingExitAction
 }
 
 // kilocode_change - submit feedback for a response
