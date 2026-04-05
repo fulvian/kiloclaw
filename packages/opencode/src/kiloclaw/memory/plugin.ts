@@ -3,9 +3,14 @@ import { Log } from "@/util/log"
 import { Instance } from "@/project/instance"
 import { Session } from "@/session"
 import { MessageV2 } from "@/session/message-v2"
+import { Flag } from "@/flag/flag"
 import type { Hooks, PluginInput } from "@kilocode/plugin"
 import { MemoryBrokerV2 } from "./memory.broker.v2"
 import { MemoryWriteback } from "./memory.writeback"
+import { MemoryRecallPolicy } from "./memory.recall-policy"
+import { MemoryMetrics } from "./memory.metrics"
+import { MemoryPackager } from "./memory.packager"
+import { MemoryInjectionPolicy } from "./memory.injection-policy"
 
 const log = Log.create({ service: "kiloclaw.memory.plugin" })
 
@@ -38,69 +43,16 @@ const RECALL = [
   /storico/i,
 ]
 
-/**
- * Check if message needs memory recall using hybrid approach:
- * 1. Regex patterns for explicit references (fast, no API calls)
- * 2. Similarity fallback for implicit/missed patterns (embeddings-based)
- */
 async function needsRecallAsync(text: string): Promise<boolean> {
-  // First: check explicit regex patterns (fast path)
   if (RECALL.some((re) => re.test(text))) {
     return true
   }
-
-  // Second: semantic similarity fallback for implicit history references
-  // This catches questions that reference "past" without explicit keywords
-  const implicitIndicators = [
-    "last time",
-    "previously",
-    "before",
-    "ago",
-    "earlier",
-    "the past",
-    "recent",
-    "le ultime",
-    "la scorsa",
-    "ultima volta",
-    "volta scorsa",
-    "sessione",
-    "conversazione passata",
-  ]
-
-  const lowerText = text.toLowerCase()
-  const hasImplicitReference = implicitIndicators.some((ind) => lowerText.includes(ind))
-  if (!hasImplicitReference) {
-    return false
-  }
-
-  // Semantic check via embeddings (triggered only when implicit reference detected)
-  try {
-    const { MemoryEmbedding } = await import("./memory.embedding")
-    const query = text.trim()
-    const recallTemplate = "user asking about conversation history past sessions what did we discuss previously"
-    const [queryEmb, templateEmb] = await MemoryEmbedding.embedBatch([query, recallTemplate])
-    const similarity = cosineSimilarity(queryEmb, templateEmb)
-    console.log("[MEMORY-PLUGIN] semantic similarity for recall detection:", similarity.toFixed(3))
-    // Threshold 0.65 catches implicit references while avoiding false positives
-    return similarity > 0.65
-  } catch (err) {
-    console.log("[MEMORY-PLUGIN] semantic check failed, defaulting to false:", err)
-    return false
-  }
+  const out = await MemoryRecallPolicy.evaluate(text)
+  return out.decision === "recall"
 }
 
-function cosineSimilarity(a: number[], b: number[]): number {
-  if (a.length !== b.length || a.length === 0) return 0
-  let dot = 0
-  let normA = 0
-  let normB = 0
-  for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i]
-    normA += a[i] * a[i]
-    normB += b[i] * b[i]
-  }
-  const denom = Math.sqrt(normA) * Math.sqrt(normB)
-  return denom > 0 ? dot / denom : 0
+function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 4)
 }
 
 export async function createMemoryContextPlugin(_input: PluginInput): Promise<Hooks> {
@@ -129,10 +81,32 @@ export async function createMemoryContextPlugin(_input: PluginInput): Promise<Ho
 
       const text = userText(msg.parts)
       console.log("[MEMORY-PLUGIN] user text:", text.slice(0, 100))
-      if (!(await needsRecallAsync(text))) {
+
+      const policy = await MemoryRecallPolicy.evaluate(text)
+      MemoryMetrics.observeGate({
+        decision: policy.decision,
+        confidence: policy.confidence,
+        lang: policy.intent.lang,
+        reasons: policy.reasons,
+      })
+
+      if (!Flag.KILO_MEMORY_RECALL_POLICY_V1) {
+        if (!(await needsRecallAsync(text))) {
+          console.log("[MEMORY-PLUGIN] recall NOT needed")
+          return
+        }
+      }
+
+      if (policy.decision === "skip") {
         console.log("[MEMORY-PLUGIN] recall NOT needed")
         return
       }
+
+      if (policy.decision === "shadow") {
+        console.log("[MEMORY-PLUGIN] recall SHADOW mode")
+        if (!Flag.KILO_MEMORY_SHADOW_MODE && !Flag.KILO_MEMORY_RECALL_TRI_STATE) return
+      }
+
       console.log("[MEMORY-PLUGIN] recall IS needed, fetching sessions and memory")
 
       const cur = msg.info.sessionID
@@ -154,7 +128,7 @@ export async function createMemoryContextPlugin(_input: PluginInput): Promise<Ho
         }),
       )
 
-      const mem = await MemoryBrokerV2.retrieve({ query: text, limit: 6 })
+      const mem = await MemoryBrokerV2.retrieve({ query: text, limit: 8 })
         .then((x) => x.items)
         .catch((err) => {
           console.log("[MEMORY-PLUGIN] retrieve failed:", err)
@@ -163,9 +137,18 @@ export async function createMemoryContextPlugin(_input: PluginInput): Promise<Ho
 
       console.log("[MEMORY-PLUGIN] memory retrieve returned:", mem.length, "items")
 
+      const plan = MemoryInjectionPolicy.decide({
+        confidence: policy.confidence,
+        text,
+      })
+      const mode = plan.mode
+      const memPacked = MemoryPackager.packageMemory(mem, {
+        structuredFormat: true,
+        maxItemsPerLayer: plan.maxItemsPerLayer,
+      })
       const memLines = mem
-        .slice(0, 4)
-        .map((item) => `- ${String((item.item as any).layer ?? "memory")}: ${clip(memorySnippet(item.item), 140)}`)
+        .slice(0, plan.maxHits)
+        .map((item) => `- ${String(layerOf(item.item))}: ${clip(memorySnippet(item.item), 140)}`)
 
       const block = [
         "<system-reminder>",
@@ -175,11 +158,27 @@ export async function createMemoryContextPlugin(_input: PluginInput): Promise<Ho
         "Relevant memory hits:",
         memLines.length > 0 ? memLines.join("\n") : "- No relevant memory entries found.",
         "",
+        "Structured memory package:",
+        memPacked,
+        "",
+        `Injection mode: ${mode}.`,
+        `Recall policy: decision=${policy.decision}, confidence=${policy.confidence.toFixed(3)}, lang=${policy.intent.lang}.`,
         "If the user asked about previous conversations, answer using this recovered context.",
         "</system-reminder>",
       ].join("\n")
 
+      MemoryMetrics.observeInjection({
+        mode,
+        tokens: estimateTokens(block),
+        count: mem.length,
+        diversity: diversity(mem),
+      })
+
       console.log("[MEMORY-PLUGIN] injecting memory block, length:", block.length)
+      if (policy.decision === "shadow") {
+        console.log("[MEMORY-PLUGIN] shadow-only decision, skipping prompt injection")
+        return
+      }
       msg.parts.push({
         id: Identifier.ascending("part"),
         messageID: msg.info.id,
@@ -219,4 +218,16 @@ function memorySnippet(item: any): string {
   if (item?.name || item?.description) return `${item.name ?? ""} ${item.description ?? ""}`.trim()
   if (item?.key || item?.value) return `${String(item.key ?? "")} ${String(item.value ?? "")}`.trim()
   return JSON.stringify(item)
+}
+
+function layerOf(item: unknown): string {
+  if (!item || typeof item !== "object") return "memory"
+  const row = item as { layer?: unknown }
+  if (typeof row.layer === "string") return row.layer
+  return "memory"
+}
+
+function diversity(items: Array<{ item: unknown }>): number {
+  const layers = new Set(items.map((x) => layerOf(x.item)))
+  return layers.size
 }

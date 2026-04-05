@@ -64,6 +64,9 @@ export { MemoryGraph } from "./memory.graph.js"
 export { MemoryConsolidation } from "./memory.consolidation.js"
 export { MemoryShadow } from "./memory.shadow.js"
 export { MemoryMetrics } from "./memory.metrics.js"
+export { MemoryIntent } from "./memory.intent.js"
+export { MemoryRecallPolicy } from "./memory.recall-policy.js"
+export { MemoryInjectionPolicy } from "./memory.injection-policy.js"
 
 // BP-12: Memory Maintenance
 export { MemoryMaintenance } from "./memory.maintenance.js"

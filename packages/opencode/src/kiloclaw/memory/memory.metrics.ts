@@ -21,9 +21,27 @@ type ShadowPoint = {
   ts: number
 }
 
+type RecallGatePoint = {
+  decision: "recall" | "shadow" | "skip"
+  confidence: number
+  lang: string
+  reasons: string[]
+  ts: number
+}
+
+type InjectionPoint = {
+  mode: "minimal" | "standard" | "proactive"
+  tokens: number
+  count: number
+  diversity: number
+  ts: number
+}
+
 const retrieval: RetrievalPoint[] = []
 const purge: PurgePoint[] = []
 const shadow: ShadowPoint[] = []
+const gate: RecallGatePoint[] = []
+const inject: InjectionPoint[] = []
 
 const MAX = 5000
 
@@ -43,13 +61,54 @@ export namespace MemoryMetrics {
     trim(shadow)
   }
 
+  export function observeGate(input: {
+    decision: "recall" | "shadow" | "skip"
+    confidence: number
+    lang: string
+    reasons: string[]
+  }): void {
+    gate.push({
+      decision: input.decision,
+      confidence: input.confidence,
+      lang: input.lang,
+      reasons: input.reasons,
+      ts: Date.now(),
+    })
+    trim(gate)
+  }
+
+  export function observeInjection(input: {
+    mode: "minimal" | "standard" | "proactive"
+    tokens: number
+    count: number
+    diversity: number
+  }): void {
+    inject.push({
+      mode: input.mode,
+      tokens: input.tokens,
+      count: input.count,
+      diversity: input.diversity,
+      ts: Date.now(),
+    })
+    trim(inject)
+  }
+
   export function snapshot() {
-    const p95 = percentile(retrieval.map((x) => x.latencyMs), 95)
+    const p95 = percentile(
+      retrieval.map((x) => x.latencyMs),
+      95,
+    )
     const avgTokens = avg(retrieval.map((x) => x.tokenUsage))
     const avgCount = avg(retrieval.map((x) => x.count))
     const purgeFailures = purge.reduce((acc, x) => acc + x.failed, 0)
     const purgeTotal = purge.reduce((acc, x) => acc + x.purged + x.failed, 0)
     const mismatchAvg = avg(shadow.map((x) => x.mismatch))
+    const recallRate = ratio(gate.filter((x) => x.decision === "recall").length, gate.length)
+    const shadowRate = ratio(gate.filter((x) => x.decision === "shadow").length, gate.length)
+    const avgGateConfidence = avg(gate.map((x) => x.confidence))
+    const avgInjectedTokens = avg(inject.map((x) => x.tokens))
+    const avgInjectedCount = avg(inject.map((x) => x.count))
+    const avgInjectedDiversity = avg(inject.map((x) => x.diversity))
 
     return {
       retrieval: {
@@ -66,10 +125,24 @@ export namespace MemoryMetrics {
         samples: shadow.length,
         avgMismatch: mismatchAvg,
       },
+      gate: {
+        samples: gate.length,
+        recallRate,
+        shadowRate,
+        avgConfidence: avgGateConfidence,
+      },
+      injection: {
+        samples: inject.length,
+        avgTokens: avgInjectedTokens,
+        avgCount: avgInjectedCount,
+        avgDiversity: avgInjectedDiversity,
+      },
       slo: {
         retrievalP95Ok: p95 <= 300,
         purgeFailureRateOk: purgeTotal === 0 ? true : purgeFailures / purgeTotal === 0,
         shadowMismatchOk: mismatchAvg <= 0.5,
+        gateConfidenceOk: avgGateConfidence >= 0.5,
+        injectionWasteRiskOk: avgInjectedTokens <= 1200,
       },
     }
   }
@@ -97,4 +170,9 @@ function percentile(values: number[], p: number): number {
   const sorted = [...values].sort((a, b) => a - b)
   const idx = Math.min(sorted.length - 1, Math.floor((p / 100) * sorted.length))
   return sorted[idx]
+}
+
+function ratio(n: number, d: number): number {
+  if (d === 0) return 0
+  return n / d
 }

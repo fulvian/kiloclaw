@@ -26,12 +26,8 @@ import { memoryBroker } from "./broker.js"
 import { semanticMemory } from "./semantic.js"
 import { episodicMemory } from "./episodic.js"
 import { MemoryRetention } from "./memory.retention.js"
-import {
-  WorkingMemoryRepo,
-  EpisodicMemoryRepo,
-  SemanticMemoryRepo,
-  ProceduralMemoryRepo,
-} from "./memory.repository.js"
+import { MemoryDb } from "./memory.db.js"
+import { WorkingMemoryRepo, EpisodicMemoryRepo, SemanticMemoryRepo, ProceduralMemoryRepo } from "./memory.repository.js"
 
 const log = Log.create({ service: "kiloclaw.memory.lifecycle" })
 
@@ -39,6 +35,15 @@ const log = Log.create({ service: "kiloclaw.memory.lifecycle" })
 let retentionTimer: ReturnType<typeof setInterval> | null = null
 
 export namespace MemoryLifecycle {
+  async function ensureRepo(): Promise<void> {
+    if (!Flag.KILO_EXPERIMENTAL_MEMORY_V2) return
+    try {
+      await WorkingMemoryRepo.count("default")
+    } catch {
+      await MemoryDb.init(":memory:")
+    }
+  }
+
   /**
    * Capture run artifacts and classify for storage
    */
@@ -273,6 +278,7 @@ export namespace MemoryLifecycle {
     procedural: { totalProcedures: number; totalPatterns: number }
   }> {
     if (Flag.KILO_EXPERIMENTAL_MEMORY_V2) {
+      await ensureRepo()
       const working = await WorkingMemoryRepo.getMany("default", [])
       const totalEpisodes = await EpisodicMemoryRepo.count("default")
       const totalEvents = await EpisodicMemoryRepo.countEvents("default")

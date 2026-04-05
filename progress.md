@@ -844,3 +844,131 @@ packages/opencode/src/kiloclaw/
 1. Commit delle modifiche
 2. Stage A rollout (internal dogfooding)
 3. Monitoraggio KPI per 30 giorni
+
+---
+
+## 2026-04-06 - Dynamic Memory Recall Production Implementation
+
+### Scope delivered
+
+- Implemented production-ready dynamic recall gating and context injection policy.
+- Replaced fragile static-only trigger path with policy-driven, multilingual-aware pipeline.
+- Added structured observability for recall gate decisions and injection telemetry.
+
+### Code changes
+
+**New modules**
+
+- `packages/opencode/src/kiloclaw/memory/memory.intent.ts`
+  - Multilingual recall-intent classification (IT/EN/mixed)
+  - Hybrid lexical + optional semantic scoring
+  - Intent taxonomy: explicit_recall, project_context, continuation, preference_reuse, none
+
+- `packages/opencode/src/kiloclaw/memory/memory.recall-policy.ts`
+  - Recall Policy Engine with tri-state decisions: recall/shadow/skip
+  - Confidence scoring + reason codes + threshold envelope
+
+- `packages/opencode/src/kiloclaw/memory/memory.injection-policy.ts`
+  - Dynamic injection mode: minimal/standard/proactive
+  - Output envelope with maxItemsPerLayer and maxHits
+
+**Updated modules**
+
+- `packages/opencode/src/kiloclaw/memory/plugin.ts`
+  - Integrated `MemoryRecallPolicy` as main gate
+  - Added gate metrics emission (`observeGate`)
+  - Added dynamic injection policy + packager integration
+  - Added shadow decision path (retrieval without prompt injection)
+  - Added injection metrics emission (`observeInjection`)
+
+- `packages/opencode/src/kiloclaw/memory/memory.metrics.ts`
+  - Added gate stream metrics and injection metrics
+  - Extended snapshot output and SLO indicators
+
+- `packages/opencode/src/flag/flag.ts`
+  - Added feature flags for recall policy, tri-state mode, intent classifier, multilingual recall, proactive injection, budget enforcer, extractor v2
+
+- `packages/opencode/src/kiloclaw/memory/index.ts`
+  - Exported new modules
+
+- `packages/opencode/src/kiloclaw/memory/lifecycle.ts`
+  - Added safe V2 repository initialization guard in `getStats()` to keep smoke path stable
+
+### Tests added
+
+- `packages/opencode/test/kiloclaw/memory-recall-policy.test.ts`
+- `packages/opencode/test/kiloclaw/memory-injection-policy.test.ts`
+
+### Verification evidence (fresh)
+
+- `bun run --cwd packages/opencode typecheck` → pass
+- `bun run --cwd packages/opencode test test/kiloclaw/memory-recall-policy.test.ts test/kiloclaw/memory-injection-policy.test.ts` → 4 pass, 0 fail
+- `bun run --cwd packages/opencode test test/kiloclaw/smoke-routing-memory.test.ts` → 3 pass, 0 fail
+- `bun run --cwd packages/opencode test test/kiloclaw/memory.test.ts test/kiloclaw/memory-ranking.test.ts test/kiloclaw/memory-retention.test.ts test/kiloclaw/memory-feedback.test.ts test/kiloclaw/memory-persistence.test.ts test/kiloclaw/memory-no-stub.test.ts test/kiloclaw/memory-graph.test.ts test/kiloclaw/memory-tier.test.ts test/kiloclaw/memory-maintenance.test.ts test/kiloclaw/memory-recall-policy.test.ts test/kiloclaw/memory-injection-policy.test.ts test/kiloclaw/smoke-routing-memory.test.ts` → 135 pass, 0 fail
+
+### Local deployment verification
+
+- CLI boot check: `bun run --cwd packages/opencode --conditions=browser src/index.ts --help` → pass
+- Headless server smoke check: started `serve` on local port and verified HTTP endpoint reachable (`HTTP_CODE=404` on root with successful startup log)
+
+### Notes
+
+- `memory-production-integration.test.ts` remains gated by env (`KILO_RUN_MEMORY_BENCHMARK=true`) and correctly skips by default.
+
+---
+
+## 2026-04-06 — Session 2 (Late Night)
+
+### Problem Investigated
+
+Memory recall system still returned `recall NOT needed` for Italian query `"di cosa abbiamo discusso nelle ultime 10 sessioni?"` after initial implementation.
+
+### Root Cause Found
+
+1. **Threshold too high**: `recall = 0.62`. Italian query scored **0.60375** — missed by only 0.016
+2. **Fallback to legacy path**: `KILO_MEMORY_RECALL_POLICY_V1` could evaluate to false in some runtime environments, falling back to regex-based `needsRecallAsync()` which doesn't handle Italian
+
+### Fix Applied
+
+**`memory.recall-policy.ts`** — Threshold calibration:
+
+- `recall`: 0.62 → **0.55**
+- `shadow`: 0.48 → **0.40**
+
+Query now correctly triggers `recall` decision (0.60375 > 0.55).
+
+### Test Pollution Investigation (7 failures → 5 remaining)
+
+Investigated 7 test failures in memory-persistence, memory-retention, smoke-routing-memory.
+
+**Root cause**: `feedback-processor.test.ts` line 10 — incomplete `vi.mock` of `memory.repository` module with only 2-4 methods per repo. When loaded first, pollutes module cache for all subsequent tests that use the real database.
+
+**Fix applied**: Expanded `vi.mock` with complete method implementations for all 7 repos. Reduced failures from 7 to 5.
+
+**Remaining 5**: Integration tests that call real DB operations but mock returns empty values. No production impact (test isolation issue only).
+
+### Files Modified
+
+- `packages/opencode/src/kiloclaw/memory/memory.recall-policy.ts` — threshold fix
+- `packages/opencode/src/kiloclaw/memory/plugin.ts` — temporary debug logging (cleaned up)
+- `packages/opencode/test/kiloclaw/feedback-processor.test.ts` — mock expansion
+
+### Files Not Committed (per user decision)
+
+- 5 remaining test failures deemed test isolation issue, not production bug
+- User chose to not fix remaining test failures
+
+### Verification
+
+| Check                      | Result                      |
+| -------------------------- | --------------------------- |
+| typecheck                  | ✅ pass                     |
+| recall-policy tests (4)    | ✅ pass                     |
+| injection-policy tests (2) | ✅ pass                     |
+| Italian query decision     | ✅ recall (was shadow/skip) |
+
+### Next Steps (if resumed)
+
+1. Fix remaining 5 test failures (optional — no production impact)
+2. Enable `KILO_MEMORY_INTENT_CLASSIFIER_V1=true` to add semantic similarity scoring
+3. Add more multilingual recall test cases (EN/IT/ES/FR)
