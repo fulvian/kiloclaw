@@ -1238,8 +1238,8 @@ export function Session() {
           <Toast />
           {/* kilocode_change */}
           <Footer />
-          {/* Session feedback dialog - shown when exit is triggered */}
-          <Show when={hasPendingSessionFeedback()}>
+          {/* Session feedback dialog - TEMPORARILY DISABLED for testing */}
+          {/* <Show when={hasPendingSessionFeedback()}>
             <SessionFeedbackDialog
               sessionId={getPendingSessionId() ?? route.sessionID}
               onSubmit={async (vote, reason) => {
@@ -1258,7 +1258,7 @@ export function Session() {
                 if (exitAction) exitAction()
               }}
             />
-          </Show>
+          </Show> */}
         </box>
         <Show when={sidebarVisible()}>
           <Switch>
