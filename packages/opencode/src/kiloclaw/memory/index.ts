@@ -56,7 +56,7 @@ export {
 
 // Database initialization and state (ADR-005)
 export { MemoryDb } from "./memory.db.js"
-export { MemoryState, ensureMemoryInit } from "./memory.state.js"
+export { MemoryState, ensureMemoryInit, memoryShutdown } from "./memory.state.js"
 export { MemoryBrokerV2 } from "./memory.broker.v2.js"
 export { MemoryBackfill } from "./memory.backfill.js"
 export { MemoryEmbedding } from "./memory.embedding.js"
