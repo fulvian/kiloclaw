@@ -275,7 +275,7 @@ async function updateUserProfileFromFeedback(feedback: FeedbackEvent, weight: nu
 
     // Update feedback stats in preferences
     const fbStats = (preferences.feedbackStats as Record<string, number>) ?? {}
-    fbStats[feedback.reason] = (fbStats[feedback.reason] ?? 0) + 1
+    if (feedback.reason) fbStats[feedback.reason] = (fbStats[feedback.reason] ?? 0) + 1
     fbStats.totalFeedback = (fbStats.totalFeedback ?? 0) + 1
     if (feedback.vote === "up") fbStats.upvotes = (fbStats.upvotes ?? 0) + 1
     else fbStats.downvotes = (fbStats.downvotes ?? 0) + 1
@@ -310,7 +310,7 @@ async function updateUserProfileFromFeedback(feedback: FeedbackEvent, weight: nu
       targetId: feedback.userId,
       targetType: "user_profile",
       delta,
-      reason: feedback.reason,
+      reason: feedback.reason ?? undefined,
       weight,
       sourceFeedbackId: feedback.id,
       ts: Date.now(),
@@ -353,7 +353,7 @@ async function updateRetrievalSignals(feedback: FeedbackEvent, weight: number): 
       targetId: feedback.target.id,
       targetType: feedback.target.type,
       delta: feedback.vote === "up" ? weight * 0.1 : -weight * 0.2,
-      reason: feedback.reason,
+      reason: feedback.reason ?? undefined,
       weight,
       sourceFeedbackId: feedback.id,
       ts: Date.now(),
@@ -387,7 +387,7 @@ async function updateProcedureFromFeedback(feedback: FeedbackEvent, weight: numb
       targetId: feedback.target.taskId,
       targetType: "procedure",
       delta: success ? weight : -weight,
-      reason: feedback.reason,
+      reason: feedback.reason ?? undefined,
       weight,
       sourceFeedbackId: feedback.id,
       ts: Date.now(),
@@ -426,7 +426,7 @@ async function updateFactConfidence(feedback: FeedbackEvent, weight: number): Pr
       targetId: feedback.target.id,
       targetType: "fact",
       delta: -reduction,
-      reason: feedback.reason,
+      reason: feedback.reason ?? undefined,
       weight,
       sourceFeedbackId: feedback.id,
       ts: Date.now(),
@@ -460,7 +460,7 @@ async function adjustProactivePolicy(feedback: FeedbackEvent, weight: number): P
       targetId: feedback.userId,
       targetType: "user_profile",
       delta,
-      reason: feedback.reason,
+      reason: feedback.reason ?? undefined,
       weight,
       sourceFeedbackId: feedback.id,
       ts: Date.now(),

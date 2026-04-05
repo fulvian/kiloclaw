@@ -96,8 +96,8 @@ export const FeedbackEventSchema = z.object({
   vote: FeedbackVote,
   score: z.number().min(0).max(1).optional(), // 0-1 normalized score
 
-  // Reason
-  reason: FeedbackReasonCode,
+  // Reason - only required for down votes
+  reason: FeedbackReasonCode.optional(),
   correction: z.string().optional(), // User-provided correction
 
   // Outcome tracking
@@ -170,7 +170,7 @@ export interface LearningUpdate {
   targetId: string
   targetType: string
   delta: number // Direction and magnitude of change
-  reason: FeedbackReasonCode
+  reason?: FeedbackReasonCode // Optional since up votes have no reason
   weight: number // Confidence in the update
   sourceFeedbackId: string
   ts: number
@@ -181,7 +181,19 @@ export const LearningUpdateSchema = z.object({
   targetId: z.string(),
   targetType: z.string(),
   delta: z.number(), // Direction and magnitude of change
-  reason: FeedbackReasonCode,
+  reason: z
+    .enum([
+      "wrong_fact",
+      "irrelevant",
+      "too_verbose",
+      "style_mismatch",
+      "unsafe",
+      "task_failed",
+      "task_partial",
+      "expectation_mismatch",
+      "other",
+    ])
+    .optional(),
   weight: z.number().min(0).max(1), // Confidence in the update
   sourceFeedbackId: z.string(),
   ts: z.number().int().positive(),
@@ -316,7 +328,7 @@ export function calculateQualityScore(event: FeedbackEvent): number {
     other: 0.05,
   }
 
-  const penalty = reasonPenalties[event.reason]
+  const penalty = event.reason ? reasonPenalties[event.reason] : 0
   if (event.vote === "down") {
     score = Math.max(0, score - penalty)
   } else if (event.correction) {
