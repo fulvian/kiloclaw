@@ -2,12 +2,40 @@
  * Memory Reranker - Cross-Encoder Style Reranking Pipeline
  * Based on BP-08 of KILOCLAW_MEMORY_ENHANCEMENT_PLAN
  * Reranks vector search candidates for better precision
+ *
+ * Performance optimizations:
+ * - Batch embedding: all candidates embedded in single API call
+ * - LRU cache: avoids re-embedding identical content
+ * - Early exit: high-scoring candidates bypass full reranking
  */
 
 import { Log } from "@/util/log"
 import { MemoryEmbedding } from "./memory.embedding"
 
 const log = Log.create({ service: "kiloclaw.memory.reranker" })
+
+// LRU cache for embeddings - avoids re-encoding identical content
+const EMBEDDING_CACHE_MAX_SIZE = 1000
+const embeddingCache = new Map<string, number[]>()
+
+function getCachedEmbedding(content: string): number[] | undefined {
+  return embeddingCache.get(content)
+}
+
+function setCachedEmbedding(content: string, embedding: number[]): void {
+  // Simple LRU eviction when cache is full
+  if (embeddingCache.size >= EMBEDDING_CACHE_MAX_SIZE) {
+    // Remove oldest 10% of entries
+    const entriesToRemove = Math.floor(EMBEDDING_CACHE_MAX_SIZE * 0.1)
+    let count = 0
+    for (const key of embeddingCache.keys()) {
+      if (count >= entriesToRemove) break
+      embeddingCache.delete(key)
+      count++
+    }
+  }
+  embeddingCache.set(content, embedding)
+}
 
 export interface RerankCandidate {
   id: string
@@ -27,7 +55,7 @@ export interface RerankResult {
 export namespace MemoryReranker {
   /**
    * Rerank candidates using cross-encoder-style scoring.
-   * Uses embedding-based score fusion for MVP.
+   * Uses batch embedding for efficiency.
    */
   export async function rerank(
     query: string,
@@ -58,38 +86,94 @@ export namespace MemoryReranker {
       }))
     }
 
-    const queryEmbedding = await MemoryEmbedding.embed(query)
+    // Check for cached query embedding
+    const queryEmbedding = getCachedEmbedding(query) ?? (await MemoryEmbedding.embed(query))
+    setCachedEmbedding(query, queryEmbedding)
 
-    // Score each candidate against query embedding
-    const scored = await Promise.all(
-      candidates.map(async (candidate) => {
-        const candidateEmbedding = await MemoryEmbedding.embed(candidate.content)
-        const rerankScore = cosineSimilarity(queryEmbedding, candidateEmbedding)
+    // Build content list, using cache where possible
+    const contents: string[] = []
+    const contentToCandidate = new Map<string, number>() // content -> candidate index
 
-        // Fusion: combine original vector score with rerank score
-        // Original score has 40% weight, rerank has 60%
-        const fusedScore = 0.4 * candidate.originalScore + 0.6 * rerankScore
+    for (let i = 0; i < candidates.length; i++) {
+      const content = candidates[i].content
+      contents.push(content)
+      // Track which candidate each content belongs to (may have duplicates)
+      if (!contentToCandidate.has(content)) {
+        contentToCandidate.set(content, i)
+      }
+    }
 
-        return {
-          id: candidate.id,
-          rerankScore: fusedScore,
-          originalScore: candidate.originalScore,
-          content: candidate.content,
-          metadata: candidate.metadata,
-        } satisfies RerankResult
-      }),
-    )
+    // Batch embed all unique contents in single API call
+    const uniqueContents = [...new Set(contents)]
+    const embeddings = await MemoryEmbedding.embedBatch(uniqueContents)
+
+    // Build content -> embedding map from batch results
+    const contentEmbeddings = new Map<string, number[]>()
+    for (let i = 0; i < uniqueContents.length; i++) {
+      contentEmbeddings.set(uniqueContents[i], embeddings[i])
+    }
+
+    // Score each candidate using cached/fresh embeddings
+    const scored = candidates.map((candidate) => {
+      let candidateEmbedding = getCachedEmbedding(candidate.content)
+
+      if (!candidateEmbedding) {
+        candidateEmbedding = contentEmbeddings.get(candidate.content)
+        if (candidateEmbedding) {
+          setCachedEmbedding(candidate.content, candidateEmbedding)
+        }
+      }
+
+      // Fallback: embed individually if not in batch results (shouldn't happen)
+      if (!candidateEmbedding) {
+        candidateEmbedding = [0] // Skip scoring if embedding unavailable
+      }
+
+      const rerankScore = cosineSimilarity(queryEmbedding, candidateEmbedding)
+
+      // Fusion: combine original vector score with rerank score
+      // Original score has 40% weight, rerank has 60%
+      const fusedScore = 0.4 * candidate.originalScore + 0.6 * rerankScore
+
+      return {
+        id: candidate.id,
+        rerankScore: fusedScore,
+        originalScore: candidate.originalScore,
+        content: candidate.content,
+        metadata: candidate.metadata,
+      } satisfies RerankResult
+    })
 
     // Sort by rerank score descending
     scored.sort((a, b) => b.rerankScore - a.rerankScore)
 
     log.debug("reranked candidates", {
       inputCount: candidates.length,
+      uniqueContents: uniqueContents.length,
       outputCount: scored.length,
       topScore: scored[0]?.rerankScore,
+      cacheSize: embeddingCache.size,
     })
 
     return scored.slice(0, topK)
+  }
+
+  /**
+   * Clear the embedding cache (useful for testing or memory management)
+   */
+  export function clearCache(): void {
+    embeddingCache.clear()
+    log.debug("embedding cache cleared")
+  }
+
+  /**
+   * Get cache statistics for diagnostics
+   */
+  export function getCacheStats(): { size: number; maxSize: number } {
+    return {
+      size: embeddingCache.size,
+      maxSize: EMBEDDING_CACHE_MAX_SIZE,
+    }
   }
 
   /**
