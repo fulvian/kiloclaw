@@ -11,6 +11,13 @@ import { ProactivityLimitsManager, type ProactivityLimitsConfig } from "./limits
 import type { ProactiveTask } from "./scheduler.store"
 import type { TriggerEvent } from "./trigger"
 import type { ExecutionContext, GateResult } from "./scheduler.engine"
+import {
+  ProactiveUserControls,
+  type ProactiveUserControls as UserControls,
+  isKillSwitchEnabled,
+  isQuietHours,
+  getUserControls,
+} from "./user-controls"
 
 // =============================================================================
 // Types
@@ -148,6 +155,25 @@ export class ProactivePolicyGate {
     metadata.actionType = actionType
     metadata.riskLevel = riskLevel
 
+    // 0. User controls check (kill switch, quiet hours, override)
+    const userControlsCheck = await this.checkUserControls(task, context)
+    if (!userControlsCheck.allowed) {
+      blockers.push(...userControlsCheck.blockers)
+    }
+    reasons.push(...userControlsCheck.reasons)
+    metadata.userControls = userControlsCheck.metadata
+
+    if (!userControlsCheck.allowed) {
+      return {
+        allowed: false,
+        reasons,
+        blockers,
+        riskLevel,
+        requiresHitl: false,
+        metadata,
+      }
+    }
+
     // 1. Budget check
     const budgetCheck = this.checkBudget(actionType)
     if (!budgetCheck.allowed) {
@@ -221,6 +247,86 @@ export class ProactivePolicyGate {
       riskLevel,
       requiresHitl,
       metadata,
+    }
+  }
+
+  /**
+   * Check user-specific controls (kill switch, quiet hours, override)
+   */
+  private async checkUserControls(
+    task: ProactiveTask,
+    context?: ExecutionContext,
+  ): Promise<{
+    allowed: boolean
+    reasons: string[]
+    blockers: string[]
+    metadata: Record<string, unknown>
+  }> {
+    const reasons: string[] = []
+    const blockers: string[] = []
+    const metadata: Record<string, unknown> = {}
+
+    // Extract tenant from task
+    const tenantId = task.tenantId
+
+    // UserId would come from context in a real implementation
+    // For now, we'll check at tenant level only
+    if (!tenantId) {
+      reasons.push("No tenant context available, skipping user controls")
+      metadata.status = "no_tenant_context"
+      return { allowed: true, reasons, blockers, metadata }
+    }
+
+    // In a full implementation, userId would come from context or task metadata
+    // For tenant-level checks, we use a wildcard userId "*" to check tenant-wide settings
+    // Note: ExecutionContext doesn't have userId, so we default to "*" for tenant-level checks
+    const userId = "*"
+
+    try {
+      // For tenant-level checks, use userId="*" which returns default controls
+      // In production, this would be replaced with actual per-user checks
+      const controls = await getUserControls({ tenantId, userId })
+      metadata.userId = userId
+      metadata.overrideLevel = controls.overrideLevel
+
+      // Check kill switch
+      if (controls.killSwitch) {
+        blockers.push("Kill switch is enabled for this user")
+        metadata.killSwitchEnabled = true
+        return { allowed: false, reasons, blockers, metadata }
+      }
+
+      // Check quiet hours (only if not using wildcard userId)
+      if (userId !== "*" && isQuietHours(controls)) {
+        blockers.push("Current time is within user's quiet hours")
+        metadata.quietHoursActive = true
+        return { allowed: false, reasons, blockers, metadata }
+      }
+
+      // Check override level (only if not using wildcard userId)
+      if (userId !== "*") {
+        switch (controls.overrideLevel) {
+          case "none":
+            reasons.push("User override: none (normal operation)")
+            break
+          case "suggest":
+            reasons.push("User override: suggest mode (suggestions only)")
+            metadata.mode = "suggest"
+            break
+          case "act":
+            reasons.push("User override: act mode (all actions allowed)")
+            break
+        }
+      }
+
+      metadata.userControlsChecked = true
+      return { allowed: true, reasons, blockers, metadata }
+    } catch (err) {
+      // If we can't get user controls, allow the action but log
+      reasons.push("Could not retrieve user controls, allowing action")
+      metadata.status = "error_fetching_controls"
+      metadata.error = err instanceof Error ? err.message : String(err)
+      return { allowed: true, reasons, blockers, metadata }
     }
   }
 

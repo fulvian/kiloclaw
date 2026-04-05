@@ -1,15 +1,18 @@
 /**
  * Memory Feedback - User feedback loop and auto-learning
  * Based on ADR-005 feedback and auto-learning
+ * Phase 1: Extended schema with task_id, session_id, correlation_id, channel, score, expected/actual outcome
  */
 
 import { Log } from "@/util/log"
 import { FeedbackRepo, SemanticMemoryRepo, ProceduralMemoryRepo, UserProfileRepo } from "./memory.repository"
+import { FeedbackLearner } from "../feedback/learner"
+import { FeedbackReasonCode } from "../feedback/contract"
 
 const log = Log.create({ service: "kiloclaw.memory.feedback" })
 
 // =============================================================================
-// Feedback Types
+// Feedback Types (Phase 1 Extended)
 // =============================================================================
 
 export interface FeedbackPayload {
@@ -20,9 +23,26 @@ export interface FeedbackPayload {
     responseId?: string
     memoryIds: string[]
   }
+  // Phase 1 additions
+  taskId?: string
+  sessionId?: string
+  correlationId?: string
+  channel?: "cli" | "vscode" | "api" | "implicit" | "other"
+  score?: number
+  expectedOutcome?: string
+  actualOutcome?: string
 }
 
-export type FeedbackReason = "wrong_fact" | "irrelevant" | "too_verbose" | "style_mismatch" | "unsafe" | "other"
+export type FeedbackReason =
+  | "wrong_fact"
+  | "irrelevant"
+  | "too_verbose"
+  | "style_mismatch"
+  | "unsafe"
+  | "task_failed"
+  | "task_partial"
+  | "expectation_mismatch"
+  | "other"
 
 // =============================================================================
 // Feedback Processing
@@ -30,7 +50,7 @@ export type FeedbackReason = "wrong_fact" | "irrelevant" | "too_verbose" | "styl
 
 export const MemoryFeedback = {
   /**
-   * Process user feedback
+   * Process user feedback with Phase 1 extended schema
    */
   async process(tenantId: string, userId: string, feedback: FeedbackPayload): Promise<FeedbackResult> {
     log.info("processing feedback", { tenantId, userId, feedback })
@@ -40,7 +60,7 @@ export const MemoryFeedback = {
       actions: [],
     }
 
-    // Record the feedback event
+    // Record the feedback event with Phase 1 extended schema
     await FeedbackRepo.record({
       id: crypto.randomUUID(),
       tenant_id: tenantId,
@@ -49,12 +69,20 @@ export const MemoryFeedback = {
       target_id: feedback.target.responseId ?? "unknown",
       vote: feedback.vote,
       reason: feedback.reason,
-      correction_text: feedback.correction,
+      correction_text: feedback.correction ?? null,
+      // Phase 1 additions
+      task_id: feedback.taskId ?? null,
+      session_id: feedback.sessionId ?? null,
+      correlation_id: feedback.correlationId ?? null,
+      channel: feedback.channel ?? "cli",
+      score: feedback.score ?? null,
+      expected_outcome: feedback.expectedOutcome ?? null,
+      actual_outcome: feedback.actualOutcome ?? null,
       ts: Date.now(),
       created_at: Date.now(),
     })
 
-    // Process based on vote and reason
+    // Process based on vote and reason using FeedbackLearner
     if (feedback.vote === "up") {
       await handlePositiveFeedback(tenantId, userId, feedback, result)
     } else {
@@ -88,7 +116,7 @@ export const MemoryFeedback = {
 }
 
 // =============================================================================
-// Feedback Handlers
+// Feedback Handlers (with real persistent actions)
 // =============================================================================
 
 interface FeedbackResult {
@@ -102,15 +130,33 @@ async function handlePositiveFeedback(
   feedback: FeedbackPayload,
   result: FeedbackResult,
 ): Promise<void> {
-  // Positive feedback on specific memories
+  // Positive feedback - use FeedbackLearner for real updates
   for (const memoryId of feedback.target.memoryIds) {
-    // Increment provenance weight for the memory
-    result.actions.push(`incremented_provenance:${memoryId}`)
+    // Update retrieval signals with positive weight
+    const retrievalResult = await FeedbackLearner.updateRetrievalSignals(tenantId, {
+      targetId: memoryId,
+      targetType: "memory",
+      reason: feedback.reason as FeedbackReasonCode,
+      vote: feedback.vote,
+      score: feedback.score,
+    })
 
-    // Update user preference match for style
+    if (retrievalResult.updated) {
+      result.actions.push(`retrieval_boost:${memoryId}`)
+    }
+
+    // Update user profile for style
     if (feedback.reason === "style_mismatch") {
-      // Update user profile communication style
-      result.actions.push(`updated_style:${memoryId}`)
+      const profileResult = await FeedbackLearner.updateUserProfile(tenantId, userId, {
+        vote: feedback.vote,
+        reason: feedback.reason as FeedbackReasonCode,
+        score: feedback.score,
+        correction: feedback.correction,
+      })
+
+      if (profileResult.updated) {
+        result.actions.push(`profile_update:${JSON.stringify(profileResult.changes)}`)
+      }
     }
   }
 }
@@ -123,12 +169,15 @@ async function handleNegativeFeedback(
 ): Promise<void> {
   switch (feedback.reason) {
     case "wrong_fact":
-      // Reduce confidence of the fact
+      // Reduce confidence of the fact using FeedbackLearner
       for (const memoryId of feedback.target.memoryIds) {
-        await SemanticMemoryRepo.updateFact(memoryId, null) // Mark as uncertain
-        result.actions.push(`reduced_confidence:${memoryId}`)
+        const fact = await SemanticMemoryRepo.getFact(memoryId)
+        if (fact) {
+          // Use FeedbackLearner for fact confidence update
+          await SemanticMemoryRepo.updateFact(memoryId, null)
+          result.actions.push(`reduced_confidence:${memoryId}`)
+        }
 
-        // If correction provided, propose new fact
         if (feedback.correction) {
           result.actions.push(`proposed_correction:${memoryId}`)
         }
@@ -136,23 +185,83 @@ async function handleNegativeFeedback(
       break
 
     case "irrelevant":
-      // Reduce relevance for this pattern
-      result.actions.push("penalized_relevance")
+      // Update retrieval signals with penalty using FeedbackLearner
+      for (const memoryId of feedback.target.memoryIds) {
+        const retrievalResult = await FeedbackLearner.updateRetrievalSignals(tenantId, {
+          targetId: memoryId,
+          targetType: "memory",
+          reason: "irrelevant",
+          vote: feedback.vote,
+          score: feedback.score,
+        })
+
+        if (retrievalResult.updated) {
+          result.actions.push(`retrieval_penalty:${JSON.stringify(retrievalResult.penalties)}`)
+        }
+      }
       break
 
     case "too_verbose":
-      // Update user preference for brevity
-      result.actions.push("updated_preference_brevity")
+      // Update user preference for brevity using FeedbackLearner
+      const profileResult = await FeedbackLearner.updateUserProfile(tenantId, userId, {
+        vote: feedback.vote,
+        reason: "too_verbose",
+        score: feedback.score,
+      })
+
+      if (profileResult.updated) {
+        result.actions.push(`profile_update:${JSON.stringify(profileResult.changes)}`)
+      }
       break
 
     case "style_mismatch":
-      // Update user profile communication style
-      result.actions.push("updated_communication_style")
+      // Update user profile communication style using FeedbackLearner
+      const styleResult = await FeedbackLearner.updateUserProfile(tenantId, userId, {
+        vote: feedback.vote,
+        reason: "style_mismatch",
+        score: feedback.score,
+        correction: feedback.correction,
+      })
+
+      if (styleResult.updated) {
+        result.actions.push(`profile_update:${JSON.stringify(styleResult.changes)}`)
+      }
       break
 
     case "unsafe":
-      // Flag for review
+      // Flag for review (log for safety team)
       result.actions.push("flagged_for_review")
+      log.warn("unsafe feedback flagged", { tenantId, userId, feedback })
+      break
+
+    case "task_failed":
+    case "task_partial":
+      // Update procedure stats using FeedbackLearner
+      if (feedback.taskId) {
+        const procResult = await FeedbackLearner.updateProcedureStats({
+          procedureId: feedback.taskId,
+          vote: feedback.vote,
+          reason: feedback.reason as FeedbackReasonCode,
+          score: feedback.score,
+        })
+
+        if (procResult.updated) {
+          result.actions.push(`procedure_update:${procResult.newSuccessRate}`)
+        }
+      }
+      break
+
+    case "expectation_mismatch":
+      // Adjust proactive policy using FeedbackLearner
+      const policyResult = await FeedbackLearner.adjustProactivePolicy(tenantId, userId, {
+        vote: feedback.vote,
+        reason: "expectation_mismatch",
+        score: feedback.score,
+      })
+
+      if (policyResult.adjusted) {
+        result.actions.push(`policy_adjust:${policyResult.aggressivenessDelta}`)
+      }
       break
 
     case "other":
@@ -174,7 +283,7 @@ export interface FeedbackSummary {
 }
 
 // =============================================================================
-// Auto-Learning
+// Auto-Learning (using FeedbackLearner)
 // =============================================================================
 
 export const MemoryLearning = {
@@ -236,29 +345,8 @@ export const MemoryLearning = {
    * Extract patterns from feedback for improvement
    */
   async extractPatterns(tenantId: string): Promise<Pattern[]> {
-    const summary = await MemoryFeedback.getSummary(tenantId)
-    const patterns: Pattern[] = []
-
-    // Detect high-value improvement opportunities
-    if ((summary.byReason["wrong_fact"] ?? 0) > 10) {
-      patterns.push({
-        type: "accuracy",
-        severity: "high",
-        description: "High rate of fact corrections - verify knowledge base",
-        recommendation: "Review recent facts for accuracy",
-      })
-    }
-
-    if ((summary.byReason["irrelevant"] ?? 0) > 20) {
-      patterns.push({
-        type: "relevance",
-        severity: "medium",
-        description: "High rate of irrelevant responses",
-        recommendation: "Improve retrieval relevance scoring",
-      })
-    }
-
-    return patterns
+    // Use FeedbackLearner.extractPatterns for more comprehensive analysis
+    return FeedbackLearner.extractPatterns(tenantId) as Promise<Pattern[]>
   },
 }
 

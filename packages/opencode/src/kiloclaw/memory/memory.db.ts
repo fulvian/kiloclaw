@@ -283,7 +283,7 @@ CREATE TABLE IF NOT EXISTS user_profile (
 
 CREATE UNIQUE INDEX IF NOT EXISTS profile_tenant_user_idx ON user_profile(tenant_id, user_id);
 
--- Feedback events
+-- Feedback events (Phase 1 extended schema)
 CREATE TABLE IF NOT EXISTS feedback_events (
   id TEXT PRIMARY KEY,
   tenant_id TEXT NOT NULL,
@@ -293,6 +293,14 @@ CREATE TABLE IF NOT EXISTS feedback_events (
   vote TEXT NOT NULL,
   reason TEXT,
   correction_text TEXT,
+  -- Phase 1 additions
+  task_id TEXT,
+  session_id TEXT,
+  correlation_id TEXT,
+  channel TEXT DEFAULT 'cli',
+  score REAL,
+  expected_outcome TEXT,
+  actual_outcome TEXT,
   ts INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
   created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
 );
@@ -300,6 +308,8 @@ CREATE TABLE IF NOT EXISTS feedback_events (
 CREATE INDEX IF NOT EXISTS feedback_target_idx ON feedback_events(target_type, target_id);
 CREATE INDEX IF NOT EXISTS feedback_tenant_user_idx ON feedback_events(tenant_id, user_id);
 CREATE INDEX IF NOT EXISTS feedback_ts_idx ON feedback_events(ts DESC);
+CREATE INDEX IF NOT EXISTS feedback_session_idx ON feedback_events(session_id);
+CREATE INDEX IF NOT EXISTS feedback_correlation_idx ON feedback_events(correlation_id);
 
 -- Audit log
 CREATE TABLE IF NOT EXISTS memory_audit_log (
@@ -321,6 +331,54 @@ CREATE INDEX IF NOT EXISTS audit_target_idx ON memory_audit_log(target_type, tar
 CREATE INDEX IF NOT EXISTS audit_actor_idx ON memory_audit_log(actor);
 CREATE INDEX IF NOT EXISTS audit_ts_idx ON memory_audit_log(ts DESC);
 CREATE INDEX IF NOT EXISTS audit_hash_idx ON memory_audit_log(hash);
+
+-- Proactive tasks (Phase 2 scheduler persistence)
+CREATE TABLE IF NOT EXISTS proactive_tasks (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  trigger_config TEXT NOT NULL,
+  schedule_cron TEXT,
+  next_run_at INTEGER,
+  status TEXT NOT NULL DEFAULT 'active',
+  retry_count INTEGER NOT NULL DEFAULT 0,
+  max_retries INTEGER NOT NULL DEFAULT 3,
+  last_error TEXT,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+  updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+);
+
+CREATE INDEX IF NOT EXISTS proactive_task_tenant_idx ON proactive_tasks(tenant_id);
+CREATE INDEX IF NOT EXISTS proactive_task_status_idx ON proactive_tasks(status);
+CREATE INDEX IF NOT EXISTS proactive_task_next_run_idx ON proactive_tasks(next_run_at) WHERE next_run_at IS NOT NULL;
+
+-- Proactive task runs
+CREATE TABLE IF NOT EXISTS proactive_task_runs (
+  id TEXT PRIMARY KEY,
+  task_id TEXT NOT NULL REFERENCES proactive_tasks(id) ON DELETE CASCADE,
+  outcome TEXT NOT NULL,
+  duration_ms INTEGER NOT NULL,
+  gate_decisions TEXT,
+  evidence_refs TEXT,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+);
+
+CREATE INDEX IF NOT EXISTS proactive_run_task_idx ON proactive_task_runs(task_id);
+CREATE INDEX IF NOT EXISTS proactive_run_created_idx ON proactive_task_runs(created_at DESC);
+
+-- Proactive dead letter queue
+CREATE TABLE IF NOT EXISTS proactive_dlq (
+  id TEXT PRIMARY KEY,
+  task_id TEXT NOT NULL REFERENCES proactive_tasks(id) ON DELETE CASCADE,
+  run_id TEXT,
+  error TEXT NOT NULL,
+  payload TEXT,
+  retry_at INTEGER,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+);
+
+CREATE INDEX IF NOT EXISTS proactive_dlq_task_idx ON proactive_dlq(task_id);
+CREATE INDEX IF NOT EXISTS proactive_dlq_retry_idx ON proactive_dlq(retry_at) WHERE retry_at IS NOT NULL;
 `
 
 export namespace MemoryDb {

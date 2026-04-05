@@ -344,6 +344,14 @@ export const FeedbackEventTable = sqliteTable(
     vote: text().notNull(), // up, down
     reason: text(), // wrong_fact, irrelevant, too_verbose, style_mismatch, unsafe, other
     correction_text: text(),
+    // Phase 1 additions
+    task_id: text(),
+    session_id: text(),
+    correlation_id: text(),
+    channel: text().default("cli"), // cli, vscode, api, implicit, other
+    score: text({ mode: "json" }).$type<number | null>(), // 0-1 normalized score
+    expected_outcome: text(),
+    actual_outcome: text(),
     ts: integer()
       .notNull()
       .$default(() => Date.now()),
@@ -355,6 +363,8 @@ export const FeedbackEventTable = sqliteTable(
     index("feedback_target_idx").on(table.target_type, table.target_id),
     index("feedback_tenant_user_idx").on(table.tenant_id, table.user_id),
     index("feedback_ts_idx").on(table.ts),
+    index("feedback_session_idx").on(table.session_id),
+    index("feedback_correlation_idx").on(table.correlation_id),
   ],
 )
 

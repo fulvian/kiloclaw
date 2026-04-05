@@ -1,18 +1,16 @@
 # Project State
 
-## Current Phase: Phase 5 - Delivery (IN PROGRESS)
+## Current Phase: Phase 8 - Proactive Auto-Learning Implementation (IN PROGRESS)
 
 ## Started: 2026-04-02T12:21:02+02:00
 
-## Last Updated: 2026-04-05T00:59:45+02:00
+## Last Updated: 2026-04-05T18:15:00+02:00
 
-## PRD: docs/foundation/KILOCLAW_BLUEPRINT.md (APPROVED)
+## PRD: docs/plans/KILOCLAW_PROACTIVE_CONTINUATIVE_AUTOLEARNING_PLAN_2026-04-05.md (NEW)
 
-## TDD: Phase 5 Safety (PENDING)
+## TDD: Task Plan created in .workflow/task_plan.md
 
-## Implementation: BP-02 Graph Memory (100% - Implemented)
-
-## Tests: BP-02 graph tests pass (3/3), typecheck pass
+## Previous Phases: 1-7 COMPLETED ✅
 
 ## Deployment: Pending
 
@@ -276,16 +274,16 @@ docs/plans/
 
 ### Test Results
 
-| Suite                   | Tests  | Pass   |
-| ----------------------- | ------ | ------ |
-| discovery.test.ts       | 8      | ✅     |
-| health.test.ts          | 4      | ✅     |
-| lifecycle.test.ts       | 9      | ✅     |
-| autostart.test.ts       | 5      | ✅     |
-| plugin.test.ts          | 5      | ✅     |
-| session.test.ts         | 11     | ✅     |
-| circuit-breaker.test.ts | 17     | ✅     |
-| **Total**               | **59** | **✅** |
+| Suite                   | Tests  | Pass |
+| ----------------------- | ------ | ---- |
+| discovery.test.ts       | 8      | ✅   |
+| health.test.ts          | 4      | ✅   |
+| lifecycle.test.ts       | 9      | ✅   |
+| autostart.test.ts       | 5      | ✅   |
+| plugin.test.ts          | 5      | ✅   |
+| session.test.ts         | 11     | ✅   |
+| circuit-breaker.test.ts | 17     | ✅   |
+| **Total**               | **59** | ✅   |
 
 ### Feature Flags
 
@@ -299,6 +297,97 @@ docs/plans/
 
 **Recommendation**: Keep as plugin (not core)
 **Rationale**: LM Studio API stability concerns, plugin isolation provides natural boundary
+
+---
+
+## Phase 8 - Proactive Auto-Learning - IN PROGRESS
+
+### Reference
+
+- `docs/plans/KILOCLAW_PROACTIVE_CONTINUATIVE_AUTOLEARNING_PLAN_2026-04-05.md`
+
+### Scope
+
+1. Feedback loop completo in produzione
+2. Scheduler persistente (job queue, retry, policy-aware)
+3. Auto-learning governato (drift detection, canary, rollback)
+4. Proattività personalizzata (explainable, budget-aware)
+
+### Baseline (Esistente)
+
+| Componente    | File                        | Stato                                 |
+| ------------- | --------------------------- | ------------------------------------- |
+| Feedback base | `memory/memory.feedback.ts` | Esiste, azioni come "logical markers" |
+| Scheduler     | `proactive/scheduler.ts`    | In-memory (Map + eventLog in RAM)     |
+| Trigger       | `proactive/trigger.ts`      | TriggerEvaluator funzionante          |
+| Budget        | `proactive/budget.ts`       | BudgetManager esistente               |
+| Limits        | `proactive/limits.ts`       | ProactivityLimitsManager esistente    |
+
+### Gap Principali
+
+1. Feedback: azioni non persistenti
+2. Scheduler: no persistenza, retry, DLQ
+3. Auto-learning: no pipeline completa
+4. Testing: coverage insufficiente
+
+### Fase 0 - Alignment & Contracts (COMPLETED ✅)
+
+- [x] `feedback/contract.ts` - schema Zod unificato con:
+  - FeedbackEventSchema (id, tenantId, userId, sessionId, correlationId, target, vote, score, reason, correction, expectedOutcome, actualOutcome, channel, metadata, ts)
+  - FeedbackReasonCode enum (9 reason codes + "other")
+  - FeedbackTargetType enum (response, task, proactive_action, memory_retrieval)
+  - FeedbackChannel enum (cli, vscode, api, implicit, other)
+  - FeedbackSummarySchema per aggregazione
+  - LearningUpdate per azioni derivate
+  - FeedbackSLO per obiettivi (p95 < 2s, coverage >= 30%)
+- [x] Dizionario reason codes (FEEDBACK_REASON_DESCRIPTIONS)
+- [x] Definizione SLO/SLA
+
+### Fase 1 - Feedback Loop End-to-End (COMPLETED ✅)
+
+- [x] Schema `feedback_events` esteso con: task_id, session_id, correlation_id, channel, score, expected_outcome, actual_outcome
+- [x] `FeedbackProcessor.process()` con azioni persistenti reali
+- [x] `FeedbackLearner` con update a UserProfileRepo, ProceduralMemoryRepo, SemanticMemoryRepo
+- [x] Test: 28 pass (feedback-processor.test.ts), 4 pass (memory-feedback.test.ts)
+
+### Fase 2 - Scheduler Persistente (COMPLETED ✅)
+
+- [x] `scheduler.store.ts` - stato job persistente (proactive_tasks, proactive_task_runs, proactive_dlq)
+- [x] `scheduler.engine.ts` - dispatcher tick-based, retry exponential backoff, DLQ management
+- [x] `policy-gate.ts` - gate unificato budget+risk+hitl
+- [x] Typecheck passato
+
+### Fase 3 - Auto-Learning Governato (COMPLETED ✅)
+
+- [x] `autolearning/feature-store.ts` - FeatureStore con aggregazione time-window
+- [x] `autolearning/trainer.ts` - LearningTrainer con algoritmi rule-based
+- [x] `autolearning/validator.ts` - LearningValidator con soglie go/no-go
+- [x] `autolearning/canary.ts` - CanaryRelease per rollout controllato
+- [x] `autolearning/drift.ts` - DriftDetector per drift detection
+- [x] `autolearning/rollback.ts` - LearningRollback per fallback
+- [x] Test: 45 pass (autolearning.test.ts)
+
+### Fase 4 - Proattività Explainable (COMPLETED ✅)
+
+- [x] `proactive/explain.ts` - ProactionExplainer con "why/what/how/howToDisable"
+- [x] `proactive/user-controls.ts` - quiet hours, override, kill-switch
+- [x] `proactive/suggest-then-act.ts` - modalità suggerimento per azioni non critiche
+- [x] `policy-gate.ts` aggiornato con user controls integration
+- [x] Test: 33 pass (6+27)
+
+### Fase 5 - Eval/Observability (COMPLETED ✅)
+
+- [x] `telemetry/feedback.metrics.ts` - FeedbackMetrics con ingest latency, coverage, upvote rate
+- [x] `telemetry/proactive.metrics.ts` - ProactiveMetrics con success rate, retry, DLQ, budget
+- [x] `telemetry/learning.metrics.ts` - LearningMetrics con satisfaction delta, drift, rollback
+- [ ] Runbook
+
+### P0 Backlog
+
+1. Contratto feedback unificato
+2. Feedback processor persistente
+3. Scheduler store + dispatcher + retry
+4. Gate budget/risk/hitl
 
 ---
 
