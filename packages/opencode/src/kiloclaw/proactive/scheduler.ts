@@ -1,22 +1,30 @@
+/**
+ * Proactive Scheduler - Task scheduling and execution
+ */
+
 import { Log } from "@/util/log"
-import { fn } from "@/util/fn"
 import z from "zod"
 import type { TriggerCondition, TriggerEvent } from "./trigger"
 import { TriggerEvaluator } from "./trigger"
 import { BudgetManager, type BudgetStats } from "./budget"
+import { ProactiveTaskStore, type ProactiveTask } from "./scheduler.store"
+import { ProactiveSchedulerEngine } from "./scheduler.engine"
 
+// =============================================================================
 // Scheduled task definition
+// =============================================================================
+
 export interface ScheduledTask {
   readonly id: string
   readonly name: string
   readonly trigger: TriggerCondition
   readonly action: () => Promise<void>
   readonly enabled: boolean
+  tenantId?: string
   lastRun?: Date
   nextRun?: Date
 }
 
-// Scheduler events
 export interface SchedulerEvent {
   readonly taskId: string
   readonly type: "scheduled" | "triggered" | "completed" | "failed"
@@ -24,7 +32,18 @@ export interface SchedulerEvent {
   readonly details?: string
 }
 
-// Proactive scheduler - manages scheduled and triggered tasks
+// =============================================================================
+// ProactiveScheduler
+// =============================================================================
+
+export const ProactiveSchedulerOptionsSchema = z.object({
+  totalDailyBudget: z.number().int().positive().optional(),
+  usePersistentStore: z.boolean().default(false),
+  tenantId: z.string().optional(),
+})
+
+export type ProactiveSchedulerOptions = z.infer<typeof ProactiveSchedulerOptionsSchema>
+
 export class ProactiveScheduler {
   private readonly log: ReturnType<typeof Log.create>
   private readonly triggerEvaluator: TriggerEvaluator
@@ -32,42 +51,110 @@ export class ProactiveScheduler {
   private readonly tasks: Map<string, ScheduledTask>
   private readonly eventLog: SchedulerEvent[]
   private paused: boolean
+  private readonly usePersistentStore: boolean
+  private readonly tenantId: string | null
 
-  constructor(budgetManager?: BudgetManager) {
-    this.log = Log.create({ service: "kiloclaw.proactive.scheduler" })
+  constructor(options?: ProactiveSchedulerOptions) {
+    this.log = Log.create({ service: "kilocclaw.proactive.scheduler" })
     this.triggerEvaluator = new TriggerEvaluator()
-    this.budgetManager = budgetManager ?? new BudgetManager(100)
+    this.budgetManager = new BudgetManager(options?.totalDailyBudget ?? 100)
     this.tasks = new Map()
     this.eventLog = []
     this.paused = false
+    this.usePersistentStore = options?.usePersistentStore ?? false
+    this.tenantId = options?.tenantId ?? null
 
-    this.log.info("proactive scheduler initialized")
+    if (this.usePersistentStore && this.tenantId) {
+      this.initializePersistentMode()
+    }
+
+    this.log.info("proactive scheduler initialized", {
+      usePersistentStore: this.usePersistentStore,
+      tenantId: this.tenantId,
+    })
   }
 
-  // Register a scheduled task
+  private initializePersistentMode(): void {
+    ProactiveSchedulerEngine.init({
+      maxConcurrent: 10,
+      defaultMaxRetries: 3,
+    })
+
+    ProactiveSchedulerEngine.setExecutor(async (context) => {
+      const task = this.tasks.get(context.task.id)
+      if (task) {
+        await task.action()
+      }
+    })
+
+    this.log.info("persistent mode initialized", { tenantId: this.tenantId })
+  }
+
   register(task: ScheduledTask): void {
     this.tasks.set(task.id, task)
     this.log.info("task registered", { taskId: task.id, name: task.name })
+
+    if (this.usePersistentStore && this.tenantId) {
+      this.persistTask(task)
+    }
+
+    this.triggerEvaluator.register(task.trigger)
   }
 
-  // Unregister a task
+  private persistTask(task: ScheduledTask): void {
+    if (!this.tenantId) return
+
+    try {
+      const existingTask = ProactiveTaskStore.get(task.id)
+      if (existingTask) {
+        ProactiveTaskStore.update(task.id, {
+          name: task.name,
+          triggerConfig: JSON.stringify(task.trigger),
+          scheduleCron: task.trigger.config.frequency ?? null,
+          nextRunAt: task.nextRun ? task.nextRun.getTime() : null,
+        })
+      } else {
+        ProactiveTaskStore.create({
+          id: task.id,
+          tenantId: this.tenantId,
+          name: task.name,
+          triggerConfig: JSON.stringify(task.trigger),
+          scheduleCron: task.trigger.config.frequency ?? null,
+          nextRunAt: task.nextRun ? task.nextRun.getTime() : null,
+          maxRetries: 3,
+        })
+      }
+    } catch (err) {
+      this.log.error("failed to persist task", { taskId: task.id, err })
+    }
+  }
+
   unregister(taskId: string): void {
+    const task = this.tasks.get(taskId)
+    if (task) {
+      this.triggerEvaluator.unregister(task.trigger.name)
+    }
     this.tasks.delete(taskId)
     this.log.info("task unregistered", { taskId })
+
+    if (this.usePersistentStore) {
+      try {
+        ProactiveTaskStore.remove(taskId)
+      } catch (err) {
+        this.log.error("failed to delete task from store", { taskId, err })
+      }
+    }
   }
 
-  // Enable/disable the scheduler
   setPaused(paused: boolean): void {
     this.paused = paused
     this.log.info("scheduler paused state changed", { paused })
   }
 
-  // Check if scheduler is paused
   isPaused(): boolean {
     return this.paused
   }
 
-  // Evaluate a trigger event and execute matching tasks
   async evaluateTrigger(event: TriggerEvent): Promise<EvaluationResult> {
     this.log.debug("evaluating trigger event", { signal: event.signal, condition: event.condition })
 
@@ -94,27 +181,29 @@ export class ProactiveScheduler {
         continue
       }
 
-      // Check budget before execution
       if (!this.budgetManager.checkLimit("act_low_risk")) {
         skipped.push(task.id)
         this.log.warn("budget limit reached, skipping task", { taskId: task.id })
         continue
       }
 
-      // Execute task
       try {
         await this.executeTask(task)
         executed.push(task.id)
       } catch (err) {
-        errors.push({ taskId: task.id, error: err instanceof Error ? err.message : String(err) })
-        this.log.error("task execution failed", { taskId: task.id, error: err })
+        const errorMsg = err instanceof Error ? err.message : String(err)
+        errors.push({ taskId: task.id, error: errorMsg })
+        this.log.error("task execution failed", { taskId: task.id, error: errorMsg })
+
+        if (this.usePersistentStore && this.tenantId) {
+          this.recordTaskFailure(task.id, errorMsg)
+        }
       }
     }
 
     return { executed, skipped, errors }
   }
 
-  // Execute a task
   private async executeTask(task: ScheduledTask): Promise<void> {
     this.log.info("executing task", { taskId: task.id, name: task.name })
 
@@ -124,7 +213,6 @@ export class ProactiveScheduler {
       timestamp: new Date(),
     })
 
-    // Consume budget
     const consumed = this.budgetManager.consume(1, "act_low_risk")
     if (!consumed) {
       throw new Error("Budget limit exceeded")
@@ -141,8 +229,11 @@ export class ProactiveScheduler {
         details: `duration=${Date.now() - start}ms`,
       })
 
-      // Update last run time
       task.lastRun = new Date()
+
+      if (this.usePersistentStore && this.tenantId) {
+        this.recordTaskSuccess(task.id, start)
+      }
     } catch (err) {
       this.eventLog.push({
         taskId: task.id,
@@ -154,7 +245,106 @@ export class ProactiveScheduler {
     }
   }
 
-  // Find task by condition
+  private recordTaskSuccess(taskId: string, startedAt: number): void {
+    if (!this.tenantId) return
+
+    try {
+      ProactiveTaskStore.recordRun({
+        id: `run-${Date.now()}-${taskId}`,
+        taskId,
+        outcome: "success",
+        durationMs: Date.now() - startedAt,
+      })
+
+      const task = this.tasks.get(taskId)
+      if (task?.trigger.config.frequency) {
+        const nextRun = this.calculateNextRun(task.trigger.config.frequency)
+        ProactiveTaskStore.update(taskId, {
+          status: "active",
+          nextRunAt: nextRun,
+          retryCount: 0,
+          lastError: null,
+        })
+      }
+    } catch (err) {
+      this.log.error("failed to record task success", { taskId, err })
+    }
+  }
+
+  private recordTaskFailure(taskId: string, error: string): void {
+    if (!this.tenantId) return
+
+    try {
+      const task = ProactiveTaskStore.get(taskId)
+      if (!task) return
+
+      const retryCount = task.retryCount + 1
+      const maxRetries = task.maxRetries
+
+      if (retryCount >= maxRetries) {
+        ProactiveTaskStore.moveToDLQ({
+          id: `dlq-${Date.now()}-${taskId}`,
+          taskId,
+          error,
+          payload: { triggerConfig: task.triggerConfig },
+          retryAt: Date.now() + this.calculateBackoff(retryCount),
+        })
+
+        ProactiveTaskStore.update(taskId, {
+          status: "dlq",
+          retryCount,
+          lastError: error,
+        })
+      } else {
+        ProactiveTaskStore.update(taskId, {
+          status: "active",
+          nextRunAt: Date.now() + this.calculateBackoff(retryCount),
+          retryCount,
+          lastError: error,
+        })
+      }
+
+      ProactiveTaskStore.recordRun({
+        id: `run-${Date.now()}-${taskId}`,
+        taskId,
+        outcome: "failed",
+        durationMs: 0,
+        gateDecisions: { error },
+      })
+    } catch (err) {
+      this.log.error("failed to record task failure", { taskId, err })
+    }
+  }
+
+  private calculateNextRun(cron: string): number {
+    try {
+      const parts = cron.split(" ")
+      if (parts.length >= 2) {
+        const minute = parseInt(parts[0], 10)
+        const hour = parseInt(parts[1], 10)
+        const now = new Date()
+        const next = new Date(now)
+        next.setHours(hour, minute, 0, 0)
+
+        if (next.getTime() <= now.getTime()) {
+          next.setDate(next.getDate() + 1)
+        }
+
+        return next.getTime()
+      }
+    } catch {
+      this.log.warn("failed to parse cron", { cron })
+    }
+
+    return Date.now() + 86400000
+  }
+
+  private calculateBackoff(retryCount: number): number {
+    const base = 1000
+    const delay = base * Math.pow(2, retryCount - 1)
+    return Math.min(delay, 300000)
+  }
+
   private findTaskByCondition(condition: TriggerCondition): ScheduledTask | undefined {
     for (const task of this.tasks.values()) {
       if (task.trigger.name === condition.name) {
@@ -164,58 +354,81 @@ export class ProactiveScheduler {
     return undefined
   }
 
-  // Get all registered tasks
   getTasks(): ScheduledTask[] {
     return [...this.tasks.values()]
   }
 
-  // Get task by ID
   getTask(taskId: string): ScheduledTask | undefined {
     return this.tasks.get(taskId)
   }
 
-  // Get event log
   getEventLog(): SchedulerEvent[] {
     return [...this.eventLog]
   }
 
-  // Get budget stats
   getBudgetStats(): BudgetStats {
     return this.budgetManager.getStats()
   }
 
-  // Clear event log
   clearEventLog(): void {
     this.eventLog.length = 0
     this.log.info("event log cleared")
   }
+
+  startEngine(): void {
+    if (!this.usePersistentStore) {
+      this.log.warn("cannot start engine: persistent store not enabled")
+      return
+    }
+
+    ProactiveSchedulerEngine.start()
+  }
+
+  stopEngine(): void {
+    ProactiveSchedulerEngine.stop()
+  }
+
+  getEngineStats() {
+    if (!this.usePersistentStore) {
+      return null
+    }
+
+    return ProactiveSchedulerEngine.getStats()
+  }
+
+  getPersistedTasks(): ProactiveTask[] {
+    if (!this.tenantId) return []
+    return ProactiveTaskStore.list(this.tenantId)
+  }
+
+  syncFromStore(): void {
+    if (!this.tenantId) return
+
+    const persistedTasks = ProactiveTaskStore.list(this.tenantId)
+
+    for (const pTask of persistedTasks) {
+      if (!this.tasks.has(pTask.id)) {
+        this.log.info("found orphaned task in store", { taskId: pTask.id })
+      }
+    }
+  }
 }
 
-// Evaluation result
 export interface EvaluationResult {
   readonly executed: string[]
   readonly skipped: string[]
   readonly errors: TaskError[]
 }
 
-// Task error
 export interface TaskError {
   readonly taskId: string
   readonly error: string
 }
 
-// Factory function
 export const ProactiveScheduler$ = {
-  create: fn(
-    z.object({
-      totalDailyBudget: z.number().int().positive().optional(),
-    }),
-    (config) =>
-      new ProactiveScheduler(config.totalDailyBudget ? new BudgetManager(config.totalDailyBudget) : undefined),
-  ),
+  create: (config?: ProactiveSchedulerOptions) => new ProactiveScheduler(config),
 }
 
-// Namespace with helper functions
 export namespace Scheduler {
   export function createTask(input: {
     id: string
@@ -223,6 +436,7 @@ export namespace Scheduler {
     trigger: TriggerCondition
     action: () => Promise<void>
     enabled?: boolean
+    tenantId?: string
   }): ScheduledTask {
     return {
       id: input.id,
@@ -230,6 +444,7 @@ export namespace Scheduler {
       trigger: input.trigger,
       action: input.action,
       enabled: input.enabled ?? true,
+      tenantId: input.tenantId,
     }
   }
 
@@ -250,6 +465,16 @@ export namespace Scheduler {
       description: `Threshold trigger: ${name}`,
       enabled: true,
       config: { threshold },
+    }
+  }
+
+  export function createAnomalyTrigger(name: string, patterns?: string[]): TriggerCondition {
+    return {
+      signal: "anomaly",
+      name,
+      description: `Anomaly trigger: ${name}`,
+      enabled: true,
+      config: { patterns: patterns ?? ["unusual_time", "unusual_frequency"] },
     }
   }
 }
