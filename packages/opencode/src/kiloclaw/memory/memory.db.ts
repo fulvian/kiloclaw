@@ -379,6 +379,65 @@ CREATE TABLE IF NOT EXISTS proactive_dlq (
 
 CREATE INDEX IF NOT EXISTS proactive_dlq_task_idx ON proactive_dlq(task_id);
 CREATE INDEX IF NOT EXISTS proactive_dlq_retry_idx ON proactive_dlq(retry_at) WHERE retry_at IS NOT NULL;
+
+-- Learning features (Phase 3 auto-learning)
+CREATE TABLE IF NOT EXISTS learning_features (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL,
+  user_id TEXT,
+  feature_name TEXT NOT NULL,
+  feature_value REAL NOT NULL,
+  window_start INTEGER NOT NULL,
+  window_end INTEGER NOT NULL,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+);
+
+CREATE INDEX IF NOT EXISTS learning_feat_tenant_user_idx ON learning_features(tenant_id, user_id);
+CREATE INDEX IF NOT EXISTS learning_feat_name_idx ON learning_features(feature_name);
+CREATE INDEX IF NOT EXISTS learning_feat_window_idx ON learning_features(window_start, window_end);
+
+-- Learning snapshots
+CREATE TABLE IF NOT EXISTS learning_snapshots (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL,
+  user_id TEXT,
+  policy_version TEXT,
+  profile_version TEXT,
+  metrics_json TEXT,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+);
+
+CREATE INDEX IF NOT EXISTS learning_snap_tenant_user_idx ON learning_snapshots(tenant_id, user_id);
+CREATE INDEX IF NOT EXISTS learning_snap_created_idx ON learning_snapshots(created_at DESC);
+
+-- Canary releases (Phase 3)
+CREATE TABLE IF NOT EXISTS learning_canary_runs (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL,
+  update_type TEXT NOT NULL,
+  cohort_percent INTEGER NOT NULL DEFAULT 10,
+  status TEXT NOT NULL DEFAULT 'running',
+  started_at INTEGER NOT NULL,
+  completed_at INTEGER,
+  metrics_json TEXT
+);
+
+CREATE INDEX IF NOT EXISTS learning_canary_tenant_idx ON learning_canary_runs(tenant_id);
+CREATE INDEX IF NOT EXISTS learning_canary_status_idx ON learning_canary_runs(status);
+
+-- Drift events (Phase 3)
+CREATE TABLE IF NOT EXISTS learning_drift_events (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL,
+  drift_type TEXT NOT NULL,
+  severity TEXT NOT NULL,
+  detected_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+  action_taken TEXT,
+  resolved_at INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS learning_drift_tenant_idx ON learning_drift_events(tenant_id);
+CREATE INDEX IF NOT EXISTS learning_drift_severity_idx ON learning_drift_events(severity);
 `
 
 export namespace MemoryDb {
