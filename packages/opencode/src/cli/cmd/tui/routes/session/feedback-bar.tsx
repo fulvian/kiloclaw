@@ -3,11 +3,12 @@
  * Shows thumbs up/down after assistant response
  */
 
-import { createSignal, Show } from "solid-js"
+import { createSignal, onMount, Show } from "solid-js"
 import { useTheme } from "../../context/theme"
 import { useSync } from "../../context/sync"
 import { FeedbackProcessor } from "@/kiloclaw/feedback/processor"
 import { FeedbackReasonCode } from "@/kiloclaw/feedback/contract"
+import { MemoryDb } from "@/kiloclaw/memory/memory.db" // kilocode_change - need to initialize MemoryDb
 
 // kilocode_change - track last message that can receive feedback for keyboard shortcuts
 let lastFeedbackMessageId: string | null = null
@@ -18,6 +19,26 @@ export function clearLastFeedbackMessageId() {
   lastFeedbackMessageId = null
 }
 // kilocode_change end
+
+// kilocode_change - track if MemoryDb is initialized
+let memoryInitialized = false
+async function ensureMemoryInitialized() {
+  if (memoryInitialized) return true
+  if (!MemoryDb.isEnabled()) {
+    console.log("[FeedbackBar] MemoryDb is not enabled")
+    return false
+  }
+  try {
+    const dbPath = `${process.cwd()}/.kilocode/memory.db`
+    await MemoryDb.init(dbPath)
+    memoryInitialized = true
+    console.log("[FeedbackBar] MemoryDb initialized at", dbPath)
+    return true
+  } catch (err) {
+    console.error("[FeedbackBar] MemoryDb init failed:", err)
+    return false
+  }
+}
 
 interface FeedbackBarProps {
   messageId: string
@@ -42,6 +63,14 @@ export function FeedbackBar(props: FeedbackBarProps) {
     setLoading(true)
 
     try {
+      // kilocode_change - ensure MemoryDb is initialized before processing feedback
+      const memOk = await ensureMemoryInitialized()
+      if (!memOk) {
+        console.error("[FeedbackBar] Cannot submit feedback: MemoryDb not available")
+        setLoading(false)
+        return
+      }
+
       const tenantId = "local"
       const userId = (sync.data as any).user?.id ?? "anonymous"
       const feedbackId = crypto.randomUUID()
