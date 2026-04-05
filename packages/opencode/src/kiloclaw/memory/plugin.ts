@@ -12,14 +12,96 @@ const log = Log.create({ service: "kiloclaw.memory.plugin" })
 log.info("createMemoryContextPlugin loaded")
 
 const RECALL = [
+  // Italian patterns
   /ultim[ea]\s+conversaz/i,
   /cronolog/i,
   /di\s+cosa\s+abbiamo\s+parlato/i,
+  /di\s+cosa\s+si\s+è\s+parlato/i,
+  /cosa\s+abbiamo\s+fatto\s+ultim/i,
+  /cosa\s+abbiamo\s+trattat/i,
+  /argoment[io]\s+(?:precedenti|passat|scors)/i,
+  /session[ie]\s+precedenti/i,
+  /nostr[ei]\s+conversation/i,
+  /ricord/i,
+  // English patterns
   /previous\s+conversation/i,
   /what\s+did\s+we\s+talk\s+about/i,
   /last\s+conversations?/i,
   /remember\s+our\s+past/i,
+  /what\s+were?\s+we\s+(?:working\s+on|talking\s+about|discussing)/i,
+  /previous\s+(?:session|meeting|discussion)/i,
+  /recall\s+(?:past|previous)/i,
+  /history\s+of\s+(?:our|our\s+)?conversations/i,
+  // Implicit references to memory/history
+  /memoria/i,
+  /passato/i,
+  /storico/i,
 ]
+
+/**
+ * Check if message needs memory recall using hybrid approach:
+ * 1. Regex patterns for explicit references (fast, no API calls)
+ * 2. Similarity fallback for implicit/missed patterns (embeddings-based)
+ */
+async function needsRecallAsync(text: string): Promise<boolean> {
+  // First: check explicit regex patterns (fast path)
+  if (RECALL.some((re) => re.test(text))) {
+    return true
+  }
+
+  // Second: semantic similarity fallback for implicit history references
+  // This catches questions that reference "past" without explicit keywords
+  const implicitIndicators = [
+    "last time",
+    "previously",
+    "before",
+    "ago",
+    "earlier",
+    "the past",
+    "recent",
+    "le ultime",
+    "la scorsa",
+    "ultima volta",
+    "volta scorsa",
+    "sessione",
+    "conversazione passata",
+  ]
+
+  const lowerText = text.toLowerCase()
+  const hasImplicitReference = implicitIndicators.some((ind) => lowerText.includes(ind))
+  if (!hasImplicitReference) {
+    return false
+  }
+
+  // Semantic check via embeddings (triggered only when implicit reference detected)
+  try {
+    const { MemoryEmbedding } = await import("./memory.embedding")
+    const query = text.trim()
+    const recallTemplate = "user asking about conversation history past sessions what did we discuss previously"
+    const [queryEmb, templateEmb] = await MemoryEmbedding.embedBatch([query, recallTemplate])
+    const similarity = cosineSimilarity(queryEmb, templateEmb)
+    console.log("[MEMORY-PLUGIN] semantic similarity for recall detection:", similarity.toFixed(3))
+    // Threshold 0.65 catches implicit references while avoiding false positives
+    return similarity > 0.65
+  } catch (err) {
+    console.log("[MEMORY-PLUGIN] semantic check failed, defaulting to false:", err)
+    return false
+  }
+}
+
+function cosineSimilarity(a: number[], b: number[]): number {
+  if (a.length !== b.length || a.length === 0) return 0
+  let dot = 0
+  let normA = 0
+  let normB = 0
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i]
+    normA += a[i] * a[i]
+    normB += b[i] * b[i]
+  }
+  const denom = Math.sqrt(normA) * Math.sqrt(normB)
+  return denom > 0 ? dot / denom : 0
+}
 
 export async function createMemoryContextPlugin(_input: PluginInput): Promise<Hooks> {
   return {
@@ -47,7 +129,7 @@ export async function createMemoryContextPlugin(_input: PluginInput): Promise<Ho
 
       const text = userText(msg.parts)
       console.log("[MEMORY-PLUGIN] user text:", text.slice(0, 100))
-      if (!needsRecall(text)) {
+      if (!(await needsRecallAsync(text))) {
         console.log("[MEMORY-PLUGIN] recall NOT needed")
         return
       }
@@ -114,10 +196,6 @@ export async function createMemoryContextPlugin(_input: PluginInput): Promise<Ho
       )
     },
   }
-}
-
-function needsRecall(text: string): boolean {
-  return RECALL.some((re) => re.test(text))
 }
 
 function userText(parts: Array<{ type: string; text?: string; synthetic?: boolean }>): string {
