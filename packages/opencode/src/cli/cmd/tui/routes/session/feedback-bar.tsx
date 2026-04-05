@@ -34,8 +34,6 @@ export function FeedbackBar(props: FeedbackBarProps) {
   const [loading, setLoading] = createSignal(false)
 
   // kilocode_change start - track this feedback bar for keyboard shortcuts
-  // Note: We don't use onMount/onCleanup here because we want the last message
-  // to always be the one that can receive feedback (it's shown continuously)
   lastFeedbackMessageId = props.messageId
   // kilocode_change end
 
@@ -44,9 +42,7 @@ export function FeedbackBar(props: FeedbackBarProps) {
     setLoading(true)
 
     try {
-      // Get tenant/user from session context
       const tenantId = "local"
-      // klocode_change - use sync user directly if available
       const userId = (sync.data as any).user?.id ?? "anonymous"
 
       await FeedbackProcessor.process({
@@ -105,7 +101,7 @@ export function FeedbackBar(props: FeedbackBarProps) {
     if (lower.includes("stile") || lower.includes("style") || lower.includes("tono")) {
       return "style_mismatch"
     }
-    if (lower.includes("unsafe") || lower.includes("unsafe") || lower.includes("pericoloso")) {
+    if (lower.includes("unsafe") || lower.includes("pericoloso")) {
       return "unsafe"
     }
     if (lower.includes("incompleto") || lower.includes("partial")) {
@@ -124,26 +120,12 @@ export function FeedbackBar(props: FeedbackBarProps) {
           {/* Initial feedback prompt */}
           <box flexDirection="row" gap={2} alignItems="center">
             <text fg={theme.textMuted}>Questa risposta è stata utile?</text>
-            <button
-              onClick={handleThumbsUp}
-              disabled={loading()}
-              bg={theme.backgroundElement}
-              paddingX={2}
-              paddingY={1}
-              borderRadius={4}
-            >
-              <text fg={theme.success}>👍 Sì</text>
-            </button>
-            <button
-              onClick={handleThumbsDown}
-              disabled={loading()}
-              bg={theme.backgroundElement}
-              paddingX={2}
-              paddingY={1}
-              borderRadius={4}
-            >
-              <text fg={theme.error}>👎 No</text>
-            </button>
+            <box onMouseUp={handleThumbsUp} paddingX={2} paddingY={1} backgroundColor={theme.backgroundElement}>
+              <text fg={theme.success}>👍</text>
+            </box>
+            <box onMouseUp={handleThumbsDown} paddingX={2} paddingY={1} backgroundColor={theme.backgroundElement}>
+              <text fg={theme.error}>👎</text>
+            </box>
           </box>
         </Show>
 
@@ -163,26 +145,12 @@ export function FeedbackBar(props: FeedbackBarProps) {
               paddingY={1}
             />
             <box flexDirection="row" gap={1} marginTop={1}>
-              <button
-                onClick={handleSubmitReason}
-                disabled={loading()}
-                bg={theme.primary}
-                paddingX={2}
-                paddingY={1}
-                borderRadius={4}
-              >
+              <box onMouseUp={handleSubmitReason} paddingX={2} paddingY={1} backgroundColor={theme.primary}>
                 <text fg={theme.text}>Invia</text>
-              </button>
-              <button
-                onClick={handleSkip}
-                disabled={loading()}
-                bg={theme.backgroundElement}
-                paddingX={2}
-                paddingY={1}
-                borderRadius={4}
-              >
+              </box>
+              <box onMouseUp={handleSkip} paddingX={2} paddingY={1} backgroundColor={theme.backgroundElement}>
                 <text fg={theme.textMuted}>Salta</text>
-              </button>
+              </box>
             </box>
           </box>
         </Show>
@@ -200,26 +168,12 @@ export function InlineFeedback(props: { onUp: () => void; onDown: () => void; di
 
   return (
     <box flexDirection="row" gap={2} alignItems="center">
-      <button
-        onClick={props.onUp}
-        disabled={props.disabled}
-        bg={theme.backgroundElement}
-        paddingX={2}
-        paddingY={1}
-        borderRadius={4}
-      >
+      <box onMouseUp={props.onUp} paddingX={2} paddingY={1} backgroundColor={theme.backgroundElement}>
         <text fg={theme.success}>👍</text>
-      </button>
-      <button
-        onClick={props.onDown}
-        disabled={props.disabled}
-        bg={theme.backgroundElement}
-        paddingX={2}
-        paddingY={1}
-        borderRadius={4}
-      >
+      </box>
+      <box onMouseUp={props.onDown} paddingX={2} paddingY={1} backgroundColor={theme.backgroundElement}>
         <text fg={theme.error}>👎</text>
-      </button>
+      </box>
     </box>
   )
 }
