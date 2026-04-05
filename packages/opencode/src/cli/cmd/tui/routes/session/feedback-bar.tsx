@@ -87,34 +87,34 @@ export function clearPendingFeedback() {
   pendingFeedbackMessageId = null
 }
 
-// kilocode_change - session feedback state
-let sessionFeedbackPending = false
-let pendingSessionId: string | null = null
-let pendingExitAction: (() => void) | null = null
+// kilocode_change - session feedback state (reactive)
+const [sessionFeedbackPending, setSessionFeedbackPending] = createSignal(false)
+const [pendingSessionId, setPendingSessionId] = createSignal<string | null>(null)
+const [pendingExitAction, setPendingExitAction] = createSignal<(() => void) | null>(null)
 
 export function requestSessionFeedback(sessionId: string, onExit?: () => void) {
-  sessionFeedbackPending = true
-  pendingSessionId = sessionId
-  pendingExitAction = onExit ?? null
+  setSessionFeedbackPending(true)
+  setPendingSessionId(sessionId)
+  setPendingExitAction(() => onExit ?? null)
   log.info("session feedback requested", { sessionId })
 }
 
 export function clearSessionFeedback() {
-  sessionFeedbackPending = false
-  pendingSessionId = null
-  pendingExitAction = null
+  setSessionFeedbackPending(false)
+  setPendingSessionId(null)
+  setPendingExitAction(null)
 }
 
 export function hasPendingSessionFeedback() {
-  return sessionFeedbackPending && pendingSessionId !== null
+  return sessionFeedbackPending() && pendingSessionId() !== null
 }
 
 export function getPendingSessionId(): string | null {
-  return pendingSessionId
+  return pendingSessionId()
 }
 
 export function getPendingExitAction(): (() => void) | null {
-  return pendingExitAction
+  return pendingExitAction()
 }
 
 // kilocode_change - submit feedback for a response
