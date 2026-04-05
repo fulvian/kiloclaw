@@ -345,6 +345,10 @@ export namespace MemoryTierManager {
     const actions: string[] = []
 
     switch (tier) {
+      case MemoryTier.TIER_0_CONTEXT:
+        actions.push("Context tier is ephemeral - not persisted")
+        actions.push("Consider what information is critical to preserve before context expires")
+        break
       case MemoryTier.TIER_1_WORKING:
         actions.push("Working memory auto-expires based on TTL")
         actions.push("Consider increasing ttlMs if sessions are being lost prematurely")
