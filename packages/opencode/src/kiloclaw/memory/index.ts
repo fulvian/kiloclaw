@@ -67,6 +67,7 @@ export { MemoryMetrics } from "./memory.metrics.js"
 
 // BP-12: Memory Maintenance
 export { MemoryMaintenance } from "./memory.maintenance.js"
+export type { MaintenanceStats, MaintenanceOptions } from "./memory.maintenance.js"
 
 // BP-14: Memory Packaging
 export { MemoryPackager } from "./memory.packager.js"

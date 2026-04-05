@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test"
-import { MemoryTierManager, MemoryTier, TIER_CONFIGS, type TierConfig, type TierHealth } from "@/kiloclaw/memory"
+import { MemoryTierManager, MemoryTier, TIER_CONFIGS } from "@/kiloclaw/memory"
 
 describe("Memory Tier Manager (BP-15)", () => {
   describe("MemoryTier enum", () => {
@@ -14,16 +14,16 @@ describe("Memory Tier Manager (BP-15)", () => {
 
   describe("TIER_CONFIGS", () => {
     it("should have configurations for all tiers", () => {
-      expect(TIER_CONFIGS[MemoryTier.TIER_0_CONTEXT]).toBeDefined()
-      expect(TIER_CONFIGS[MemoryTier.TIER_1_WORKING]).toBeDefined()
-      expect(TIER_CONFIGS[MemoryTier.TIER_2_EPISODIC]).toBeDefined()
-      expect(TIER_CONFIGS[MemoryTier.TIER_3_SEMANTIC]).toBeDefined()
-      expect(TIER_CONFIGS[MemoryTier.TIER_4_PROCEDURAL]).toBeDefined()
+      expect(TIER_CONFIGS["tier0_context"]).toBeDefined()
+      expect(TIER_CONFIGS["tier1_working"]).toBeDefined()
+      expect(TIER_CONFIGS["tier2_episodic"]).toBeDefined()
+      expect(TIER_CONFIGS["tier3_semantic"]).toBeDefined()
+      expect(TIER_CONFIGS["tier4_procedural"]).toBeDefined()
     })
 
     it("should have correct tier 1 (working) configuration", () => {
-      const config = TIER_CONFIGS[MemoryTier.TIER_1_WORKING]
-      expect(config.tier).toBe(MemoryTier.TIER_1_WORKING)
+      const config = TIER_CONFIGS["tier1_working"]
+      expect(config.tier).toBe("tier1_working")
       expect(config.ttlMs).toBe(6 * 60 * 60 * 1000) // 6 hours
       expect(config.maxItems).toBe(100)
       expect(config.vectorEnabled).toBe(false)
@@ -31,15 +31,15 @@ describe("Memory Tier Manager (BP-15)", () => {
     })
 
     it("should have correct tier 3 (semantic) configuration", () => {
-      const config = TIER_CONFIGS[MemoryTier.TIER_3_SEMANTIC]
-      expect(config.tier).toBe(MemoryTier.TIER_3_SEMANTIC)
+      const config = TIER_CONFIGS["tier3_semantic"]
+      expect(config.tier).toBe("tier3_semantic")
       expect(config.ttlMs).toBeNull() // No automatic expiry
       expect(config.maxItems).toBe(10000)
       expect(config.vectorEnabled).toBe(true)
     })
 
     it("should have tier 0 as non-persistent", () => {
-      const config = TIER_CONFIGS[MemoryTier.TIER_0_CONTEXT]
+      const config = TIER_CONFIGS["tier0_context"]
       expect(config.persistence).toBe("memory")
       expect(config.maxItems).toBe(0)
       expect(config.ttlMs).toBeNull()
@@ -48,31 +48,31 @@ describe("Memory Tier Manager (BP-15)", () => {
 
   describe("classifyTier()", () => {
     it("should classify working layer correctly", () => {
-      expect(MemoryTierManager.classifyTier("working")).toBe(MemoryTier.TIER_1_WORKING)
+      expect(MemoryTierManager.classifyTier("working")).toBe("tier1_working")
     })
 
     it("should classify episodic layer correctly", () => {
-      expect(MemoryTierManager.classifyTier("episodic")).toBe(MemoryTier.TIER_2_EPISODIC)
+      expect(MemoryTierManager.classifyTier("episodic")).toBe("tier2_episodic")
     })
 
     it("should classify semantic layer correctly", () => {
-      expect(MemoryTierManager.classifyTier("semantic")).toBe(MemoryTier.TIER_3_SEMANTIC)
+      expect(MemoryTierManager.classifyTier("semantic")).toBe("tier3_semantic")
     })
 
     it("should classify procedural layer correctly", () => {
-      expect(MemoryTierManager.classifyTier("procedural")).toBe(MemoryTier.TIER_4_PROCEDURAL)
+      expect(MemoryTierManager.classifyTier("procedural")).toBe("tier4_procedural")
     })
 
     it("should default unknown layers to episodic", () => {
-      expect(MemoryTierManager.classifyTier("unknown")).toBe(MemoryTier.TIER_2_EPISODIC)
-      expect(MemoryTierManager.classifyTier("")).toBe(MemoryTier.TIER_2_EPISODIC)
+      expect(MemoryTierManager.classifyTier("unknown")).toBe("tier2_episodic")
+      expect(MemoryTierManager.classifyTier("")).toBe("tier2_episodic")
     })
   })
 
   describe("getTierInfo()", () => {
     it("should return tier configuration", () => {
       const info = MemoryTierManager.getTierInfo(MemoryTier.TIER_1_WORKING)
-      expect(info.tier).toBe(MemoryTier.TIER_1_WORKING)
+      expect(info.tier).toBe("tier1_working")
       expect(info.name).toBeDefined()
       expect(info.description).toBeDefined()
     })
@@ -89,7 +89,7 @@ describe("Memory Tier Manager (BP-15)", () => {
     it("should return stats for all tiers", async () => {
       const stats = await MemoryTierManager.getTierStats()
       expect(stats.length).toBe(4) // Tiers 1-4 have stats (tier 0 is not persisted)
-      expect(stats[0].tier).toBe(MemoryTier.TIER_1_WORKING)
+      expect(stats[0].tier).toBe("tier1_working")
       expect(stats[0].count).toBeNumber()
       expect(stats[0].sizeBytes).toBeNumber()
       expect(stats[0].config).toBeDefined()
@@ -123,14 +123,21 @@ describe("Memory Tier Manager (BP-15)", () => {
   describe("checkTierHealth()", () => {
     it("should return health for specific tier", async () => {
       const health = await MemoryTierManager.checkTierHealth(MemoryTier.TIER_1_WORKING)
-      expect(health.tier).toBe(MemoryTier.TIER_1_WORKING)
+      expect(health.tier).toBe("tier1_working")
       expect(health.status).toMatch(/healthy|warning|critical/)
     })
   })
 
   describe("getRecommendedActions()", () => {
     it("should return actions for each tier", () => {
-      for (const tier of Object.values(MemoryTier)) {
+      const tiers = [
+        MemoryTier.TIER_0_CONTEXT,
+        MemoryTier.TIER_1_WORKING,
+        MemoryTier.TIER_2_EPISODIC,
+        MemoryTier.TIER_3_SEMANTIC,
+        MemoryTier.TIER_4_PROCEDURAL,
+      ]
+      for (const tier of tiers) {
         const actions = MemoryTierManager.getRecommendedActions(tier)
         expect(Array.isArray(actions)).toBe(true)
         expect(actions.length).toBeGreaterThan(0)
