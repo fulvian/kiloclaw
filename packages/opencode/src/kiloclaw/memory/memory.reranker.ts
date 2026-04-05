@@ -18,6 +18,15 @@ const log = Log.create({ service: "kiloclaw.memory.reranker" })
 const EMBEDDING_CACHE_MAX_SIZE = 1000
 const embeddingCache = new Map<string, number[]>()
 
+// Configurable reranking weights via environment variables
+const ORIGINAL_WEIGHT = Number(process.env["KILO_RERANK_ORIGINAL_WEIGHT"] ?? 0.4)
+const RERANK_WEIGHT = Number(process.env["KILO_RERANK_WEIGHT"] ?? 0.6)
+
+// Configurable lexical reranking weights
+const LEXICAL_WEIGHT = Number(process.env["KILO_RERANK_LEXICAL_WEIGHT"] ?? 0.3)
+const BM25_WEIGHT = Number(process.env["KILO_RERANK_BM25_WEIGHT"] ?? 0.3)
+const SCORE_WEIGHT = Number(process.env["KILO_RERANK_SCORE_WEIGHT"] ?? 0.4)
+
 function getCachedEmbedding(content: string): number[] | undefined {
   return embeddingCache.get(content)
 }
@@ -131,9 +140,8 @@ export namespace MemoryReranker {
 
       const rerankScore = cosineSimilarity(queryEmbedding, candidateEmbedding)
 
-      // Fusion: combine original vector score with rerank score
-      // Original score has 40% weight, rerank has 60%
-      const fusedScore = 0.4 * candidate.originalScore + 0.6 * rerankScore
+      // Fusion: combine original vector score with rerank score using configurable weights
+      const fusedScore = ORIGINAL_WEIGHT * candidate.originalScore + RERANK_WEIGHT * rerankScore
 
       return {
         id: candidate.id,
@@ -199,8 +207,8 @@ export namespace MemoryReranker {
       // BM25-style term frequency
       const bm25 = computeBM25(queryTerms, candidate.content)
 
-      // Fusion
-      const rerankScore = 0.3 * candidate.originalScore + 0.4 * lexicalScore + 0.3 * bm25
+      // Fusion using configurable weights
+      const rerankScore = SCORE_WEIGHT * candidate.originalScore + LEXICAL_WEIGHT * lexicalScore + BM25_WEIGHT * bm25
 
       return {
         id: candidate.id,

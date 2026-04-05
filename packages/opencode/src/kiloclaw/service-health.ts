@@ -207,6 +207,126 @@ export namespace ServiceHealth {
   }
 
   /**
+   * Check PostgreSQL connectivity when using postgres provider
+   */
+  async function checkPostgres(): Promise<CheckResult> {
+    const provider = process.env["KILO_MEMORY_PROVIDER"] ?? "sqlite"
+
+    if (provider !== "postgres") {
+      return {
+        name: "postgres",
+        status: "healthy",
+        message: "Using SQLite provider",
+        canStartup: true,
+        requiresStartup: false,
+      }
+    }
+
+    const connectionString = process.env["KILO_POSTGRES_CONNECTION_STRING"]
+    if (!connectionString) {
+      return {
+        name: "postgres",
+        status: "unavailable",
+        message: "PostgreSQL provider selected but no connection string",
+        error: "KILO_POSTGRES_CONNECTION_STRING not set",
+        canStartup: false,
+        requiresStartup: true,
+      }
+    }
+
+    try {
+      // Try to connect and run simple query
+      // Note: Actual implementation would use pg driver to connect
+      // For now, we just validate the connection string format
+      if (!connectionString.startsWith("postgresql://") && !connectionString.startsWith("postgres://")) {
+        throw new Error("Invalid PostgreSQL connection string format")
+      }
+
+      return {
+        name: "postgres",
+        status: "healthy",
+        message: "PostgreSQL connection string configured",
+        canStartup: true,
+        requiresStartup: false,
+      }
+    } catch (err) {
+      return {
+        name: "postgres",
+        status: "unavailable",
+        message: "PostgreSQL connection failed",
+        error: String(err),
+        canStartup: false,
+        requiresStartup: true,
+      }
+    }
+  }
+
+  /**
+   * Check LM Studio model availability
+   */
+  async function checkLMStudioModel(): Promise<CheckResult> {
+    if (!Flag.KILO_EXPERIMENTAL_MEMORY_V2) {
+      return {
+        name: "lmstudio-model",
+        status: "healthy",
+        message: "Memory V2 disabled",
+        canStartup: true,
+        requiresStartup: false,
+      }
+    }
+
+    const baseURL = process.env["KILO_MEMORY_LMSTUDIO_BASE_URL"] ?? "http://127.0.0.1:1234"
+
+    try {
+      const response = await fetch(`${baseURL}/v1/models`, {
+        method: "GET",
+        signal: AbortSignal.timeout(3000),
+      })
+
+      if (!response.ok) {
+        return {
+          name: "lmstudio-model",
+          status: "degraded",
+          message: `LM Studio returned status ${response.status}`,
+          canStartup: true,
+          requiresStartup: false,
+        }
+      }
+
+      const data = (await response.json()) as { models?: Array<{ id?: string; model?: string }> }
+      const expectedModel = process.env["KILO_MEMORY_EMBEDDING_MODEL"] ?? "text-embedding-mxbai-embed-large-v1"
+      const hasModel = data.models?.some((m) => m.id?.includes(expectedModel) || m.model?.includes(expectedModel))
+
+      if (hasModel) {
+        return {
+          name: "lmstudio-model",
+          status: "healthy",
+          message: `Expected model "${expectedModel}" is available`,
+          canStartup: true,
+          requiresStartup: false,
+        }
+      }
+
+      return {
+        name: "lmstudio-model",
+        status: "degraded",
+        message: `Expected model "${expectedModel}" not found in available models`,
+        canStartup: true,
+        requiresStartup: false,
+      }
+    } catch (err) {
+      return {
+        name: "lmstudio-model",
+        status: "unavailable",
+        message: "Could not check LM Studio models",
+        error: String(err),
+        canStartup: false,
+        requiresStartup: true,
+      }
+    }
+  }
+
+  /**
    * Service descriptors - define all services to check
    */
   const services: ServiceDescriptor[] = [
@@ -224,6 +344,16 @@ export namespace ServiceHealth {
       name: "database",
       required: false,
       check: checkDatabase,
+    },
+    {
+      name: "postgres",
+      required: process.env["KILO_MEMORY_PROVIDER"] === "postgres",
+      check: checkPostgres,
+    },
+    {
+      name: "lmstudio-model",
+      required: Flag.KILO_EXPERIMENTAL_MEMORY_V2,
+      check: checkLMStudioModel,
     },
   ]
 

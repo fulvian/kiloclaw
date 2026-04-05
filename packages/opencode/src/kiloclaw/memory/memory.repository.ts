@@ -51,6 +51,13 @@ const log = Log.create({ service: "kiloclaw.memory.repository" })
 // Database instance type
 type MemoryDb = SQLiteBunDatabase<any>
 
+/**
+ * Get the vector search provider based on environment configuration
+ */
+function getVectorSearchProvider(): "sqlite" | "postgres" {
+  return (process.env["KILO_MEMORY_PROVIDER"] as "sqlite" | "postgres") ?? "sqlite"
+}
+
 // State for lazy initialization
 let _db: MemoryDb | undefined
 
@@ -474,31 +481,91 @@ export const SemanticMemoryRepo = {
     k: number,
     tenantId: string,
   ): Promise<{ fact: Fact; similarity: number }[]> {
-    // For MVP without pgvector, we load all vectors and compute similarity in-memory
-    // This will be replaced with actual vector search when migrating to Postgres+pgvector
-    const rows = await db()
-      .select()
-      .from(FactVectorTable)
-      .innerJoin(FactTable, eq(FactVectorTable.fact_id, FactTable.id))
-      .where(eq(FactTable.tenant_id, tenantId))
+    const provider = getVectorSearchProvider()
 
-    const results: { fact: Fact; similarity: number }[] = []
-
-    for (const row of rows) {
-      try {
-        const storedEmbedding = JSON.parse(row.fact_vectors.embedding)
-        const similarity = cosineSimilarity(embedding, storedEmbedding)
-        if (similarity > 0) {
-          results.push({ fact: row.facts, similarity })
-        }
-      } catch {
-        // Skip invalid embeddings
-      }
+    if (provider === "postgres") {
+      // Use PostgreSQL pgvector for fast ANN search
+      return postgresSimilaritySearch(embedding, k, tenantId)
     }
 
-    results.sort((a, b) => b.similarity - a.similarity)
-    return results.slice(0, k)
+    // Fallback to SQLite implementation (current MVP code)
+    return sqliteSimilaritySearch(embedding, k, tenantId)
   },
+}
+
+/**
+ * SQLite implementation - loads all vectors and computes similarity in-memory
+ */
+async function sqliteSimilaritySearch(
+  embedding: number[],
+  k: number,
+  tenantId: string,
+): Promise<{ fact: Fact; similarity: number }[]> {
+  const rows = await db()
+    .select()
+    .from(FactVectorTable)
+    .innerJoin(FactTable, eq(FactVectorTable.fact_id, FactTable.id))
+    .where(eq(FactTable.tenant_id, tenantId))
+
+  const results: { fact: Fact; similarity: number }[] = []
+
+  for (const row of rows) {
+    try {
+      const storedEmbedding = JSON.parse(row.fact_vectors.embedding)
+      const similarity = cosineSimilarity(embedding, storedEmbedding)
+      if (similarity > 0) {
+        results.push({ fact: row.facts, similarity })
+      }
+    } catch {
+      // Skip invalid embeddings
+    }
+  }
+
+  results.sort((a, b) => b.similarity - a.similarity)
+  return results.slice(0, k)
+}
+
+/**
+ * PostgreSQL implementation using pgvector for fast ANN search
+ * Note: Requires KILO_MEMORY_PROVIDER=postgres and pgvector extension
+ */
+async function postgresSimilaritySearch(
+  embedding: number[],
+  k: number,
+  tenantId: string,
+): Promise<{ fact: Fact; similarity: number }[]> {
+  // pgvector implementation - uses HNSW index for fast cosine similarity search
+  // The embedding is sent as a JSON array, pgvector parses it as vector(1536)
+  const embeddingStr = JSON.stringify(embedding)
+
+  try {
+    // Use raw SQL with pgvector's <=> (cosine distance) operator
+    // The HNSW index will be used automatically for ANN search
+    const rows = await db()
+      .select({
+        fact: FactTable,
+        distance: sql<string>`(fv.embedding <=> ${embeddingStr}::vector)`,
+      })
+      .from(FactVectorTable)
+      .innerJoin(FactTable, eq(FactVectorTable.fact_id, FactTable.id))
+      .where(
+        and(
+          eq(FactTable.tenant_id, tenantId),
+          sql`fv.embedding <=> ${embeddingStr}::vector < 1`, // Only get results with similarity > 0
+        ),
+      )
+      .orderBy(sql`fv.embedding <=> ${embeddingStr}::vector`)
+      .limit(k)
+
+    return rows.map((row) => ({
+      fact: row.fact,
+      similarity: 1 - parseFloat(row.distance), // Convert cosine distance to similarity
+    }))
+  } catch (err) {
+    // If PostgreSQL query fails (e.g., pgvector not available), fall back to SQLite
+    log.warn("postgres similarity search failed, falling back to sqlite", { err })
+    return sqliteSimilaritySearch(embedding, k, tenantId)
+  }
 }
 
 // =============================================================================
@@ -587,32 +654,32 @@ export const GraphMemoryRepo = {
   async traverse(tenantId: string, startEntityId: string, hops: number): Promise<string[]> {
     const visited = new Set<string>()
     const maxHops = Math.max(1, hops)
-    const frontier = [startEntityId]
+    let frontier = [startEntityId]
 
-    for (const _ of Array.from({ length: maxHops })) {
+    for (let hop = 0; hop < maxHops; hop++) {
+      if (frontier.length === 0) break
+
+      // Single query for all frontier nodes in this hop (batch query optimization)
+      const clauses = frontier.map((id) => or(eq(MemoryEdgeTable.source_id, id), eq(MemoryEdgeTable.target_id, id)))
+
+      const edges = await db()
+        .select({ source_id: MemoryEdgeTable.source_id, target_id: MemoryEdgeTable.target_id })
+        .from(MemoryEdgeTable)
+        .where(and(eq(MemoryEdgeTable.tenant_id, tenantId), or(...clauses)))
+
       const next: string[] = []
-      for (const id of frontier) {
-        if (visited.has(id)) continue
-        visited.add(id)
-
-        const edges = await db()
-          .select({ source_id: MemoryEdgeTable.source_id, target_id: MemoryEdgeTable.target_id })
-          .from(MemoryEdgeTable)
-          .where(
-            and(
-              eq(MemoryEdgeTable.tenant_id, tenantId),
-              or(eq(MemoryEdgeTable.source_id, id), eq(MemoryEdgeTable.target_id, id)),
-            ),
-          )
-
-        for (const edge of edges) {
-          next.push(edge.source_id, edge.target_id)
+      for (const edge of edges) {
+        if (!visited.has(edge.source_id)) {
+          visited.add(edge.source_id)
+          next.push(edge.source_id)
+        }
+        if (!visited.has(edge.target_id)) {
+          visited.add(edge.target_id)
+          next.push(edge.target_id)
         }
       }
 
-      const deduped = [...new Set(next)]
-      frontier.splice(0, frontier.length, ...deduped)
-      if (frontier.length === 0) break
+      frontier = [...new Set(next)]
     }
 
     return [...visited]

@@ -4,6 +4,10 @@ import { GraphMemoryRepo } from "./memory.repository"
 const log = Log.create({ service: "kiloclaw.memory.graph" })
 const TENANT = "default"
 
+// Traversal cache for graph queries
+const traverseCache = new Map<string, { ids: string[]; ts: number }>()
+const TRAVERSE_CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+
 export namespace MemoryGraph {
   export async function upsertEntity(input: {
     name: string
@@ -11,7 +15,7 @@ export namespace MemoryGraph {
     metadata?: Record<string, unknown>
   }): Promise<string> {
     const id = `ent_${crypto.randomUUID()}`
-    return GraphMemoryRepo.upsertEntity({
+    const result = await GraphMemoryRepo.upsertEntity({
       id,
       tenant_id: TENANT,
       name: input.name,
@@ -20,6 +24,9 @@ export namespace MemoryGraph {
       created_at: Date.now(),
       updated_at: Date.now(),
     })
+    // Invalidate traversal cache when entities are modified
+    clearTraverseCache()
+    return result
   }
 
   export async function addRelation(input: {
@@ -41,6 +48,8 @@ export namespace MemoryGraph {
       metadata_json: input.metadata,
       created_at: Date.now(),
     })
+    // Invalidate traversal cache when edges are modified
+    clearTraverseCache()
     return id
   }
 
@@ -58,8 +67,29 @@ export namespace MemoryGraph {
 
   export async function traverse(startEntityId: string, hops = 2): Promise<string[]> {
     const maxHops = Math.max(1, Math.min(4, hops))
+    const cacheKey = `${startEntityId}:${maxHops}`
+
+    // Check cache first
+    const cached = traverseCache.get(cacheKey)
+    if (cached && Date.now() - cached.ts < TRAVERSE_CACHE_TTL_MS) {
+      log.debug("traverse cache hit", { startEntityId, hops: maxHops, count: cached.ids.length })
+      return cached.ids
+    }
+
+    // Cache miss - perform traversal
     const ids = await GraphMemoryRepo.traverse(TENANT, startEntityId, maxHops)
+    traverseCache.set(cacheKey, { ids, ts: Date.now() })
+
     log.debug("graph traverse", { startEntityId, hops: maxHops, count: ids.length })
     return ids
+  }
+
+  /**
+   * Clear the traversal cache
+   * Call this when graph structure changes significantly
+   */
+  export function clearTraverseCache(): void {
+    traverseCache.clear()
+    log.debug("traverse cache cleared")
   }
 }

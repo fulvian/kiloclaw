@@ -18,6 +18,63 @@ const log = Log.create({ service: "kiloclaw.memory.db" })
 // Memory database path
 const MEMORY_DB_PATH = ".kilocode/memory.db"
 
+// =============================================================================
+// Database Configuration (for PostgreSQL/SQLite abstraction)
+// =============================================================================
+
+export interface VectorIndexConfig {
+  type: "hnsw" | "ivfflat"
+  m: number // HNSW: connections per node (default 16)
+  efConstruction: number // HNSW: build-time accuracy (default 64)
+  lists: number // IVFFlat: number of clusters
+}
+
+export interface DatabaseConfig {
+  provider: "sqlite" | "postgres"
+  connectionString?: string
+  vectorIndex?: VectorIndexConfig
+}
+
+/**
+ * Memory database provider configuration
+ */
+export namespace MemoryDb {
+  /**
+   * Check if Memory V2 is enabled
+   */
+  export function isEnabled(): boolean {
+    return Flag.KILO_EXPERIMENTAL_MEMORY_V2
+  }
+
+  /**
+   * Get the database provider (sqlite or postgres)
+   */
+  export function getProvider(): "sqlite" | "postgres" {
+    return (process.env["KILO_MEMORY_PROVIDER"] as "sqlite" | "postgres") ?? "sqlite"
+  }
+
+  /**
+   * Get PostgreSQL connection string
+   */
+  export function getConnectionString(): string | undefined {
+    return process.env["KILO_POSTGRES_CONNECTION_STRING"]
+  }
+
+  /**
+   * Get vector index configuration
+   */
+  export function getVectorIndexConfig(): VectorIndexConfig | undefined {
+    const type = process.env["KILO_MEMORY_VECTOR_INDEX_TYPE"] as "hnsw" | "ivfflat" | undefined
+    if (!type) return undefined
+    return {
+      type,
+      m: Number(process.env["KILO_MEMORY_HNSW_M"] ?? 16),
+      efConstruction: Number(process.env["KILO_MEMORY_HNSW_EF_CONSTRUCTION"] ?? 64),
+      lists: Number(process.env["KILO_MEMORY_IVFFLAT_LISTS"] ?? 100),
+    }
+  }
+}
+
 let _db: ReturnType<typeof drizzle> | null = null
 
 /**
@@ -267,13 +324,6 @@ CREATE INDEX IF NOT EXISTS audit_hash_idx ON memory_audit_log(hash);
 `
 
 export namespace MemoryDb {
-  /**
-   * Check if Memory V2 is enabled
-   */
-  export function isEnabled(): boolean {
-    return Flag.KILO_EXPERIMENTAL_MEMORY_V2
-  }
-
   /**
    * Initialize memory database - creates tables if needed
    */
