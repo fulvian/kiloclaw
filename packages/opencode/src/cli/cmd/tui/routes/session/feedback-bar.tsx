@@ -44,10 +44,19 @@ export function FeedbackBar(props: FeedbackBarProps) {
     try {
       const tenantId = "local"
       const userId = (sync.data as any).user?.id ?? "anonymous"
+      const feedbackId = crypto.randomUUID()
 
-      await FeedbackProcessor.process({
+      console.log("[FeedbackBar] Submitting feedback:", {
+        feedbackId,
+        vote,
+        reasonText,
+        messageId: props.messageId,
+        sessionId: props.sessionId,
+      })
+
+      const result = await FeedbackProcessor.process({
         feedback: {
-          id: crypto.randomUUID(),
+          id: feedbackId,
           tenantId,
           userId,
           sessionId: props.sessionId,
@@ -62,8 +71,14 @@ export function FeedbackBar(props: FeedbackBarProps) {
         },
       })
 
-      setSubmitted(true)
-      props.onFeedbackSent?.()
+      console.log("[FeedbackBar] Process result:", JSON.stringify(result))
+
+      if (result.success) {
+        setSubmitted(true)
+        props.onFeedbackSent?.()
+      } else {
+        console.error("[FeedbackBar] Feedback processing failed:", result.errors)
+      }
     } catch (err) {
       console.error("Feedback submission failed:", err)
     } finally {
