@@ -293,9 +293,9 @@ export namespace ServiceHealth {
         }
       }
 
-      const data = (await response.json()) as { models?: Array<{ id?: string; model?: string }> }
+      const data = (await response.json()) as { data?: Array<{ id?: string; model?: string }> }
       const expectedModel = process.env["KILO_MEMORY_EMBEDDING_MODEL"] ?? "text-embedding-mxbai-embed-large-v1"
-      const hasModel = data.models?.some((m) => m.id?.includes(expectedModel) || m.model?.includes(expectedModel))
+      const hasModel = data.data?.some((m) => m.id?.includes(expectedModel) || m.model?.includes(expectedModel))
 
       if (hasModel) {
         return {
