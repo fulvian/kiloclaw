@@ -67,12 +67,13 @@ async function ensureMemoryInitialized(): Promise<boolean> {
 
 // kilocode_change - reason codes for categorical feedback
 const NEGATIVE_REASONS = [
-  { code: "wrong_fact", label: "Informazione sbagliata", icon: "❌" },
+  { code: "wrong_fact", label: "Info sbagliata", icon: "❌" },
   { code: "irrelevant", label: "Non pertinente", icon: "↩️" },
   { code: "too_verbose", label: "Troppo lungo", icon: "📏" },
-  { code: "incomplete", label: "Incompleto", icon: "⬜" },
+  { code: "task_partial", label: "Incompleto", icon: "⬜" },
   { code: "style_mismatch", label: "Stile non adatto", icon: "✏️" },
-  { code: "task_failed", label: "Task non completato", icon: "❗" },
+  { code: "task_failed", label: "Task fallito", icon: "❗" },
+  { code: "expectation_mismatch", label: "Non come previsto", icon: "❓" },
 ] as const
 
 interface FeedbackBarProps {
