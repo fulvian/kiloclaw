@@ -46,18 +46,20 @@ export function FeedbackBar(props: FeedbackBarProps) {
       const userId = (sync.data as any).user?.id ?? "anonymous"
 
       await FeedbackProcessor.process({
-        id: crypto.randomUUID(),
-        tenantId,
-        userId,
-        sessionId: props.sessionId,
-        target: {
-          type: "response",
-          id: props.messageId,
+        feedback: {
+          id: crypto.randomUUID(),
+          tenantId,
+          userId,
+          sessionId: props.sessionId,
+          target: {
+            type: "response",
+            id: props.messageId,
+          },
+          vote,
+          reason: reasonText ? mapToReasonCode(reasonText) : undefined,
+          correction: reasonText,
+          ts: Date.now(),
         },
-        vote,
-        reason: reasonText ? mapToReasonCode(reasonText) : undefined,
-        correction: reasonText,
-        ts: Date.now(),
       })
 
       setSubmitted(true)
