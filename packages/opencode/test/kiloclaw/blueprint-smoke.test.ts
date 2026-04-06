@@ -23,7 +23,9 @@ import {
   AuditRepo,
   WorkingMemoryRepo,
 } from "@/kiloclaw/memory"
-import type { AgencyId } from "@/kiloclaw"
+import type { AgencyId } from "@/kiloclaw/types"
+import { CorrelationId as CorrelationIdGen } from "@/kiloclaw/dispatcher"
+import type { CorrelationId as CorrelationIdBranded } from "@/kiloclaw/types"
 
 // Helper to create test intent
 function createIntent(overrides?: Partial<Intent>): Intent {
@@ -40,7 +42,7 @@ function createIntent(overrides?: Partial<Intent>): Intent {
 function createPolicyContext(overrides?: Partial<PolicyContext>): PolicyContext {
   return {
     agencyId: "test-agency" as AgencyId,
-    correlationId: "test-correlation-" + Math.random().toString(36).slice(2),
+    correlationId: CorrelationIdGen.generate() as unknown as CorrelationIdBranded,
     ...overrides,
   }
 }
