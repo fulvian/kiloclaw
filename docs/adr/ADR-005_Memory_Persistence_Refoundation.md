@@ -3,7 +3,7 @@
 **Status:** ✅ Implemented  
 **Date:** 2026-04-04  
 **Deciders:** Kiloclaw Technical Team  
-**Last Updated:** 2026-04-04 (Implementation Complete)
+**Last Updated:** 2026-04-06 (Recall Policy + Preference Reuse + Session Scope Fix)
 
 ---
 

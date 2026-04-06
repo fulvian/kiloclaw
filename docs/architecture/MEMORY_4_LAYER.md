@@ -2,6 +2,7 @@
 
 > **Status**: Implemented + Enhanced  
 > **Date**: 2026-04-05  
+> **Last Updated**: 2026-04-06 (Recall Policy + Preference Reuse)  
 > **ADR**: ADR-002, ADR-005  
 > **Implementation**: Phase 3 (Base) + KILOCLAW_MEMORY_ENHANCEMENT_PLAN (SOTA)
 
@@ -457,6 +458,73 @@ Intercepts queries matching recall patterns and injects context:
 - **Injection**: appends `<system-reminder>` block with recovered context to user message
 
 This enables the router agent to answer questions about previous conversations by recovering context from the 4-layer memory system.
+
+### Recall Policy Engine (2026-04-06)
+
+The recall policy determines when memory context should be injected into prompts.
+
+#### Intent Classification (`memory.intent.ts`)
+
+Five intent kinds with priority order:
+
+| Intent             | Pattern                                               | Score Boost |
+| ------------------ | ----------------------------------------------------- | ----------- |
+| `preference_reuse` | "in base ai miei gusti", "consigliami", "what i like" | +0.16       |
+| `explicit_recall`  | "di cosa abbiamo discusso", "what did we talk about"  | +0.18       |
+| `continuation`     | "riprendi", "continue from where we left off"         | +0.10       |
+| `project_context`  | Default fallback for project-related queries          | 0           |
+| `none`             | Score < 0.36 → skip                                   | 0           |
+
+#### Explicit Recall Patterns (high lexical signal = 0.95)
+
+```typescript
+/di\s+cosa\s+abbiamo\s+(?:parlato|discusso|trattato)/i
+/cosa\s+abbiamo\s+(?:fatto|detto)\s+(?:ultimamente|nelle\s+ultime\s+chat|nelle\s+ultime\s+sessioni)/i
+/di\s+cosa\s+si\s+è\s+parlato/i
+/what\s+did\s+we\s+(?:talk\s+about|discuss)\s+(?:recently|in\s+the\s+last\s+sessions?)/i
+/what\s+have\s+we\s+been\s+(?:working\s+on|discussing)/i
+```
+
+#### Preference Reuse Hard-Recall Patterns
+
+Force `decision: recall` when score ≥ 0.72:
+
+```typescript
+/in\s+base\s+ai\s+miei\s+gusti/i
+/sulla\s+base\s+dei\s+miei\s+gusti/i
+/in\s+base\s+alle\s+mie\s+preferenze/i
+/based\s+on\s+my\s+tastes?/i
+/based\s+on\s+my\s+preferences/i
+/what\s+i\s+like/i
+```
+
+#### Decision Thresholds
+
+| Decision | Condition       | Description                     |
+| -------- | --------------- | ------------------------------- |
+| `recall` | score ≥ 0.55    | Full memory context injection   |
+| `shadow` | score 0.40–0.54 | Observational only (flag-gated) |
+| `skip`   | score < 0.40    | No injection                    |
+
+#### Session Retrieval Scope
+
+Global session history is fetched without directory filter to enable cross-project recall:
+
+```typescript
+Session.listGlobal({ roots: true, limit: 12 })
+```
+
+#### Memory Extractor (`memory.extractor.ts`)
+
+Selective semantic extraction from user input. Minimum content length: 20 chars.
+
+Extraction rules:
+
+- **likes**: "mi piace", "i like" → `subject: user, predicate: likes`
+- **dislikes**: "non mi piace", "i don't like" → `subject: user, predicate: dislikes`
+- **preference_context**: "in base ai miei gusti" → `subject: user, predicate: preference_context`
+
+This enables persistent storage of user preferences (TV series tastes, etc.) for future recall.
 
 ## Testing
 
