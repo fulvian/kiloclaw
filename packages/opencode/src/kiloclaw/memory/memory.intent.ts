@@ -39,6 +39,11 @@ const IT = [
   "discusso",
   "feedback",
   "preferenze",
+  "gusto",
+  "gusti",
+  "piace",
+  "piacciono",
+  "consigliami",
 ]
 
 const EN = [
@@ -55,11 +60,41 @@ const EN = [
   "agreed",
   "feedback",
   "preferences",
+  "taste",
+  "tastes",
+  "recommend",
+  "suggest",
 ]
 
-const PREF = ["prefer", "preferenze", "preferences", "style", "stile", "come vuoi", "as i asked"]
+const PREF = [
+  "prefer",
+  "preferenze",
+  "preferences",
+  "style",
+  "stile",
+  "come vuoi",
+  "as i asked",
+  "gusto",
+  "gusti",
+  "mi piace",
+  "mi piacciono",
+  "in base ai miei gusti",
+  "sulla base dei miei gusti",
+  "in base alle mie preferenze",
+  "based on my taste",
+  "based on my tastes",
+  "based on my preferences",
+  "what i like",
+]
 const CONT = ["riprendi", "continue", "continue from", "come prima", "from before", "da prima", "resume"]
 const TEMP = ["ieri", "today", "yesterday", "last", "prima", "earlier", "ultime", "recent", "recently"]
+const EXPLICIT_RECALL = [
+  /di\s+cosa\s+abbiamo\s+(?:parlato|discusso|trattato)/i,
+  /cosa\s+abbiamo\s+(?:fatto|detto)\s+(?:ultimamente|nelle\s+ultime\s+chat|nelle\s+ultime\s+sessioni)/i,
+  /di\s+cosa\s+si\s+è\s+parlato/i,
+  /what\s+did\s+we\s+(?:talk\s+about|discuss)\s+(?:recently|in\s+the\s+last\s+sessions?)/i,
+  /what\s+have\s+we\s+been\s+(?:working\s+on|discussing)/i,
+]
 
 const PROTO: Record<Exclude<RecallIntentKind, "none">, string[]> = {
   explicit_recall: [
@@ -96,7 +131,7 @@ export namespace MemoryIntent {
     const lang = detectLang(norm)
     const lexical = lexicalScore(norm)
     const temporal = hasAny(norm, TEMP) ? 1 : 0
-    const referential = /(we|our|abbiamo|nostr|prima|before|già|already)/i.test(norm) ? 1 : 0
+    const referential = /(we|our|abbiamo|nostr|prima|before|già|already|mio|miei|mie|my)/i.test(norm) ? 1 : 0
     const question = /\?|\b(cosa|what|which|quando|when|who)\b/i.test(norm) ? 1 : 0
     const semantic = await semanticScore(norm)
     const score = clamp(
@@ -126,6 +161,8 @@ export namespace MemoryIntent {
 }
 
 function classifyKind(text: string, score: number): RecallIntentKind {
+  if (hasPreferenceCue(text)) return "preference_reuse"
+  if (hasExplicitRecallCue(text)) return "explicit_recall"
   if (score < 0.36) return "none"
   if (hasAny(text, PREF)) return "preference_reuse"
   if (hasAny(text, CONT)) return "continuation"
@@ -147,12 +184,28 @@ function lexicalScore(text: string): number {
   const b = hitRatio(text, EN)
   const c = hasAny(text, PREF) ? 0.8 : 0
   const d = hasAny(text, CONT) ? 0.8 : 0
-  return clamp(Math.max(a, b, c, d))
+  const e = EXPLICIT_RECALL.some((re) => re.test(text)) ? 0.95 : 0
+  return clamp(Math.max(a, b, c, d, e))
 }
 
 async function semanticScore(text: string): Promise<number> {
   if (!Flag.KILO_MEMORY_INTENT_CLASSIFIER_V1) return 0
-  const terms = ["session", "ricorda", "remember", "previous", "feedback", "preferenze"]
+  const terms = [
+    "session",
+    "ricorda",
+    "remember",
+    "previous",
+    "feedback",
+    "preferenze",
+    "gusti",
+    "gusto",
+    "mi piace",
+    "preferences",
+    "taste",
+    "recommend",
+    "consigli",
+    "consigliami",
+  ]
   const has = terms.some((x) => text.includes(x))
   if (!has) return 0
   try {
@@ -179,6 +232,25 @@ function hitRatio(text: string, words: string[]): number {
 
 function hasAny(text: string, words: string[]): boolean {
   return words.some((x) => text.includes(x))
+}
+
+function hasPreferenceCue(text: string): boolean {
+  if (hasAny(text, PREF)) return true
+  if (/\b(consigliami|consiglia|raccomanda)\b/i.test(text) && /(gust|prefer|piac)/i.test(text)) return true
+  if (/\b(recommend|suggest)\b/i.test(text) && /(taste|preference|like)/i.test(text)) return true
+  if (/\b(simile|similar)\b/i.test(text) && /(piace|liked|like)/i.test(text)) return true
+  return false
+}
+
+function hasExplicitRecallCue(text: string): boolean {
+  if (EXPLICIT_RECALL.some((re) => re.test(text))) return true
+  if (
+    /\b(ultimamente|ultime\s+chat|ultime\s+sessioni|precedenti\s+sessioni)\b/i.test(text) &&
+    /\b(abbiamo|we)\b/i.test(text)
+  ) {
+    return true
+  }
+  return false
 }
 
 function clamp(n: number): number {

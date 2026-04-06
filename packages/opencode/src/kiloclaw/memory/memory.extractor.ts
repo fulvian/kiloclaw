@@ -32,6 +32,7 @@ export namespace MemoryExtractor {
    */
   export async function extractFacts(content: string, context: ExtractionContext): Promise<ExtractedFact[]> {
     const facts: ExtractedFact[] = []
+    const text = content.trim()
 
     // Rule-based extraction patterns
 
@@ -43,6 +44,51 @@ export namespace MemoryExtractor {
         predicate: "prefers",
         object: match[1].trim(),
         confidence: 0.75,
+        provenance: `extracted:${context.sessionId}`,
+      })
+    }
+
+    const likeMatches = text.matchAll(
+      /(?:mi\s+piace(?:\s+molto)?|mi\s+piacciono|i\s+like|i\s+love)\s+(.+?)(?:[.!?]|$)/gim,
+    )
+    for (const match of likeMatches) {
+      const obj = match[1]?.trim()
+      if (!obj) continue
+      facts.push({
+        subject: "user",
+        predicate: "likes",
+        object: obj,
+        confidence: 0.82,
+        provenance: `extracted:${context.sessionId}`,
+      })
+    }
+
+    const dislikeMatches = text.matchAll(
+      /(?:non\s+mi\s+piace|non\s+mi\s+piacciono|i\s+don'?t\s+like|i\s+hate)\s+(.+?)(?:[.!?]|$)/gim,
+    )
+    for (const match of dislikeMatches) {
+      const obj = match[1]?.trim()
+      if (!obj) continue
+      facts.push({
+        subject: "user",
+        predicate: "dislikes",
+        object: obj,
+        confidence: 0.84,
+        provenance: `extracted:${context.sessionId}`,
+      })
+    }
+
+    const tasteMatches = text.matchAll(
+      /(?:in\s+base\s+ai\s+miei\s+gusti|sulla\s+base\s+dei\s+miei\s+gusti|based\s+on\s+my\s+tastes?|based\s+on\s+my\s+preferences)\s*(.+?)(?:[.!?]|$)/gim,
+    )
+    for (const match of tasteMatches) {
+      const obj = match[1]?.trim()
+      if (!obj) continue
+      facts.push({
+        subject: "user",
+        predicate: "preference_context",
+        object: obj,
+        confidence: 0.72,
         provenance: `extracted:${context.sessionId}`,
       })
     }
@@ -175,7 +221,7 @@ export namespace MemoryExtractor {
    * Check if content is worth extracting (too short or noisy).
    */
   export function isWorthExtracting(content: string): boolean {
-    if (content.length < 50) return false
+    if (content.length < 20) return false
     if (content.length > 10000) return false // too long, needs summarization first
     // Skip very noisy content
     const noiseRatio = (content.match(/[!?]{2,}/g) ?? []).length / content.length

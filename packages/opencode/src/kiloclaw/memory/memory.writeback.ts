@@ -67,6 +67,7 @@ export namespace MemoryWriteback {
     agent?: string
     text: string
   }): void {
+    if (params.text.trim().length === 0) return
     schedule("low", async () => {
       const ts = Date.now()
 

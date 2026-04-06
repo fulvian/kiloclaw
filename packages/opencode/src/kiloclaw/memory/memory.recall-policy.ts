@@ -22,11 +22,39 @@ const DEFAULT = {
   shadow: 0.4,
 } as const
 
+const PREF_HARD_RECALL = [
+  /in\s+base\s+ai\s+miei\s+gusti/i,
+  /sulla\s+base\s+dei\s+miei\s+gusti/i,
+  /in\s+base\s+alle\s+mie\s+preferenze/i,
+  /based\s+on\s+my\s+tastes?/i,
+  /based\s+on\s+my\s+preferences/i,
+  /what\s+i\s+like/i,
+]
+
 export namespace MemoryRecallPolicy {
   export async function evaluate(text: string): Promise<RecallEval> {
     const intent = await MemoryIntent.classify(text)
-    const boost = intent.kind === "explicit_recall" ? 0.18 : 0
+    const boost =
+      intent.kind === "explicit_recall"
+        ? 0.18
+        : intent.kind === "preference_reuse"
+          ? 0.16
+          : intent.kind === "continuation"
+            ? 0.1
+            : 0
     const score = clamp(intent.score + boost)
+
+    if (intent.kind === "preference_reuse" && PREF_HARD_RECALL.some((re) => re.test(text))) {
+      const out = {
+        decision: "recall",
+        confidence: Math.max(score, 0.72),
+        reasons: [...intent.reasons, "hard_preference_recall_pattern"],
+        intent,
+        thresholds: { ...DEFAULT },
+      } satisfies RecallEval
+      log.debug("recall policy evaluated", out)
+      return out
+    }
 
     if (!Flag.KILO_MEMORY_RECALL_POLICY_V1) {
       const decision = score >= DEFAULT.recall ? "recall" : "skip"

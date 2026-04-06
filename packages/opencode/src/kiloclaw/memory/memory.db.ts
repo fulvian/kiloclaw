@@ -76,6 +76,7 @@ export namespace MemoryDb {
 }
 
 let _db: ReturnType<typeof drizzle> | null = null
+let _path: string | null = null
 
 /**
  * SQL statements to create memory tables
@@ -450,7 +451,19 @@ export namespace MemoryDb {
       return
     }
 
-    const path = dbPath ?? MEMORY_DB_PATH
+    const path = dbPath ?? process.env["KILO_MEMORY_DB_PATH"] ?? MEMORY_DB_PATH
+
+    if (_db) {
+      if (_path === path) {
+        log.debug("memory database already initialized")
+        return
+      }
+      log.warn("memory database already initialized with a different path", {
+        existingPath: _path,
+        requestedPath: path,
+      })
+      return
+    }
 
     log.info("initializing memory database", { path })
 
@@ -479,6 +492,7 @@ export namespace MemoryDb {
     // Initialize repository
     initMemoryRepository(db)
     _db = db
+    _path = path
 
     log.info("memory database initialized successfully")
 
@@ -504,6 +518,7 @@ export namespace MemoryDb {
       // Drizzle doesn't have a close method for bun-sqlite
       // The underlying sqlite connection is managed by Bun
       _db = null
+      _path = null
       log.info("memory database closed")
     }
   }

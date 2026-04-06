@@ -39,6 +39,12 @@ const RECALL = [
   /history\s+of\s+(?:our|our\s+)?conversations/i,
   // Implicit references to memory/history
   /memoria/i,
+  /gust[oi]/i,
+  /preferenz/i,
+  /in\s+base\s+ai\s+miei\s+gusti/i,
+  /sulla\s+base\s+dei\s+miei\s+gusti/i,
+  /based\s+on\s+my\s+tastes?/i,
+  /based\s+on\s+my\s+preferences/i,
   /passato/i,
   /storico/i,
 ]
@@ -112,7 +118,7 @@ export async function createMemoryContextPlugin(_input: PluginInput): Promise<Ho
       const cur = msg.info.sessionID
       const currentDir = Instance.directory
       console.log("[MEMORY-PLUGIN] current directory:", currentDir)
-      const allSessions = [...Session.listGlobal({ directory: currentDir, roots: true, limit: 12 })]
+      const allSessions = [...Session.listGlobal({ roots: true, limit: 12 })]
       console.log("[MEMORY-PLUGIN] all sessions found:", allSessions.length)
       const items = allSessions.filter((s) => s.id !== cur).slice(0, 5)
       console.log("[MEMORY-PLUGIN] filtered sessions (excluding current):", items.length)
