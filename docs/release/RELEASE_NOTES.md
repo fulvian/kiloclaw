@@ -47,6 +47,15 @@ Kiloclaw 7.3.0 completes the **Memory Persistence Refoundation (ADR-005)** - ena
 
 **Net effect:** Router agent can now answer "what did we talk about in our last conversations?" by recovering context from persistent memory.
 
+### Hardening updates (2026-04-06)
+
+| Area                           | Update                                                                                                                                                                                             | Status |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| **Strict env gating**          | `KILOCLAW_STRICT_ENV=true` now blocks legacy prefixes `ARIA_`, `KILO_`, `OPENCODE_` in runtime/config paths                                                                                        | ✅     |
+| **Policy audit observability** | Service health includes `policy-audit-trail` check item for audit trail visibility                                                                                                                 | ✅     |
+| **CI regression subset**       | `.github/workflows/test.yml` includes targeted regression run for `test/kiloclaw/config-legacy-adapter.test.ts`, `test/kiloclaw/config-strict-env.test.ts`, `test/kiloclaw/service-health.test.ts` | ✅     |
+| **Verification snapshot**      | Full Kiloclaw suite result: **690 pass, 3 skip, 0 fail**                                                                                                                                           | ✅     |
+
 ---
 
 ## Migration from 7.2.0
@@ -309,5 +318,5 @@ See `docs/foundation/STABILIZZAZIONE_APRILE_2026.md` for consolidated infrastruc
 
 ---
 
-_Release Notes Version: 1.0.1_  
-_Generated: 2026-04-03_
+_Release Notes Version: 1.0.2_  
+_Generated: 2026-04-06_

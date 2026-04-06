@@ -1,7 +1,9 @@
 // Bootstrap - Initialize registries with skills and agencies
 // Phase 1: Knowledge Agency Implementation
+// Phase 8: Dynamic Multi-Level Retrieval SOTA 2026 - Lazy loading support
 
 import { Log } from "@/util/log"
+import { Flag } from "@/flag/flag"
 import { SkillRegistry } from "./registry/skill-registry"
 import { AgencyRegistry } from "./registry/agency-registry"
 import { FlexibleAgentRegistry } from "./registry/agent-registry"
@@ -9,6 +11,13 @@ import { ChainRegistry } from "./registry/chain-registry"
 import type { AgencyDefinition, SkillChain } from "./registry/types"
 import type { Skill } from "../skill"
 import type { SkillDefinition } from "./registry/types"
+import {
+  setLazyBootstrap,
+  ensureRegistryInitialized,
+  isRegistryInitialized,
+  getAllRegistryStatuses,
+  LazyLoader,
+} from "./lazy-registry"
 
 // Import all skills
 import { allSkills, knowledgeSkills, developmentSkills, nutritionSkills, weatherSkills } from "../skills"
@@ -139,13 +148,10 @@ const chainDefinitions: SkillChain[] = [
 
 let bootstrapped = false
 
-// Bootstrap function to initialize all registries
-export function bootstrapRegistries(): void {
-  if (bootstrapped) {
-    log.debug("registries already bootstrapped, skipping")
-    return
-  }
-
+/**
+ * Internal bootstrap function - registers all agencies, skills, agents, and chains
+ */
+function doBootstrap(): void {
   log.info("bootstrapping registries...")
 
   // 1. Register agencies
@@ -198,8 +204,6 @@ export function bootstrapRegistries(): void {
     }
   }
 
-  bootstrapped = true
-
   log.info("registries bootstrapped", {
     agencies: agencyDefinitions.length,
     skills: allSkills.length,
@@ -209,6 +213,28 @@ export function bootstrapRegistries(): void {
     agentsRegistered: FlexibleAgentRegistry.getAllAgents().length,
     chainsRegistered: ChainRegistry.getAllChains().length,
   })
+}
+
+// Bootstrap function to initialize all registries
+export function bootstrapRegistries(): void {
+  if (bootstrapped) {
+    log.debug("registries already bootstrapped, skipping")
+    return
+  }
+
+  doBootstrap()
+  bootstrapped = true
+}
+
+// Lazy bootstrap - only initializes when first accessed
+export function lazyBootstrapRegistries(): void {
+  // Register the bootstrap function with the lazy loader
+  setLazyBootstrap(doBootstrap)
+
+  // For backward compatibility, also mark as bootstrapped
+  // The actual initialization will happen on first access
+  bootstrapped = true
+  log.debug("lazy bootstrap registered, initialization deferred")
 }
 
 // Check if bootstrapped

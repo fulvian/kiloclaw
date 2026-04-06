@@ -151,17 +151,17 @@ export namespace MemoryState {
 
   /**
    * Get the database path for memory storage
-   * Uses .kilocode/memory.db relative to project root
+   * Uses .kiloclaw/memory.db relative to project root
    */
   function getMemoryDbPath(): string {
     // Use Instance.directory if available (project context)
     // Otherwise fall back to process.cwd()
     try {
       const dir = Instance.directory
-      return `${dir}/.kilocode/memory.db`
+      return `${dir}/.kiloclaw/memory.db`
     } catch {
       // Not in project context, use cwd
-      return `.kilocode/memory.db`
+      return `.kiloclaw/memory.db`
     }
   }
 }

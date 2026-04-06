@@ -99,6 +99,7 @@ export const PolicyContext = z.object({
   agentId: AgentId.optional(),
   intent: Intent.optional(),
   action: Action.optional(),
+  userApproved: z.boolean().optional(),
   correlationId: CorrelationId,
 })
 export type PolicyContext = z.infer<typeof PolicyContext>

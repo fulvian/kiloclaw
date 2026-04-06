@@ -82,6 +82,20 @@ export namespace Flag {
   // kilocode_change start
   export const KILOCLAW_KNOWLEDGE_FORCE_PROVIDER = process.env["KILOCLAW_KNOWLEDGE_FORCE_PROVIDER"]
   // kilocode_change end
+
+  // Routing Dynamic Multi-Level SOTA 2026
+  // kilocode_change start
+  export const KILO_ROUTING_DYNAMIC_ENABLED = !falsy("KILO_ROUTING_DYNAMIC_ENABLED")
+  export const KILO_ROUTING_SHADOW_ENABLED = truthy("KILO_ROUTING_SHADOW_ENABLED")
+  export const KILO_ROUTING_MANIFEST_ENABLED = truthy("KILO_ROUTING_MANIFEST_ENABLED")
+  export const KILO_ROUTING_AGENCY_CONTEXT_ENABLED = truthy("KILO_ROUTING_AGENCY_CONTEXT_ENABLED")
+
+  // Performance tuning flags
+  export const KILO_ROUTING_LRU_ENABLED = !falsy("KILO_ROUTING_LRU_ENABLED")
+  export const KILO_ROUTING_CACHE_TTL_MS = number("KILO_ROUTING_CACHE_TTL_MS") ?? 60_000 // 1 minute default
+  export const KILO_ROUTING_CAPABILITY_CACHE_TTL_MS = number("KILO_ROUTING_CAPABILITY_CACHE_TTL_MS") ?? 300_000 // 5 minutes default
+  export const KILO_ROUTING_MANIFEST_CACHE_TTL_MS = number("KILO_ROUTING_MANIFEST_CACHE_TTL_MS") ?? 60_000 // 1 minute default
+  // kilocode_change end
 }
 
 // Dynamic getter for KILO_DISABLE_PROJECT_CONFIG

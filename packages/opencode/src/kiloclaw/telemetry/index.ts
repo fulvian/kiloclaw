@@ -106,3 +106,34 @@ export {
   DriftDetectedRateSchema,
   RollbackCountSchema,
 } from "./learning.metrics"
+
+// =============================================================================
+// Routing Metrics (L0-L3)
+// =============================================================================
+
+export {
+  RoutingMetrics,
+  RoutingLayer,
+  RoutingDecision,
+  Layer0DecisionSchema,
+  Layer1DecisionSchema,
+  Layer2DecisionSchema,
+  Layer3DecisionSchema,
+  PolicyDeniedSchema,
+  FallbackUsedSchema,
+  Layer0DecisionEvent,
+  Layer1DecisionEvent,
+  Layer2DecisionEvent,
+  Layer3DecisionEvent,
+  PolicyDeniedEvent,
+  FallbackUsedEvent,
+} from "./routing.metrics"
+
+export type {
+  Layer0Decision,
+  Layer1Decision,
+  Layer2Decision,
+  Layer3Decision,
+  PolicyDenied,
+  FallbackUsed,
+} from "./routing.metrics"

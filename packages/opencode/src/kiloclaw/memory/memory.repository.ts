@@ -71,6 +71,14 @@ export function initMemoryRepository(db: MemoryDb): void {
 }
 
 /**
+ * Dispose memory repository instance
+ */
+export function disposeMemoryRepository(): void {
+  _db = undefined
+  log.info("memory repository disposed")
+}
+
+/**
  * Get database instance
  */
 function db(): MemoryDb {
@@ -942,6 +950,24 @@ export const AuditRepo = {
       .where(eq(MemoryAuditLogTable.actor, actor))
       .orderBy(desc(MemoryAuditLogTable.ts))
       .limit(limit ?? 100)
+  },
+
+  async getByAction(action: string, limit?: number): Promise<MemoryAuditLog[]> {
+    return db()
+      .select()
+      .from(MemoryAuditLogTable)
+      .where(eq(MemoryAuditLogTable.action, action))
+      .orderBy(desc(MemoryAuditLogTable.ts))
+      .limit(limit ?? 100)
+  },
+
+  async countByAction(action: string): Promise<number> {
+    const rows = await db()
+      .select({ count: sql<number>`count(*)` })
+      .from(MemoryAuditLogTable)
+      .where(eq(MemoryAuditLogTable.action, action))
+    const first = rows[0]
+    return Number(first?.count ?? 0)
   },
 
   async verifyChain(): Promise<{ valid: boolean; errors: string[] }> {

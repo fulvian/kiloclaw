@@ -1,0 +1,39 @@
+{
+  "version": "1.0.0",
+  "manifests": {
+    "agencies": {
+      "agency-knowledge": "1.0.0",
+      "agency-development": "1.0.0",
+      "agency-nutrition": "1.0.0",
+      "agency-weather": "1.0.0"
+    },
+    "skills": {
+      "web-research": "1.0.0",
+      "literature-review": "1.0.0",
+      "fact-check": "1.0.0",
+      "synthesis": "1.0.0",
+      "critical-analysis": "1.0.0",
+      "code-review": "1.0.0",
+      "debugging": "1.0.0",
+      "tdd": "1.0.0",
+      "comparison": "1.0.0",
+      "document-analysis": "1.0.0",
+      "simplification": "1.0.0",
+      "diet-plan": "1.0.0",
+      "nutrition-analysis": "1.0.0",
+      "food-recall": "1.0.0",
+      "recipe-search": "1.0.0",
+      "weather-forecast": "1.0.0",
+      "weather-alerts": "1.0.0",
+      "weather-current": "1.0.0"
+    },
+    "agents": {},
+    "chains": {
+      "knowledge-research-synthesis": "1.0.0",
+      "knowledge-full-research": "1.0.0",
+      "knowledge-academic-review": "1.0.0",
+      "knowledge-verify-claim": "1.0.0"
+    }
+  },
+  "updatedAt": 1743974400000
+}

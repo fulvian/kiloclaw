@@ -395,6 +395,56 @@ describe("Kiloclaw Core Runtime", () => {
         expect(result.allowed).toBe(true)
       })
 
+      it("should deny high-risk policy action without approval", () => {
+        const orchestrator = CoreOrchestrator.create({})
+
+        const action: Action = {
+          type: "delete_resource",
+          target: "/critical",
+        }
+
+        const context: PolicyContext = {
+          agencyId: FIXTURES.agencyId,
+          correlationId: FIXTURES.correlationId,
+          intent: {
+            id: "intent-high-risk",
+            type: "cleanup",
+            description: "Delete production resources",
+            risk: "critical",
+          },
+          userApproved: false,
+        }
+
+        const result = orchestrator.enforcePolicy(action, context)
+        expect(result.allowed).toBe(false)
+        expect(result.requiresApproval).toBe(true)
+      })
+
+      it("should allow high-risk policy action with explicit approval", () => {
+        const orchestrator = CoreOrchestrator.create({})
+
+        const action: Action = {
+          type: "delete_resource",
+          target: "/critical",
+        }
+
+        const context: PolicyContext = {
+          agencyId: FIXTURES.agencyId,
+          correlationId: FIXTURES.correlationId,
+          intent: {
+            id: "intent-high-risk-approved",
+            type: "cleanup",
+            description: "Delete production resources",
+            risk: "critical",
+          },
+          userApproved: true,
+        }
+
+        const result = orchestrator.enforcePolicy(action, context)
+        expect(result.allowed).toBe(true)
+        expect(result.requiresApproval).toBe(true)
+      })
+
       it("should provide memory broker", () => {
         const orchestrator = CoreOrchestrator.create({})
         const memory = orchestrator.memory()

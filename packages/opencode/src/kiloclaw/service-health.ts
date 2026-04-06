@@ -14,6 +14,7 @@ import { access, mkdir } from "fs/promises"
 import { dirname } from "path"
 import { HealthCheck as LMStudioHealth } from "@/kiloclaw/lmstudio/health"
 import { AutoStart as LMStudioAutoStart } from "@/kiloclaw/lmstudio/autostart"
+import { AuditRepo } from "@/kiloclaw/memory/memory.repository"
 
 const log = Log.create({ service: "kiloclaw.service.health" })
 
@@ -112,7 +113,8 @@ export namespace ServiceHealth {
     // Memory persistence uses SQLite (embedded in Bun) - no external service needed
     // Just verify the data directory is accessible
     try {
-      const dbPath = process.env["KILO_MEMORY_DB_PATH"] || ".kilocode/memory.db"
+      const dbPath =
+        process.env["KILOCLAW_MEMORY_DB_PATH"] || process.env["KILO_MEMORY_DB_PATH"] || ".kiloclaw/memory.db"
       const result = await checkPathAccessible(dbPath)
 
       if (result.status === "healthy") {
@@ -327,6 +329,33 @@ export namespace ServiceHealth {
   }
 
   /**
+   * Check policy audit trail health for high-impact actions
+   */
+  async function checkPolicyAuditTrail(): Promise<CheckResult> {
+    try {
+      const denied = await AuditRepo.countByAction("policy_denied")
+      const approved = await AuditRepo.countByAction("policy_approved")
+
+      return {
+        name: "policy-audit-trail",
+        status: "healthy",
+        message: `Policy audit counters available (denied=${denied}, approved=${approved})`,
+        canStartup: true,
+        requiresStartup: false,
+      }
+    } catch (err) {
+      return {
+        name: "policy-audit-trail",
+        status: "degraded",
+        message: "Policy audit trail unavailable",
+        error: String(err),
+        canStartup: true,
+        requiresStartup: false,
+      }
+    }
+  }
+
+  /**
    * Service descriptors - define all services to check
    */
   const services: ServiceDescriptor[] = [
@@ -354,6 +383,11 @@ export namespace ServiceHealth {
       name: "lmstudio-model",
       required: Flag.KILO_EXPERIMENTAL_MEMORY_V2,
       check: checkLMStudioModel,
+    },
+    {
+      name: "policy-audit-trail",
+      required: false,
+      check: checkPolicyAuditTrail,
     },
   ]
 

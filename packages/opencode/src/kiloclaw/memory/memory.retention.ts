@@ -278,15 +278,31 @@ export const MemoryRetention = {
   > {
     const stats: Record<string, any> = {}
 
-    const workingCount = await WorkingMemoryRepo.count(tenantId)
-    const episodicCount = await EpisodicMemoryRepo.count(tenantId)
-    const semanticCount = await SemanticMemoryRepo.count(tenantId)
-    const proceduralCount = await ProceduralMemoryRepo.count(tenantId)
+    const counts = await (async () => {
+      try {
+        const workingCount = await WorkingMemoryRepo.count(tenantId)
+        const episodicCount = await EpisodicMemoryRepo.count(tenantId)
+        const semanticCount = await SemanticMemoryRepo.count(tenantId)
+        const proceduralCount = await ProceduralMemoryRepo.count(tenantId)
+        return { workingCount, episodicCount, semanticCount, proceduralCount }
+      } catch (err) {
+        log.warn("memory stats requested before repository init", {
+          tenantId,
+          err: err instanceof Error ? err.message : String(err),
+        })
+        return {
+          workingCount: 0,
+          episodicCount: 0,
+          semanticCount: 0,
+          proceduralCount: 0,
+        }
+      }
+    })()
 
-    stats.working = { count: workingCount, policy: DEFAULT_RETENTION.working }
-    stats.episodic = { count: episodicCount, policy: DEFAULT_RETENTION.episodic }
-    stats.semantic = { count: semanticCount, policy: DEFAULT_RETENTION.semantic }
-    stats.procedural = { count: proceduralCount, policy: DEFAULT_RETENTION.procedural }
+    stats.working = { count: counts.workingCount, policy: DEFAULT_RETENTION.working }
+    stats.episodic = { count: counts.episodicCount, policy: DEFAULT_RETENTION.episodic }
+    stats.semantic = { count: counts.semanticCount, policy: DEFAULT_RETENTION.semantic }
+    stats.procedural = { count: counts.proceduralCount, policy: DEFAULT_RETENTION.procedural }
 
     return stats
   },

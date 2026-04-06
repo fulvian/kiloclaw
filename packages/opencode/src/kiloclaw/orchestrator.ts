@@ -4,9 +4,13 @@ import z from "zod"
 import { type Intent, type Action, type PolicyContext, type PolicyResult, type AgencyAssignment } from "./types"
 import { getOrchestratorMemory } from "./memory.adapter"
 import { Router } from "./router"
-import { CapabilityRouter } from "./agency/routing/capability-router"
+import { CapabilityRouter, CapabilityDeniedError } from "./agency/routing/capability-router"
+import { AgencyRegistry } from "./agency/registry/agency-registry"
 import { bootstrapRegistries } from "./agency/bootstrap"
 import type { RouteResult } from "./agency/routing/types"
+import { Flag } from "@/flag/flag"
+import { RoutingMetrics } from "./telemetry/routing.metrics"
+import { AuditRepo } from "./memory/memory.repository"
 
 // Memory broker interface
 export interface MemoryBroker {
@@ -54,11 +58,15 @@ export const CoreOrchestrator = {
 
     const orchestrator: CoreOrchestrator = {
       async routeIntent(intent: Intent): Promise<AgencyAssignment> {
+        const startTime = Date.now()
         log.info("routing intent", { intentId: intent.id, type: intent.type })
 
         try {
-          // Step 1: Use keyword-based Router to determine domain
+          // Step 1: Use keyword-based Router to determine domain (L0 - Agency Routing)
           const routingResult = await router.route(intent)
+          const agencyId = routingResult.agencyId
+
+          const l0LatencyMs = Date.now() - startTime
 
           log.debug("domain routed", {
             intentId: intent.id,
@@ -66,19 +74,35 @@ export const CoreOrchestrator = {
             confidence: routingResult.confidence,
           })
 
-          // Step 2: Map domain to agency ID
-          const agencyId = routingResult.agencyId
+          // Emit L0 event (agency routing decision)
+          if (Flag.KILO_ROUTING_SHADOW_ENABLED) {
+            RoutingMetrics.recordLayer0({
+              correlationId: intent.id,
+              intent: intent.description || intent.type,
+              intentType: intent.type,
+              domain: routingResult.matchedDomain,
+              agencyId,
+              agencyDomain: routingResult.matchedDomain,
+              confidence: routingResult.confidence,
+              decision: "allowed",
+              reason: routingResult.reasoning,
+              latencyMs: l0LatencyMs,
+            })
+          }
 
-          // Step 3: Try capability-based routing via CapabilityRouter
+          // Step 2: Try capability-based routing via CapabilityRouter (L1 - Skill Discovery)
           let routeResult: RouteResult | null = null
+          const l1StartTime = Date.now()
+
           try {
             // Map intent risk to urgency (critical -> high)
             const urgency = intent.risk === "critical" ? "high" : intent.risk || "medium"
+            const capabilities = extractCapabilitiesFromIntent(intent)
 
             const taskIntent = {
               intent: intent.type,
               parameters: {
-                capabilities: extractCapabilitiesFromIntent(intent),
+                capabilities,
                 ...(intent.parameters || {}),
               },
               context: {
@@ -88,7 +112,9 @@ export const CoreOrchestrator = {
               },
             }
 
-            routeResult = CapabilityRouter.routeTask(taskIntent, routingResult.matchedDomain)
+            routeResult = CapabilityRouter.routeTask(taskIntent, agencyId)
+
+            const l1LatencyMs = Date.now() - l1StartTime
 
             log.debug("capability routed", {
               intentId: intent.id,
@@ -96,15 +122,74 @@ export const CoreOrchestrator = {
               routeTarget: routeResult.skill || routeResult.chain || routeResult.agent,
               confidence: routeResult.confidence,
             })
+
+            // Emit L1 event (skill/agent discovery)
+            if (Flag.KILO_ROUTING_SHADOW_ENABLED) {
+              RoutingMetrics.recordLayer1({
+                correlationId: intent.id,
+                agencyId,
+                capabilities,
+                skillsFound: routeResult.skill ? 1 : 0,
+                bestSkill: routeResult.skill,
+                bestSkillScore: routeResult.confidence,
+                decision: "allowed",
+                reason: routeResult.reason || `Route via ${routeResult.type}`,
+                latencyMs: l1LatencyMs,
+              })
+            }
           } catch (capabilityError) {
-            // Capability routing failed, fall back to domain-based routing
-            log.debug("capability routing failed, using domain fallback", {
-              intentId: intent.id,
-              error: capabilityError instanceof Error ? capabilityError.message : String(capabilityError),
-            })
+            const l1LatencyMs = Date.now() - l1StartTime
+
+            // Check if it was a policy denial
+            if (capabilityError instanceof CapabilityDeniedError) {
+              const agency = AgencyRegistry.getAgency(agencyId)
+              log.debug("capability routing denied by policy", {
+                intentId: intent.id,
+                capability: capabilityError.message,
+                agency: agencyId,
+              })
+
+              // Emit policy denied event
+              if (Flag.KILO_ROUTING_SHADOW_ENABLED) {
+                RoutingMetrics.recordPolicyDenied({
+                  correlationId: intent.id,
+                  agencyId,
+                  capability: capabilityError.message,
+                  policy: "deniedCapabilities",
+                  reason: capabilityError.message,
+                })
+              }
+
+              // Emit fallback event
+              RoutingMetrics.recordFallback({
+                correlationId: intent.id,
+                layer: "L1",
+                originalRoute: "capability",
+                fallbackRoute: "domain-fallback",
+                reason: `Policy denied: ${capabilityError.message}`,
+                latencyMs: l1LatencyMs,
+              })
+            } else {
+              log.debug("capability routing failed, using domain fallback", {
+                intentId: intent.id,
+                error: capabilityError instanceof Error ? capabilityError.message : String(capabilityError),
+              })
+
+              // Emit fallback event for non-policy errors
+              if (Flag.KILO_ROUTING_SHADOW_ENABLED) {
+                RoutingMetrics.recordFallback({
+                  correlationId: intent.id,
+                  layer: "L1",
+                  originalRoute: "capability",
+                  fallbackRoute: "domain-fallback",
+                  reason: capabilityError instanceof Error ? capabilityError.message : String(capabilityError),
+                  latencyMs: l1LatencyMs,
+                })
+              }
+            }
           }
 
-          // Step 4: Return agency assignment
+          // Step 3: Return agency assignment
           return {
             agencyId,
             confidence: routingResult.confidence,
@@ -113,10 +198,24 @@ export const CoreOrchestrator = {
               : routingResult.reasoning,
           }
         } catch (error) {
+          const totalLatencyMs = Date.now() - startTime
+
           log.error("routing failed, using fallback", {
             intentId: intent.id,
             error: error instanceof Error ? error.message : String(error),
           })
+
+          // Emit fallback event for complete routing failure
+          if (Flag.KILO_ROUTING_SHADOW_ENABLED) {
+            RoutingMetrics.recordFallback({
+              correlationId: intent.id,
+              layer: "L0",
+              originalRoute: "domain",
+              fallbackRoute: "default-domain",
+              reason: error instanceof Error ? error.message : String(error),
+              latencyMs: totalLatencyMs,
+            })
+          }
 
           // Fallback: return default agency based on domain keywords
           const domainFromType = inferDomainFromIntent(intent)
@@ -131,14 +230,102 @@ export const CoreOrchestrator = {
       enforcePolicy(action: Action, context: PolicyContext): PolicyResult {
         log.info("enforcing policy", { actionType: action.type, correlationId: context.correlationId })
 
-        // TODO: Implement full policy enforcement
-        // For now, allow most actions with basic checks
-        const highRiskActions = ["delete", "rm", "remove", "drop"]
-        const isHighRisk = highRiskActions.some((risk) => action.type.toLowerCase().includes(risk))
+        const risk = context.intent?.risk ?? "low"
+        const approval = context.userApproved ?? false
+        const highRiskActions = ["delete", "rm", "remove", "drop", "destroy", "truncate", "wipe"]
+        const hasHighRiskAction = highRiskActions.some((item) => action.type.toLowerCase().includes(item))
+        const hasNetwork = action.type.toLowerCase().includes("network") || action.type.toLowerCase().includes("http")
+
+        const requiresApproval = risk === "high" || risk === "critical" || hasHighRiskAction
+
+        if (requiresApproval && !approval) {
+          void AuditRepo.log({
+            id: crypto.randomUUID(),
+            actor: context.agentId ?? "system",
+            action: "policy_denied",
+            target_type: "policy",
+            target_id: action.type,
+            reason: "action requires explicit approval by policy",
+            correlation_id: context.correlationId,
+            previous_hash: "",
+            hash: "",
+            metadata_json: {
+              action,
+              agencyId: context.agencyId,
+              risk,
+              approval,
+            },
+            ts: Date.now(),
+            created_at: Date.now(),
+          }).catch((err) => {
+            log.warn("policy audit write failed", { err: err instanceof Error ? err.message : String(err) })
+          })
+
+          return {
+            allowed: false,
+            reason: "action requires explicit approval by policy",
+            requiresApproval: true,
+          }
+        }
+
+        if (hasNetwork && risk === "critical" && !approval) {
+          void AuditRepo.log({
+            id: crypto.randomUUID(),
+            actor: context.agentId ?? "system",
+            action: "policy_denied",
+            target_type: "policy",
+            target_id: action.type,
+            reason: "critical network action denied without approval",
+            correlation_id: context.correlationId,
+            previous_hash: "",
+            hash: "",
+            metadata_json: {
+              action,
+              agencyId: context.agencyId,
+              risk,
+              approval,
+            },
+            ts: Date.now(),
+            created_at: Date.now(),
+          }).catch((err) => {
+            log.warn("policy audit write failed", { err: err instanceof Error ? err.message : String(err) })
+          })
+
+          return {
+            allowed: false,
+            reason: "critical network action denied without approval",
+            requiresApproval: true,
+          }
+        }
+
+        if (requiresApproval) {
+          void AuditRepo.log({
+            id: crypto.randomUUID(),
+            actor: context.agentId ?? "system",
+            action: "policy_approved",
+            target_type: "policy",
+            target_id: action.type,
+            reason: "approved high-risk action",
+            correlation_id: context.correlationId,
+            previous_hash: "",
+            hash: "",
+            metadata_json: {
+              action,
+              agencyId: context.agencyId,
+              risk,
+              approval,
+            },
+            ts: Date.now(),
+            created_at: Date.now(),
+          }).catch((err) => {
+            log.warn("policy audit write failed", { err: err instanceof Error ? err.message : String(err) })
+          })
+        }
 
         return {
           allowed: true,
-          requiresApproval: isHighRisk,
+          reason: requiresApproval ? "approved high-risk action" : "policy checks passed",
+          requiresApproval,
         }
       },
 

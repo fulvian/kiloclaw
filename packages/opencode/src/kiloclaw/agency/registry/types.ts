@@ -3,8 +3,9 @@
 
 import z from "zod"
 
-// Re-export SemanticVersion for convenience
-export { type SemanticVersion } from "../../types"
+// kilocode_change start - removed SemanticVersion re-export to break circular dependency
+// The version field in schemas uses inline z.string().regex() validation
+// kilocode_change end
 
 // PermissionNext.Rule import for agent permissions
 import { PermissionNext } from "@/permission/next"

@@ -11,8 +11,60 @@ export { CatalogEntryType, type CatalogEntry } from "./catalog"
 export { type AgencyInfo } from "../agency"
 
 // Bootstrap
-export { bootstrapRegistries, isBootstrapped, getBootstrapStats } from "./bootstrap"
+export { bootstrapRegistries, isBootstrapped, getBootstrapStats, lazyBootstrapRegistries } from "./bootstrap"
 export { KeyPool, KeyManager, withKeyRotation, type RateLimitConfig, type ApiKeyState } from "./key-pool"
+
+// Lazy Registry (Phase 8: Dynamic Multi-Level Routing)
+export {
+  setLazyBootstrap,
+  ensureRegistryInitialized,
+  isRegistryInitialized,
+  getAllRegistryStatuses,
+  getRegistryStatus,
+  LazyLoader,
+} from "./lazy-registry"
+export type { RegistryStatus } from "./lazy-registry"
+
+// Routing Pipeline (Phase 8: Dynamic Multi-Level Routing)
+export {
+  RoutingPipeline,
+  type L0Result,
+  type L1Result,
+  type L2Result,
+  type L3Result,
+  type PipelineResult,
+} from "./routing/pipeline"
+
+// LRU Cache for Performance (Phase 8: PR-9 Performance Hardening)
+export {
+  LRUCache,
+  getRouterCache,
+  getCapabilityCache,
+  resetRouterCache,
+  resetCapabilityCache,
+} from "./routing/lru-cache"
+
+// Manifest Discovery (Phase 8: Dynamic Multi-Level Routing)
+export { ManifestLoader, type ManifestType } from "./manifests"
+export {
+  CompatibilityContractSchema,
+  ManifestHeaderSchema,
+  AgencyManifestSchema,
+  SkillManifestSchema,
+  AgentManifestSchema,
+  ChainManifestSchema,
+  ManifestIndexSchema,
+  isCompatible,
+  type CompatibilityContract,
+  type ManifestHeader,
+  type AgencyManifest,
+  type SkillManifest,
+  type AgentManifest,
+  type ChainManifest,
+  type ManifestIndex,
+  type ChainStepManifest,
+  type AgencyPoliciesManifest,
+} from "./manifests"
 
 // =============================================================================
 // DEPRECATED EXPORTS - Use new Flexible* types and registries instead

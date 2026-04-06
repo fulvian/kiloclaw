@@ -423,6 +423,85 @@ describe("CapabilityRouter", () => {
       expect(() => CapabilityRouter.routeTask(intent, "dev-agency")).toThrow(CapabilityDeniedError)
     })
 
+    test("routes_with_agency_id_for_policy_check", () => {
+      // This test verifies the bug fix: agencyId (not domain) is used for policy check
+      const agency = createAgency({
+        id: "knowledge-agency",
+        domain: "knowledge", // domain is "knowledge"
+        policies: {
+          allowedCapabilities: [],
+          deniedCapabilities: ["code"],
+          maxRetries: 3,
+          requiresApproval: false,
+          dataClassification: "internal",
+        },
+      })
+      AgencyRegistry.registerAgency(agency)
+
+      const skill = createSkill({
+        id: "code-gen",
+        capabilities: ["code", "generation"],
+      })
+      SkillRegistry.registerSkill(skill)
+
+      const intent = {
+        intent: "generate-code",
+        parameters: { capabilities: ["code"] },
+        context: { urgency: "medium" as const },
+      }
+
+      // Pass agencyId (not domain) - should throw because "code" is denied
+      expect(() => CapabilityRouter.routeTask(intent, "knowledge-agency")).toThrow(CapabilityDeniedError)
+    })
+
+    test("denied_capability_blocks_route_for_agency", () => {
+      // Verifies that denied capabilities correctly block routing for the specific agency
+      const restrictedAgency = createAgency({
+        id: "restricted-research",
+        domain: "restricted",
+        policies: {
+          allowedCapabilities: [],
+          deniedCapabilities: ["web", "external"],
+          maxRetries: 3,
+          requiresApproval: false,
+          dataClassification: "internal",
+        },
+      })
+      const openAgency = createAgency({
+        id: "open-research",
+        domain: "open",
+        policies: {
+          allowedCapabilities: [],
+          deniedCapabilities: [],
+          maxRetries: 3,
+          requiresApproval: false,
+          dataClassification: "internal",
+        },
+      })
+      AgencyRegistry.registerAgency(restrictedAgency)
+      AgencyRegistry.registerAgency(openAgency)
+
+      const webSkill = createSkill({
+        id: "web-search",
+        capabilities: ["web", "search"],
+      })
+      SkillRegistry.registerSkill(webSkill)
+
+      const intent = {
+        intent: "web-research",
+        parameters: { capabilities: ["web"] },
+        context: { urgency: "medium" as const },
+      }
+
+      // restricted-research has "web" denied - should throw
+      expect(() => CapabilityRouter.routeTask(intent, "restricted-research")).toThrow(CapabilityDeniedError)
+
+      // open-research has no denied capabilities - should succeed
+      const result = CapabilityRouter.routeTask(intent, "open-research")
+      expect(result.type).toBe("skill")
+      expect(result.skill).toBe("web-search")
+    })
+
     test("given agency context when route then respects agency policies", () => {
       const agency = createAgency({
         id: "dev-agency",

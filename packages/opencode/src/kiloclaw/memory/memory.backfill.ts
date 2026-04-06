@@ -19,7 +19,12 @@ import {
   ProceduralMemoryRepo,
   AuditRepo,
 } from "./memory.repository"
-import { workingMemory, episodicMemory, semanticMemory, proceduralMemory } from "./index.js"
+// kilocode_change start - direct imports to avoid circular dependency with barrel
+import { workingMemory } from "./working.js"
+import { episodicMemory } from "./episodic.js"
+import { semanticMemory } from "./semantic.js"
+import { proceduralMemory } from "./procedural.js"
+// kilocode_change end
 
 const log = Log.create({ service: "kiloclaw.memory.backfill" })
 

@@ -53,6 +53,7 @@ export { getOrchestratorMemory, writeEntry, readEntries, purgeEntry } from "./me
 
 // Service health check (ADR-005)
 export { ServiceHealth } from "./service-health.js"
+export { AuditRepo } from "./memory/memory.repository.js"
 
 // Skills (Wave 1 - Development and Knowledge agencies)
 export * from "./skills"

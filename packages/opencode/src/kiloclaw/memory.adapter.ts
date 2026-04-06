@@ -10,8 +10,15 @@
 import { Flag } from "@/flag/flag"
 import { MemoryBrokerV2 } from "./memory/memory.broker.v2"
 import { memoryBroker as legacyBroker } from "./memory/broker"
-import type { MemoryBroker } from "./orchestrator"
 import type { MemoryEntry, MemoryId, PurgeReason } from "./memory/types"
+
+// MemoryBroker interface - defined locally to avoid circular dependency with orchestrator
+export interface MemoryBroker {
+  read(key: string): Promise<unknown>
+  write(key: string, value: unknown): Promise<void>
+  delete(key: string): Promise<void>
+  list(prefix: string): Promise<string[]>
+}
 
 const store = new Map<string, unknown>()
 

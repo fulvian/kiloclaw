@@ -8,7 +8,7 @@ import { drizzle } from "drizzle-orm/bun-sqlite"
 import { migrate } from "drizzle-orm/bun-sqlite/migrator"
 import { Log } from "@/util/log"
 import { Flag } from "@/flag/flag"
-import { initMemoryRepository } from "./memory.repository.js"
+import { initMemoryRepository, disposeMemoryRepository } from "./memory.repository.js"
 import { MemoryRetention } from "./memory.retention.js"
 import { mkdir } from "fs/promises"
 import { dirname } from "path"
@@ -16,7 +16,7 @@ import { dirname } from "path"
 const log = Log.create({ service: "kiloclaw.memory.db" })
 
 // Memory database path
-const MEMORY_DB_PATH = ".kilocode/memory.db"
+const MEMORY_DB_PATH = ".kiloclaw/memory.db"
 
 // =============================================================================
 // Database Configuration (for PostgreSQL/SQLite abstraction)
@@ -77,6 +77,7 @@ export namespace MemoryDb {
 
 let _db: ReturnType<typeof drizzle> | null = null
 let _path: string | null = null
+let _sqlite: BunDatabase | null = null
 
 /**
  * SQL statements to create memory tables
@@ -451,7 +452,8 @@ export namespace MemoryDb {
       return
     }
 
-    const path = dbPath ?? process.env["KILO_MEMORY_DB_PATH"] ?? MEMORY_DB_PATH
+    const path =
+      dbPath ?? process.env["KILOCLAW_MEMORY_DB_PATH"] ?? process.env["KILO_MEMORY_DB_PATH"] ?? MEMORY_DB_PATH
 
     if (_db) {
       if (_path === path) {
@@ -491,6 +493,7 @@ export namespace MemoryDb {
 
     // Initialize repository
     initMemoryRepository(db)
+    _sqlite = sqlite
     _db = db
     _path = path
 
@@ -515,8 +518,11 @@ export namespace MemoryDb {
    */
   export function close(): void {
     if (_db) {
-      // Drizzle doesn't have a close method for bun-sqlite
-      // The underlying sqlite connection is managed by Bun
+      if (_sqlite) {
+        _sqlite.close()
+      }
+      disposeMemoryRepository()
+      _sqlite = null
       _db = null
       _path = null
       log.info("memory database closed")

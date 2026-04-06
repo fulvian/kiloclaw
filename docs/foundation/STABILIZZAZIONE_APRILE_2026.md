@@ -14,6 +14,8 @@ Risolto il blocco installazione Bun con configurazione PATH coerente per ambient
 
 Completato il parsing config env con prefisso `KILOCLAW_*` in modalità strict. Corretto il typo nel mapping della scheduler recovery policy.
 
+Abilitato il gating rigoroso con `KILOCLAW_STRICT_ENV=true`: in runtime/config path ora vengono bloccati i prefissi legacy `ARIA_`, `KILO_`, `OPENCODE_`.
+
 Resa persistente la memoria dell'orchestrator tra cicli operativi previsti. Sistemato il fallback del capability router per evitare errori su capability non risolte al primo match.
 
 ---
@@ -32,6 +34,16 @@ L'integrazione reale agent → skill è ora attiva nel flusso operativo standard
 ## Documenta verifiche
 
 Eseguito typecheck completo con esito positivo. Eseguiti test Kiloclaw totali con esito pass.
+
+Snapshot corrente di verifica: **690 pass, 3 skip, 0 fail** sulla suite Kiloclaw completa.
+
+Aggiunto subset di regressione in CI su `.github/workflows/test.yml` con:
+
+- `test/kiloclaw/config-legacy-adapter.test.ts`
+- `test/kiloclaw/config-strict-env.test.ts`
+- `test/kiloclaw/service-health.test.ts`
+
+La salute servizio include ora l'item osservabile `policy-audit-trail` per tracciare disponibilità dell'audit policy.
 
 Eseguito smoke test end-to-end su routing capability e persistenza memoria con esito pass. Nessuna regressione bloccante rilevata nella finestra di stabilizzazione.
 

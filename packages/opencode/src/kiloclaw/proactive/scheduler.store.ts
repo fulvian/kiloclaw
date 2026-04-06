@@ -5,6 +5,8 @@
 import { Log } from "@/util/log"
 import z from "zod"
 import { Database as BunDatabase } from "bun:sqlite"
+import { mkdirSync } from "node:fs"
+import { dirname } from "node:path"
 
 // =============================================================================
 // Schemas
@@ -156,7 +158,7 @@ CREATE INDEX IF NOT EXISTS proactive_dlq_retry_idx ON proactive_dlq(retry_at) WH
 // Database
 // =============================================================================
 
-const PROACTIVE_DB_PATH = ".kilocode/proactive.db"
+const PROACTIVE_DB_PATH = process.env["KILOCLAW_PROACTIVE_DB_PATH"] ?? ".kiloclaw/proactive.db"
 
 let _sqlite: BunDatabase | null = null
 let _dbInitialized = false
@@ -179,6 +181,7 @@ function initDb(): void {
   if (_dbInitialized) return
 
   try {
+    mkdirSync(dirname(PROACTIVE_DB_PATH), { recursive: true })
     _sqlite = new BunDatabase(PROACTIVE_DB_PATH, { create: true })
     _sqlite.run("PRAGMA journal_mode = WAL")
     _sqlite.run("PRAGMA foreign_keys = ON")

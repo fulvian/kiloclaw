@@ -4,86 +4,13 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "bun:test"
-import { tmpdir } from "../fixture/fixture"
-
-// Mock modules before importing - complete mock to avoid polluting module cache
-vi.mock("@/kiloclaw/memory/memory.repository", () => ({
-  FeedbackRepo: {
-    record: vi.fn().mockResolvedValue("fb_123"),
-    getByTenant: vi.fn().mockResolvedValue([]),
-    getByTarget: vi.fn().mockResolvedValue([]),
-    deleteByUser: vi.fn().mockResolvedValue(undefined),
-  },
-  UserProfileRepo: {
-    get: vi.fn().mockResolvedValue(null),
-    upsert: vi.fn().mockResolvedValue(undefined),
-  },
-  ProceduralMemoryRepo: {
-    get: vi.fn().mockResolvedValue({ id: "proc_1", usage_count: 10, success_rate: 80 }),
-    upsert: vi.fn().mockResolvedValue(undefined),
-    updateStats: vi.fn().mockResolvedValue(undefined),
-    incrementUsage: vi.fn().mockResolvedValue(undefined),
-    recordOutcome: vi.fn().mockResolvedValue(undefined),
-    delete: vi.fn().mockResolvedValue(undefined),
-    findByPattern: vi.fn().mockResolvedValue([]),
-    getStats: vi.fn().mockResolvedValue({ total_uses: 0, success_rate: 0 }),
-    count: vi.fn().mockResolvedValue(0),
-  },
-  SemanticMemoryRepo: {
-    getFact: vi.fn().mockResolvedValue({ id: "fact_1", confidence: 80 }),
-    updateFact: vi.fn().mockResolvedValue(undefined),
-    count: vi.fn().mockResolvedValue(0),
-    assertFact: vi.fn().mockResolvedValue("fact_mock_id"),
-    queryFacts: vi.fn().mockResolvedValue([]),
-    deleteFact: vi.fn().mockResolvedValue(undefined),
-    retractFact: vi.fn().mockResolvedValue(undefined),
-    storeVector: vi.fn().mockResolvedValue(undefined),
-    getVectors: vi.fn().mockResolvedValue([]),
-    similaritySearch: vi.fn().mockResolvedValue([]),
-    getById: vi.fn().mockResolvedValue(null),
-    getBySubject: vi.fn().mockResolvedValue([]),
-    getByPredicate: vi.fn().mockResolvedValue([]),
-    getByActor: vi.fn().mockResolvedValue([]),
-    getRecent: vi.fn().mockResolvedValue([]),
-    search: vi.fn().mockResolvedValue([]),
-    archive: vi.fn().mockResolvedValue(undefined),
-    countArchived: vi.fn().mockResolvedValue(0),
-  },
-  AuditRepo: {
-    log: vi.fn().mockResolvedValue("audit_123"),
-    getByTarget: vi.fn().mockResolvedValue([]),
-    getByActor: vi.fn().mockResolvedValue([]),
-    verifyChain: vi.fn().mockResolvedValue(true),
-  },
-  EpisodicMemoryRepo: {
-    save: vi.fn().mockResolvedValue("ep_123"),
-    getById: vi.fn().mockResolvedValue(null),
-    getByTenant: vi.fn().mockResolvedValue([]),
-    count: vi.fn().mockResolvedValue(0),
-    countEvents: vi.fn().mockResolvedValue(0),
-    getRecent: vi.fn().mockResolvedValue([]),
-    getBySession: vi.fn().mockResolvedValue([]),
-    archive: vi.fn().mockResolvedValue(undefined),
-    countArchived: vi.fn().mockResolvedValue(0),
-    delete: vi.fn().mockResolvedValue(undefined),
-    GC: vi.fn().mockResolvedValue(0),
-  },
-  WorkingMemoryRepo: {
-    get: vi.fn().mockResolvedValue(null),
-    set: vi.fn().mockResolvedValue(undefined),
-    delete: vi.fn().mockResolvedValue(undefined),
-    getMany: vi.fn().mockResolvedValue([]),
-    count: vi.fn().mockResolvedValue(0),
-    clear: vi.fn().mockResolvedValue(undefined),
-  },
-  GraphMemoryRepo: {
-    upsert: vi.fn().mockResolvedValue(undefined),
-    get: vi.fn().mockResolvedValue(null),
-    getNeighbors: vi.fn().mockResolvedValue([]),
-    delete: vi.fn().mockResolvedValue(undefined),
-    search: vi.fn().mockResolvedValue([]),
-  },
-}))
+import {
+  FeedbackRepo,
+  UserProfileRepo,
+  ProceduralMemoryRepo,
+  SemanticMemoryRepo,
+  AuditRepo,
+} from "@/kiloclaw/memory/memory.repository"
 
 import {
   FeedbackProcessor,
@@ -93,6 +20,42 @@ import {
   validateFeedbackEvent,
 } from "@/kiloclaw/feedback"
 import type { FeedbackEvent } from "@/kiloclaw/feedback"
+
+beforeEach(() => {
+  vi.clearAllMocks()
+
+  vi.spyOn(FeedbackRepo, "record").mockResolvedValue("fb_123")
+  vi.spyOn(FeedbackRepo, "getByTenant").mockResolvedValue([])
+  vi.spyOn(FeedbackRepo, "getByTarget").mockResolvedValue([])
+  vi.spyOn(FeedbackRepo, "deleteByUser").mockResolvedValue(0)
+
+  vi.spyOn(UserProfileRepo, "get").mockResolvedValue(null)
+  vi.spyOn(UserProfileRepo, "upsert").mockResolvedValue(undefined)
+
+  vi.spyOn(ProceduralMemoryRepo, "get").mockResolvedValue({ id: "proc_1", usage_count: 10, success_rate: 80 } as any)
+  vi.spyOn(ProceduralMemoryRepo, "updateStats").mockResolvedValue(undefined)
+  vi.spyOn(ProceduralMemoryRepo, "count").mockResolvedValue(0)
+
+  vi.spyOn(SemanticMemoryRepo, "getFact").mockResolvedValue({ id: "fact_1", confidence: 80 } as any)
+  vi.spyOn(SemanticMemoryRepo, "updateFact").mockResolvedValue(undefined)
+  vi.spyOn(SemanticMemoryRepo, "count").mockResolvedValue(0)
+  vi.spyOn(SemanticMemoryRepo, "assertFact").mockResolvedValue("fact_mock_id")
+  vi.spyOn(SemanticMemoryRepo, "queryFacts").mockResolvedValue([])
+  vi.spyOn(SemanticMemoryRepo, "deleteFact").mockResolvedValue(undefined)
+  vi.spyOn(SemanticMemoryRepo, "retractFact").mockResolvedValue(undefined)
+  vi.spyOn(SemanticMemoryRepo, "storeVector").mockResolvedValue("vec_mock_id")
+  vi.spyOn(SemanticMemoryRepo, "getVectors").mockResolvedValue([])
+  vi.spyOn(SemanticMemoryRepo, "similaritySearch").mockResolvedValue([])
+
+  vi.spyOn(AuditRepo, "log").mockResolvedValue("audit_123")
+  vi.spyOn(AuditRepo, "getByTarget").mockResolvedValue([])
+  vi.spyOn(AuditRepo, "getByActor").mockResolvedValue([])
+  vi.spyOn(AuditRepo, "verifyChain").mockResolvedValue({ valid: true, errors: [] })
+})
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
 
 // =============================================================================
 // Unit Tests for FeedbackProcessor
