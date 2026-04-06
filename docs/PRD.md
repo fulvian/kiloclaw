@@ -232,15 +232,25 @@ packages/opencode/src/kiloclaw/
 
 ### 6.3 External APIs (read-only, user must provide keys)
 
-| API            | Env Var                  | Purpose                              |
-| -------------- | ------------------------ | ------------------------------------ |
-| Tavily         | `TAVILY_API_KEY`         | Web search                           |
-| Brave          | `BRAVE_API_KEY`          | Web search                           |
-| Perplexity     | `PERPLEXITY_API_KEY`     | AI web research (requires user auth) |
-| PubMed/NCBI    | `PUBMED_API_KEY`         | Academic search                      |
-| OpenWeatherMap | `OPENWEATHERMAP_API_KEY` | Weather data                         |
-| USDA FoodData  | (free)                   | Nutrition database                   |
-| OpenFoodFacts  | (free)                   | Product nutrition                    |
+**API Key Rotation:** Multiple API keys per provider are supported via:
+
+- Indexed format: `TAVILY_API_KEY_1`, `TAVILY_API_KEY_2`, ... (up to 100)
+- Comma-separated: `TAVILY_API_KEYS=key1,key2,key3`
+- Legacy single key: `TAVILY_API_KEY`
+
+Keys are rotated round-robin with automatic failover on rate limits (429) and quota errors (4xx).
+After 3 consecutive errors, a key enters cooldown and the pool automatically uses the next available key.
+
+| API            | Env Var                         | Purpose                               |
+| -------------- | ------------------------------- | ------------------------------------- |
+| Tavily         | `TAVILY_API_KEY_N` (up to 8)    | Web search (key rotation supported)   |
+| Brave          | `BRAVE_API_KEY`                 | Web search                            |
+| Firecrawl      | `FIRECRAWL_API_KEY_N` (up to 6) | Web scraping (key rotation supported) |
+| Perplexity     | `PERPLEXITY_API_KEY`            | AI web research (requires user auth)  |
+| PubMed/NCBI    | `PUBMED_API_KEY`                | Academic search                       |
+| OpenWeatherMap | `OPENWEATHERMAP_API_KEY`        | Weather data                          |
+| USDA FoodData  | (free)                          | Nutrition database                    |
+| OpenFoodFacts  | (free)                          | Product nutrition                     |
 
 ---
 

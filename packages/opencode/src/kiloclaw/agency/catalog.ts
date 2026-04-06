@@ -117,17 +117,30 @@ function createKeyedProvider(options: KeyedProviderOptions): Provider {
         }
 
         if (!response.ok) {
-          pool.markError(keyState.key, `HTTP ${response.status}`)
-          throw new Error(`${name} API error: ${response.status}`)
+          const status = response.status
+          // Mark key as errored (after 3 consecutive errors it goes to cooldown)
+          pool.markError(keyState.key, `HTTP ${status}`)
+          // Retry with next key for rate limits (429) or quota errors (4xx)
+          // Non-retryable: 401 (auth), 403 (forbidden), 500+ (server error)
+          if (status === 429 || (status >= 400 && status < 500)) {
+            return this.search(query) // Try next key
+          }
+          throw new Error(`${name} API error: ${status}`)
         }
 
         pool.markSuccess(keyState.key)
         const data = await response.json()
         return parseResults(data)
       } catch (error: any) {
-        if (error?.status === 429) {
+        const status = error?.status
+        if (status === 429) {
           const retryAfter = error?.headers?.get?.("retry-after")
           pool.markRateLimited(keyState.key, retryAfter ? parseInt(retryAfter, 10) : undefined)
+          return this.search(query) // Try next key
+        }
+        // For network errors or non-429 HTTP errors, mark error and retry
+        if (status && status >= 400 && status < 500) {
+          pool.markError(keyState.key, error?.message || String(error))
           return this.search(query) // Try next key
         }
         pool.markError(keyState.key, error?.message || String(error))
@@ -152,8 +165,12 @@ function createKeyedProvider(options: KeyedProviderOptions): Provider {
         }
 
         if (!response.ok) {
-          pool.markError(keyState.key, `HTTP ${response.status}`)
-          throw new Error(`${name} extract error: ${response.status}`)
+          const status = response.status
+          pool.markError(keyState.key, `HTTP ${status}`)
+          if (status === 429 || (status >= 400 && status < 500)) {
+            return this.extract ? this.extract(urls, query) : []
+          }
+          throw new Error(`${name} extract error: ${status}`)
         }
 
         pool.markSuccess(keyState.key)
@@ -161,12 +178,17 @@ function createKeyedProvider(options: KeyedProviderOptions): Provider {
         return (data.results ?? []).map((r: any) => ({
           url: r.url,
           title: r.title,
-          content: r.raw_content ?? r.content ?? "",
+          content: r.raw_content ?? r.content ?? r.markdown ?? r.text ?? "",
           publishedAt: r.published_date,
         }))
       } catch (error: any) {
-        if (error?.status === 429) {
+        const status = error?.status
+        if (status === 429) {
           pool.markRateLimited(keyState.key)
+          return this.extract ? this.extract(urls, query) : []
+        }
+        if (status && status >= 400 && status < 500) {
+          pool.markError(keyState.key, error?.message || String(error))
           return this.extract ? this.extract(urls, query) : []
         }
         pool.markError(keyState.key, error?.message || String(error))
@@ -378,72 +400,44 @@ export class AgencyCatalog {
 
   private bootstrapKnowledgeProviders(): void {
     // Tavily - primary web search
-    this.registerProvider({
-      name: "tavily",
-      agency: "knowledge",
-      async search(query: SearchQuery): Promise<SearchResult[]> {
-        const apiKey = process.env.TAVILY_API_KEY
-        if (!apiKey) {
-          throw new Error("TAVILY_API_KEY not configured")
-        }
-
-        const response = await fetch("https://api.tavily.com/search", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            query: query.query,
-            search_depth: "basic",
-            max_results: query.limit ?? 10,
+    this.registerProvider(
+      createKeyedProvider({
+        name: "tavily",
+        agency: "knowledge",
+        rateLimit: DEFAULT_RATE_LIMITS.tavily ?? { requestsPerMinute: 15, requestsPerDay: 500, retryAfterMs: 60000 },
+        search: (query, apiKey) =>
+          fetch("https://api.tavily.com/search", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${apiKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              query: query.query,
+              search_depth: "basic",
+              max_results: query.limit ?? 10,
+            }),
           }),
-        })
-
-        if (!response.ok) {
-          throw new Error(`Tavily API error: ${response.status}`)
-        }
-
-        const data = await response.json()
-        return (data.results ?? []).map((r: any) => ({
-          title: r.title,
-          url: r.url,
-          description: r.content,
-          publishedAt: r.published_date,
-          provider: "tavily",
-          score: r.score,
-        }))
-      },
-      async extract(urls: string[], query: string): Promise<ExtractedContent[]> {
-        const apiKey = process.env.TAVILY_API_KEY
-        if (!apiKey) throw new Error("TAVILY_API_KEY not configured")
-
-        const response = await fetch("https://api.tavily.com/extract", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ urls, query }),
-        })
-
-        const data = await response.json()
-        return (data.results ?? []).map((r: any) => ({
-          url: r.url,
-          title: r.title,
-          content: r.raw_content ?? r.content,
-          publishedAt: r.published_date,
-        }))
-      },
-      async health(): Promise<boolean> {
-        try {
-          await this.search({ query: "health", limit: 1 })
-          return true
-        } catch {
-          return false
-        }
-      },
-    })
+        extract: (urls, query, apiKey) =>
+          fetch("https://api.tavily.com/extract", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${apiKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ urls, query }),
+          }),
+        parseResults: (data) =>
+          (data.results ?? []).map((r: any) => ({
+            title: r.title,
+            url: r.url,
+            description: r.content,
+            publishedAt: r.published_date,
+            provider: "tavily",
+            score: r.score,
+          })),
+      }),
+    )
 
     // Brave Search
     this.registerProvider({
@@ -798,151 +792,46 @@ export class AgencyCatalog {
       },
     })
 
-    // Firecrawl - web scraping and crawling (has multiple API keys for rotation)
-    this.registerProvider({
-      name: "firecrawl",
-      agency: "knowledge",
-      async search(query: SearchQuery): Promise<SearchResult[]> {
-        const keyManager = KeyManager.getInstance()
-        const pool = keyManager.getPool("FIRECRAWL")
-        const keyState = pool.getKey()
-
-        if (!keyState) {
-          throw new Error("No FIRECRAWL API keys available")
-        }
-
-        try {
-          // Firecrawl uses /v0/search endpoint
-          const response = await fetch("https://api.firecrawl.dev/v0/search", {
+    // Firecrawl - web scraping and crawling (managed by KeyPool, same rotation path as Tavily)
+    this.registerProvider(
+      createKeyedProvider({
+        name: "firecrawl",
+        agency: "knowledge",
+        rateLimit: DEFAULT_RATE_LIMITS.firecrawl ?? { requestsPerMinute: 20, requestsPerDay: 500, retryAfterMs: 60000 },
+        search: (query, apiKey) =>
+          fetch("https://api.firecrawl.dev/v0/search", {
             method: "POST",
             headers: {
-              Authorization: `Bearer ${keyState.key}`,
+              Authorization: `Bearer ${apiKey}`,
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
               query: query.query,
               limit: query.limit ?? 10,
             }),
-          })
-
-          if (response.status === 429) {
-            const retryAfter = response.headers.get("retry-after")
-            pool.markRateLimited(keyState.key, retryAfter ? parseInt(retryAfter, 10) : undefined)
-            // Try next key
-            return this.search(query)
-          }
-
-          if (!response.ok) {
-            pool.markError(keyState.key, `HTTP ${response.status}`)
-            throw new Error(`Firecrawl API error: ${response.status}`)
-          }
-
-          pool.markSuccess(keyState.key)
-          const data = await response.json()
-
-          return (data.data ?? []).map((r: any) => ({
+          }),
+        extract: (urls, query, apiKey) =>
+          fetch("https://api.firecrawl.dev/v0/scrape", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${apiKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              urls,
+              query,
+            }),
+          }),
+        parseResults: (data) =>
+          (data.data ?? []).map((r: any) => ({
             title: r.title || "No title",
             url: r.url,
             description: r.description || r.excerpt || "",
             publishedAt: r.metadata?.publishedAt,
             provider: "firecrawl",
-          }))
-        } catch (error: any) {
-          if (error?.status === 429) {
-            pool.markRateLimited(keyState.key)
-            return this.search(query)
-          }
-          pool.markError(keyState.key, error?.message || String(error))
-          throw error
-        }
-      },
-      async extract(urls: string[], extractionQuery: string): Promise<ExtractedContent[]> {
-        const keyManager = KeyManager.getInstance()
-        const pool = keyManager.getPool("FIRECRAWL")
-        const keyState = pool.getKey()
-
-        if (!keyState) {
-          throw new Error("No FIRECRAWL API keys available")
-        }
-
-        const doExtract = async (): Promise<ExtractedContent[]> => {
-          try {
-            const response = await fetch("https://api.firecrawl.dev/v0/scrape", {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${keyState.key}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                urls,
-                query: extractionQuery,
-              }),
-            })
-
-            if (response.status === 429) {
-              const retryAfter = response.headers.get("retry-after")
-              pool.markRateLimited(keyState.key, retryAfter ? parseInt(retryAfter, 10) : undefined)
-              return doExtract() // retry with potentially different key
-            }
-
-            if (!response.ok) {
-              pool.markError(keyState.key, `HTTP ${response.status}`)
-              throw new Error(`Firecrawl extract error: ${response.status}`)
-            }
-
-            pool.markSuccess(keyState.key)
-            const data = await response.json()
-
-            // Handle both single URL and batch responses
-            const results = Array.isArray(data.data) ? data.data : [data]
-            return results.map((r: any) => ({
-              url: r.url,
-              title: r.title || "",
-              content: r.content || "",
-              publishedAt: r.metadata?.publishedAt,
-            }))
-          } catch (error: any) {
-            if (error?.status === 429) {
-              pool.markRateLimited(keyState.key)
-              return doExtract() // retry with potentially different key
-            }
-            pool.markError(keyState.key, error?.message || String(error))
-            throw error
-          }
-        }
-
-        return doExtract()
-      },
-      async health(): Promise<boolean> {
-        try {
-          const keyManager = KeyManager.getInstance()
-          const pool = keyManager.getPool("FIRECRAWL")
-          const keyState = pool.getKey()
-          if (!keyState) return false
-
-          const response = await fetch("https://api.firecrawl.dev/v0/search", {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${keyState.key}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ query: "health", limit: 1 }),
-          })
-
-          if (response.ok) {
-            pool.markSuccess(keyState.key)
-          } else if (response.status === 429) {
-            pool.markRateLimited(keyState.key)
-          } else {
-            pool.markError(keyState.key, `HTTP ${response.status}`)
-          }
-
-          return response.ok
-        } catch {
-          return false
-        }
-      },
-    })
+          })),
+      }),
+    )
 
     this.log.debug("knowledge providers bootstrapped", { count: this.listProviders("knowledge").length })
   }
