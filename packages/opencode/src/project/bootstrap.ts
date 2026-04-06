@@ -51,7 +51,7 @@ export async function InstanceBootstrap() {
         // Instance.directory not available yet, use current working directory
         dbBasePath = process.cwd()
       }
-      const dbPath = `${dbBasePath}/.kilocode/memory.db`
+      const dbPath = `${dbBasePath}/.kiloclaw/memory.db`
       await MemoryDb.init(dbPath)
       Log.Default.info("memory persistence initialized", { dbPath })
     } catch (err) {

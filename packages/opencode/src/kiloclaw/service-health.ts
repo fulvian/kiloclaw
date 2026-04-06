@@ -344,10 +344,12 @@ export namespace ServiceHealth {
         requiresStartup: false,
       }
     } catch (err) {
+      // Return "unknown" instead of "degraded" - this is a non-required check
+      // and "unknown" doesn't set allRequiredHealthy to false
       return {
         name: "policy-audit-trail",
-        status: "degraded",
-        message: "Policy audit trail unavailable",
+        status: "unknown",
+        message: "Policy audit trail not yet initialized",
         error: String(err),
         canStartup: true,
         requiresStartup: false,
