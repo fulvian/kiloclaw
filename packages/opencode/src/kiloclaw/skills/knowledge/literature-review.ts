@@ -2,6 +2,7 @@ import { Log } from "@/util/log"
 import { Skill } from "../../skill"
 import type { SkillContext } from "../../skill"
 import { SkillId } from "../../types"
+import { getCatalog, type SearchResult } from "../../agency/catalog"
 
 // Academic paper type
 export interface Paper {
@@ -26,86 +27,236 @@ export interface LiteratureReviewOutput {
   papers: Paper[]
   summary: string
   totalFound: number
+  providersUsed: string[]
 }
 
-// Mock academic paper database (in production, this would integrate with arXiv, PubMed, etc.)
-function searchAcademicPapers(topic: string, maxCount: number): Paper[] {
-  // This is a mock implementation that returns placeholder results
-  // In production, this would call actual academic APIs (arXiv, PubMed, Google Scholar)
+// Academic providers priority order
+const ACADEMIC_PROVIDERS = ["arxiv", "pubmed", "semanticscholar", "crossref"]
 
-  const mockPapers: Paper[] = [
-    {
-      title: `Advances in ${topic}: A Comprehensive Survey`,
-      authors: ["Smith, J.", "Johnson, A.", "Williams, B."],
-      abstract: `This paper provides a comprehensive survey of recent advances in ${topic}, covering theoretical foundations, practical applications, and future research directions. We review over 100 relevant publications and provide a taxonomy of current approaches.`,
-      year: 2024,
-      journal: "Journal of Computer Science",
-      doi: "10.1234/jcs.2024.1234",
-      citations: 156,
-      url: "https://arxiv.org/abs/2401.12345",
-    },
-    {
-      title: `Deep Learning for ${topic}: Methods and Applications`,
-      authors: ["Chen, L.", "Brown, M.", "Davis, K."],
-      abstract: `We present novel deep learning methods applied to ${topic} that achieve state-of-the-art results on multiple benchmarks. Our approach combines transformer architectures with domain-specific optimizations.`,
-      year: 2024,
-      journal: "Nature Machine Intelligence",
-      doi: "10.1038/s42256-024-00789-1",
-      citations: 89,
-      url: "https://arxiv.org/abs/2402.23456",
-    },
-    {
-      title: `A Systematic Review of ${topic} Techniques`,
-      authors: ["Garcia, R.", "Martinez, E.", "Rodriguez, F."],
-      abstract: `This systematic review examines existing techniques for ${topic}, analyzing their strengths, limitations, and applicability across different domains. We identify key gaps in current research and propose future directions.`,
-      year: 2023,
-      journal: "ACM Computing Surveys",
-      doi: "10.1145/3485123.3485124",
-      citations: 234,
-      url: "https://dl.acm.org/10.1145/3485123",
-    },
-    {
-      title: `Scalable Algorithms for ${topic} at Large Scale`,
-      authors: ["Lee, S.", "Park, J.", "Kim, H."],
-      abstract: `We propose scalable algorithms for processing ${topic} at web scale. Our methods demonstrate linear time complexity while maintaining high accuracy across distributed computing environments.`,
-      year: 2023,
-      journal: "Proceedings of VLDB",
-      doi: "10.14778/3587555.3587556",
-      citations: 67,
-      url: "https://www.vldb.org/2023/paper1.pdf",
-    },
-    {
-      title: `${topic}: From Theory to Practice`,
-      authors: ["Anderson, P.", "Taylor, N.", "Wilson, C."],
-      abstract: `This paper bridges the gap between theoretical foundations and practical implementations of ${topic}. We present case studies from industry applications and derive best practices for practitioners.`,
-      year: 2022,
-      journal: "IEEE Transactions on Knowledge and Data Engineering",
-      doi: "10.1109/TKDE.2022.3189012",
-      citations: 312,
-      url: "https://ieeexplore.ieee.org/document/9876543",
-    },
-  ]
+// Parse arXiv XML entry to Paper
+function parseArXivEntry(xml: string): Paper | null {
+  const titleMatch = /<title>([\s\S]*?)<\/title>/.exec(xml)
+  const summaryMatch = /<summary>([\s\S]*?)<\/summary>/.exec(xml)
+  const idMatch = /<id>([\s\S]*?)<\/id>/.exec(xml)
+  const publishedMatch = /<published>([\s\S]*?)<\/published>/.exec(xml)
+  const authorMatches = [...xml.matchAll(/<author>[\s\S]*?<name>([\s\S]*?)<\/name>[\s\S]*?<\/author>/g)]
 
-  return mockPapers.slice(0, maxCount)
+  if (!titleMatch || !idMatch) return null
+
+  const title = titleMatch[1].replace(/\s+/g, " ").trim()
+  const url = idMatch[1].trim()
+  const published = publishedMatch?.[1]?.trim() || ""
+  const year = published ? new Date(published).getFullYear() : 0
+  const abstractText = summaryMatch?.[1]?.replace(/\s+/g, " ").trim().slice(0, 500) || ""
+  const authors = authorMatches.map((m) => m[1]).filter(Boolean)
+
+  return {
+    title,
+    authors: authors.length > 0 ? authors : ["Unknown"],
+    abstract: abstractText,
+    year,
+    url,
+  }
+}
+
+// Search arXiv directly
+async function searchArXiv(topic: string, maxCount: number): Promise<Paper[]> {
+  const params = new URLSearchParams({
+    search_query: `all:${topic}`,
+    start: "0",
+    max_results: String(maxCount),
+    sortBy: "relevance",
+  })
+
+  const response = await fetch(`https://export.arxiv.org/api/query?${params}`)
+  const text = await response.text()
+
+  const papers: Paper[] = []
+  const entryRegex = /<entry>([\s\S]*?)<\/entry>/g
+  let match
+
+  while ((match = entryRegex.exec(text)) !== null && papers.length < maxCount) {
+    const paper = parseArXivEntry(match[1])
+    if (paper) {
+      papers.push(paper)
+    }
+  }
+
+  return papers
+}
+
+// Search PubMed directly
+async function searchPubMed(topic: string, maxCount: number): Promise<Paper[]> {
+  const baseUrl = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
+
+  // Search for IDs
+  const searchParams = new URLSearchParams({
+    db: "pubmed",
+    term: topic,
+    retmax: String(maxCount),
+    retmode: "json",
+  })
+
+  const searchRes = await fetch(`${baseUrl}/esearch.fcgi?${searchParams}`)
+  const searchData = await searchRes.json()
+  const ids = searchData.esearchresult?.idlist ?? []
+
+  if (ids.length === 0) return []
+
+  // Fetch details
+  const fetchParams = new URLSearchParams({
+    db: "pubmed",
+    id: ids.join(","),
+    retmode: "xml",
+    rettype: "abstract",
+  })
+
+  const fetchRes = await fetch(`${baseUrl}/efetch.fcgi?${fetchParams}`)
+  const xmlText = await fetchRes.text()
+
+  const papers: Paper[] = []
+  const articleRegex = /<PubmedArticle>[\s\S]*?<\/PubmedArticle>/g
+  let match
+
+  while ((match = articleRegex.exec(xmlText)) !== null) {
+    const article = match[0]
+
+    const titleMatch = /<ArticleTitle>([\s\S]*?)<\/ArticleTitle>/.exec(article)
+    const abstractMatch = /<AbstractText[^>]*>([\s\S]*?)<\/AbstractText>/.exec(article)
+    const pmidMatch = /<PMID[^>]*>([\s\S]*?)<\/PMID>/.exec(article)
+    const pubDateMatch = /<PubDate>[\s\S]*?<Year>([\s\S]*?)<\/Year>[\s\S]*?<\/PubDate>/.exec(article)
+    const authorMatches = [
+      ...article.matchAll(/<Author[^>]*>[\s\S]*?<LastName>([\s\S]*?)<\/LastName>[\s\S]*?<\/Author>/g),
+    ]
+
+    if (titleMatch && pmidMatch) {
+      const title = titleMatch[1].replace(/<[^>]*>/g, "").trim()
+      const abstract =
+        abstractMatch?.[1]
+          ?.replace(/<[^>]*>/g, "")
+          .replace(/\s+/g, " ")
+          .trim() || ""
+      const url = `https://pubmed.ncbi.nlm.nih.gov/${pmidMatch[1].trim()}/`
+      const year = pubDateMatch?.[1] ? parseInt(pubDateMatch[1]) : 0
+      const authors = authorMatches.map((m) => m[1]).filter(Boolean)
+
+      papers.push({
+        title,
+        authors: authors.length > 0 ? authors : ["Unknown"],
+        abstract: abstract.slice(0, 500),
+        year,
+        url,
+      })
+    }
+  }
+
+  return papers
+}
+
+// Search CrossRef directly
+async function searchCrossRef(topic: string, maxCount: number): Promise<Paper[]> {
+  const params = new URLSearchParams({
+    query: topic,
+    rows: String(maxCount),
+  })
+
+  const response = await fetch(`https://api.crossref.org/works?${params}`)
+  const data = await response.json()
+
+  const papers: Paper[] = []
+
+  for (const item of data.message?.items ?? []) {
+    const title = item.title?.[0] || "Unknown"
+    const url = item.URL || (item.DOI ? `https://doi.org/${item.DOI}` : "")
+    const year = item.published?.["date-parts"]?.[0]?.[0] || 0
+    const authors = item.author?.map((a: any) => `${a.given || ""} ${a.family || ""}`.trim()) || []
+    const abstract = item.abstract?.replace(/<[^>]*>/g, "") || ""
+
+    papers.push({
+      title,
+      authors: authors.length > 0 ? authors : ["Unknown"],
+      abstract: abstract.slice(0, 500),
+      year,
+      url,
+      doi: item.DOI,
+    })
+  }
+
+  return papers
+}
+
+// Search academic papers using real providers
+async function searchAcademicPapers(
+  topic: string,
+  maxCount: number,
+): Promise<{ papers: Paper[]; providersUsed: string[] }> {
+  const allPapers: Paper[] = []
+  const providersUsed: string[] = []
+  const errors: string[] = []
+
+  // Try arXiv first (free, no API key needed)
+  try {
+    const arxivPapers = await searchArXiv(topic, maxCount)
+    if (arxivPapers.length > 0) {
+      allPapers.push(...arxivPapers)
+      providersUsed.push("arxiv")
+    }
+  } catch (err) {
+    errors.push(`arxiv: ${err instanceof Error ? err.message : String(err)}`)
+  }
+
+  // Try PubMed
+  try {
+    const pubmedPapers = await searchPubMed(topic, maxCount)
+    if (pubmedPapers.length > 0) {
+      allPapers.push(...pubmedPapers)
+      providersUsed.push("pubmed")
+    }
+  } catch (err) {
+    errors.push(`pubmed: ${err instanceof Error ? err.message : String(err)}`)
+  }
+
+  // Try CrossRef as fallback
+  try {
+    const crossrefPapers = await searchCrossRef(topic, maxCount)
+    if (crossrefPapers.length > 0) {
+      allPapers.push(...crossrefPapers)
+      providersUsed.push("crossref")
+    }
+  } catch (err) {
+    errors.push(`crossref: ${err instanceof Error ? err.message : String(err)}`)
+  }
+
+  // Deduplicate by URL
+  const seen = new Set<string>()
+  const uniquePapers = allPapers.filter((p) => {
+    if (seen.has(p.url)) return false
+    seen.add(p.url)
+    return true
+  })
+
+  // Sort by year descending
+  uniquePapers.sort((a, b) => b.year - a.year)
+
+  return {
+    papers: uniquePapers.slice(0, maxCount),
+    providersUsed,
+  }
 }
 
 // Generate summary
-function generateSummary(papers: Paper[], topic: string): string {
+function generateSummary(papers: Paper[], topic: string, providersUsed: string[]): string {
   if (papers.length === 0) {
-    return `No academic papers found for "${topic}".`
+    return `No academic papers found for "${topic}". Try different keywords or check API availability.`
   }
 
-  const years = papers.map((p) => p.year)
-  const yearRange = `${Math.min(...years)}-${Math.max(...years)}`
-  const totalCitations = papers.reduce((sum, p) => sum + (p.citations || 0), 0)
-  const avgCitations = Math.round(totalCitations / papers.length)
-
-  const journals = [...new Set(papers.map((p) => p.journal || "Unknown"))]
+  const years = papers.map((p) => p.year).filter((y) => y > 0)
+  const yearRange = years.length > 0 ? `${Math.min(...years)}-${Math.max(...years)}` : "unknown"
+  const providerStr = providersUsed.length > 0 ? ` via ${providersUsed.join(", ")}` : ""
 
   return (
-    `Found ${papers.length} academic papers on "${topic}" published between ${yearRange}. ` +
-    `Papers from ${journals.length} journals with average ${avgCitations} citations per paper. ` +
-    `Most cited: "${papers.sort((a, b) => (b.citations || 0) - (a.citations || 0))[0].title}"`
+    `Found ${papers.length} academic papers on "${topic}" published between ${yearRange}${providerStr}. ` +
+    `Papers cover theoretical foundations, methodologies, and applications in the field.`
   )
 }
 
@@ -142,6 +293,7 @@ export const LiteratureReviewSkill: Skill = {
       },
       summary: { type: "string", description: "Summary of literature review" },
       totalFound: { type: "number", description: "Total papers found" },
+      providersUsed: { type: "array", items: { type: "string" }, description: "Providers that returned results" },
     },
   },
   capabilities: ["paper_search", "summarization", "academic_research", "citation_analysis"],
@@ -159,23 +311,26 @@ export const LiteratureReviewSkill: Skill = {
         papers: [],
         summary: "No topic provided",
         totalFound: 0,
+        providersUsed: [],
       }
     }
 
     const maxCount = Math.min(Math.max(count || 5, 1), 20)
-    const papers = searchAcademicPapers(topic, maxCount)
-    const summary = generateSummary(papers, topic)
+    const { papers, providersUsed } = await searchAcademicPapers(topic, maxCount)
+    const summary = generateSummary(papers, topic, providersUsed)
 
     log.info("literature review completed", {
       correlationId: context.correlationId,
       topic,
       paperCount: papers.length,
+      providersUsed,
     })
 
     return {
       papers,
       summary,
       totalFound: papers.length,
+      providersUsed,
     }
   },
 }

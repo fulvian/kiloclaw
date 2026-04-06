@@ -77,6 +77,11 @@ export namespace Flag {
   }
 
   export const KILO_SESSION_RETRY_LIMIT = number("KILO_SESSION_RETRY_LIMIT")
+
+  // Knowledge agency settings
+  // kilocode_change start
+  export const KILOCLAW_KNOWLEDGE_FORCE_PROVIDER = process.env["KILOCLAW_KNOWLEDGE_FORCE_PROVIDER"]
+  // kilocode_change end
 }
 
 // Dynamic getter for KILO_DISABLE_PROJECT_CONFIG

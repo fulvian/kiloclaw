@@ -9,6 +9,9 @@ export {
 } from "./catalog"
 export { CatalogEntryType, type CatalogEntry } from "./catalog"
 export { type AgencyInfo } from "../agency"
+
+// Bootstrap
+export { bootstrapRegistries, isBootstrapped, getBootstrapStats } from "./bootstrap"
 export { KeyPool, KeyManager, withKeyRotation, type RateLimitConfig, type ApiKeyState } from "./key-pool"
 
 // =============================================================================
@@ -70,6 +73,17 @@ export { CapabilityRouterError, CapabilityDeniedError, NoMatchingCapabilityError
 
 // Phase 4: ChainComposer
 export { ChainComposer, ChainCompositionError } from "./routing/chain-composer"
+
+// Chain Executor
+export {
+  executeChain,
+  executeChainForCapabilities,
+  executeBestChain,
+  listChains,
+  getChain,
+  type ChainExecutionResult,
+  type ChainStepResult,
+} from "./chain-executor"
 
 // Phase 5: IntentClassifier
 export { IntentClassifier } from "./routing/intent-classifier"

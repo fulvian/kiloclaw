@@ -3,6 +3,7 @@ import { Tool } from "./tool"
 import DESCRIPTION from "./websearch.txt"
 import { abortAfterAny } from "../util/abort"
 import { getCatalog } from "../kiloclaw/agency/catalog"
+import { Flag } from "@/flag/flag"
 
 // Default number of results
 const DEFAULT_NUM_RESULTS = 8
@@ -16,9 +17,11 @@ export const WebSearchTool = Tool.define("websearch", async () => {
       query: z.string().describe("Websearch query"),
       numResults: z.number().optional().describe("Number of search results to return (default: 8)"),
       provider: z
-        .enum(["tavily", "firecrawl", "auto"])
+        .enum(["tavily", "firecrawl", "ddg", "auto"])
         .optional()
-        .describe("Search provider to use: 'tavily', 'firecrawl', or 'auto' (default: auto - uses first available)"),
+        .describe(
+          "Search provider to use: 'tavily', 'firecrawl', 'ddg', or 'auto' (default: auto - uses first available)",
+        ),
     }),
     async execute(params, ctx) {
       await ctx.ask({
@@ -40,9 +43,12 @@ export const WebSearchTool = Tool.define("websearch", async () => {
         const catalog = getCatalog()
         const providers = catalog.listProviders("knowledge")
 
-        // Priority order for search providers
-        const providerPriority = ["tavily", "firecrawl", "brave", "ddg"]
-        const selectedProvider = params.provider || "auto"
+        // Priority order for search providers (ddg is free fallback)
+        const providerPriority = ["tavily", "firecrawl", "brave", "ddg", "wikipedia"]
+
+        // Check for forced provider via environment variable
+        const forcedProvider = Flag.KILOCLAW_KNOWLEDGE_FORCE_PROVIDER
+        const selectedProvider = forcedProvider || params.provider || "auto"
 
         // Sort providers by priority
         const sortedProviders = providers.sort((a, b) => {
@@ -59,6 +65,7 @@ export const WebSearchTool = Tool.define("websearch", async () => {
         let lastError: Error | null = null
         let results: any[] = []
         let providerUsed = ""
+        const errors: string[] = []
 
         // Try providers in order
         for (const prov of sortedProviders) {
@@ -76,6 +83,8 @@ export const WebSearchTool = Tool.define("websearch", async () => {
               break
             }
           } catch (err) {
+            const errMsg = err instanceof Error ? err.message : String(err)
+            errors.push(`${prov.name}: ${errMsg}`)
             lastError = err instanceof Error ? err : new Error(String(err))
             // Continue to next provider
           }
@@ -84,11 +93,14 @@ export const WebSearchTool = Tool.define("websearch", async () => {
         clearTimeout()
 
         if (results.length === 0) {
-          const errorMsg = lastError ? ` (last error: ${lastError.message})` : ""
+          const errorDetails = errors.length > 0 ? `\nProvider errors: ${errors.join("; ")}` : ""
+          const hint = errors.some((e) => e.includes("No available API keys"))
+            ? "\nHint: Set TAVILY_API_KEY, FIRECRAWL_API_KEY, or BRAVE_API_KEY for better results. DDG is available as a free fallback."
+            : ""
           return {
-            output: `No search results found. Please try a different query.${errorMsg}`,
+            output: `No search results found. Please try a different query.${errorDetails}${hint}`,
             title: `Web search: ${params.query}`,
-            metadata: { provider: "none" },
+            metadata: { provider: "none", errors },
           }
         }
 
