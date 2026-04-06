@@ -1,9 +1,15 @@
 # Kiloclaw PRD — Agency-Based AI Agent System
 
-**Version:** 1.0  
-**Date:** 2026-04-03  
-**Status:** Draft  
-**Reference:** ARIA source at `/home/fulvio/coding/aria`, Blueprint at `docs/foundation/KILOCLAW_BLUEPRINT.md`
+**Version:** 1.1  
+**Date:** 2026-04-06  
+**Status:** In Progress
+
+### Changelog (v1.1)
+
+- **2026-04-06**: WebSearchTool refactored to use catalog providers (Tavily/Firecrawl) instead of Exa API
+- **2026-04-06**: API key rotation implemented for Tavily (8 keys) and Firecrawl (6 unique keys)
+- **2026-04-03**: Initial draft  
+  **Reference:** ARIA source at `/home/fulvio/coding/aria`, Blueprint at `docs/foundation/KILOCLAW_BLUEPRINT.md`
 
 ---
 
@@ -80,19 +86,19 @@ Port the **agency-based architecture** from ARIA (Go) to TypeScript for Kiloclaw
 
 ### 3.4 Tools / Providers
 
-| ID    | Requirement                                                   | Priority |
-| ----- | ------------------------------------------------------------- | -------- |
-| F4.1  | Tavily search provider (tavily-search, tavily-extract)        | MUST     |
-| F4.2  | Brave search provider (brave-web-search, brave-news-search)   | MUST     |
-| F4.3  | DuckDuckGo search provider                                    | MUST     |
-| F4.4  | Wikipedia provider                                            | MUST     |
-| F4.5  | Academic providers: PubMed, arXiv, Semantic Scholar, CrossRef | MUST     |
-| F4.6  | News providers: NewsData, GNews                               | MUST     |
-| F4.7  | Perplexity API integration (requires user auth)               | SHOULD   |
-| F4.8  | USDA nutrition database                                       | MUST     |
-| F4.9  | OpenFoodFacts                                                 | MUST     |
-| F4.10 | Weather API                                                   | MUST     |
-| F4.11 | Tool governance: risk scoring, audit trail                    | SHOULD   |
+| ID    | Requirement                                                                                          | Priority |
+| ----- | ---------------------------------------------------------------------------------------------------- | -------- |
+| F4.1  | Tavily search provider (tavily-search, tavily-extract)                                               | MUST     |
+| F4.1a | **WebSearchTool** uses catalog providers (Tavily/Firecrawl/Brave/DuckDuckGo) with automatic failover | MUST     |
+| F4.3  | DuckDuckGo search provider                                                                           | MUST     |
+| F4.4  | Wikipedia provider                                                                                   | MUST     |
+| F4.5  | Academic providers: PubMed, arXiv, Semantic Scholar, CrossRef                                        | MUST     |
+| F4.6  | News providers: NewsData, GNews                                                                      | MUST     |
+| F4.7  | Perplexity API integration (requires user auth)                                                      | SHOULD   |
+| F4.8  | USDA nutrition database                                                                              | MUST     |
+| F4.9  | OpenFoodFacts                                                                                        | MUST     |
+| F4.10 | Weather API                                                                                          | MUST     |
+| F4.11 | Tool governance: risk scoring, audit trail                                                           | SHOULD   |
 
 ### 3.5 Memory Layer
 
