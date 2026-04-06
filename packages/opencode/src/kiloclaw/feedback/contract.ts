@@ -50,7 +50,7 @@ export const FEEDBACK_REASON_DESCRIPTIONS: Record<FeedbackReasonCode, string> = 
 /**
  * Types of targets that can receive feedback
  */
-export const FeedbackTargetType = z.enum(["response", "task", "proactive_action", "memory_retrieval"])
+export const FeedbackTargetType = z.enum(["response", "task", "proactive_action", "memory_retrieval", "session"])
 export type FeedbackTargetType = z.infer<typeof FeedbackTargetType>
 
 /**

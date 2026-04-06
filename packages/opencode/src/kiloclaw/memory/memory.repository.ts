@@ -399,14 +399,17 @@ export const SemanticMemoryRepo = {
     await db().update(FactTable).set({ valid_to: Date.now() }).where(eq(FactTable.id, factId))
   },
 
-  async updateFact(factId: string, newValue: unknown): Promise<void> {
-    await db()
-      .update(FactTable)
-      .set({
-        object: JSON.stringify(newValue),
-        updated_at: Date.now(),
-      })
-      .where(eq(FactTable.id, factId))
+  async updateFact(factId: string, newValue: unknown, newConfidence?: number): Promise<void> {
+    const updates: Record<string, unknown> = {
+      updated_at: Date.now(),
+    }
+    if (newValue !== undefined) {
+      updates.object = JSON.stringify(newValue)
+    }
+    if (newConfidence !== undefined) {
+      updates.confidence = Math.max(0, Math.min(100, newConfidence))
+    }
+    await db().update(FactTable).set(updates).where(eq(FactTable.id, factId))
   },
 
   async queryFacts(

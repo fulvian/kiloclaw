@@ -412,7 +412,7 @@ async function updateFactConfidence(feedback: FeedbackEvent, weight: number): Pr
     const reduction = Math.round(weight * 30) // Up to 30% reduction
     const newConfidence = Math.max(0, fact.confidence - reduction)
 
-    await SemanticMemoryRepo.updateFact(feedback.target.id, null)
+    await SemanticMemoryRepo.updateFact(feedback.target.id, null, newConfidence)
 
     log.debug("fact confidence updated from feedback", {
       factId: feedback.target.id,

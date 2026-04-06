@@ -1,9 +1,9 @@
 # ADR-005: Memory Persistence Refoundation
 
-**Status:** ✅ Implemented  
-**Date:** 2026-04-04  
-**Deciders:** Kiloclaw Technical Team  
-**Last Updated:** 2026-04-06 (Recall Policy + Preference Reuse + Session Scope Fix)
+**Status:** ✅ Implemented
+**Date:** 2026-04-04
+**Deciders:** Kiloclaw Technical Team
+**Last Updated:** 2026-04-06 (Feedback System Verification + Bug Fixes)
 
 ---
 
@@ -209,6 +209,86 @@ score =
 ### MVP Note
 
 Current implementation uses **SQLite** for persistence (MVP). Architecture supports future migration to Postgres+pgvector via clean repository interfaces.
+
+---
+
+## Feedback System Verification (2026-04-06)
+
+### Verification Summary
+
+The feedback system was thoroughly verified on 2026-04-06. The system is now **complete and functioning correctly**.
+
+### Components Verified
+
+| Component  | File                                          | Status                                                |
+| ---------- | --------------------------------------------- | ----------------------------------------------------- |
+| Contract   | `feedback/contract.ts`                        | ✅ Schema completo con 9 reason codes, 5 target types |
+| Processor  | `feedback/processor.ts`                       | ✅ Validazione, storage, learning actions, audit      |
+| Learner    | `feedback/learner.ts`                         | ✅ Profile, retrieval, procedure, policy updates      |
+| UI         | `cli/cmd/tui/routes/session/feedback-bar.tsx` | ✅ FeedbackBar + SessionFeedbackDialog                |
+| Repository | `memory.repository.ts` (FeedbackRepo)         | ✅ CRUD completo                                      |
+| Metrics    | `telemetry/feedback.metrics.ts`               | ✅ Latency, coverage, upvote rate, distributions      |
+
+### Bugs Fixed
+
+| Bug                                 | File                       | Issue                              | Fix                                          |
+| ----------------------------------- | -------------------------- | ---------------------------------- | -------------------------------------------- |
+| `updateFact` ignorava confidence    | `memory.repository.ts:402` | Funzione non aggiornava confidence | Aggiunto parametro opzionale `newConfidence` |
+| Broker usava target type non valido | `memory.broker.v2.ts:609`  | `"memory"` non era nel schema      | Corretto in `"memory_retrieval"`             |
+| FeedbackBar target type mancante    | `contract.ts:53`           | `"session"` non era nel enum       | Aggiunto `"session"` al enum                 |
+| Backfill target type non valido     | `memory.backfill.ts:113`   | `"memory"` non era nel schema      | Corretto in `"memory_retrieval"`             |
+
+### Test Results
+
+```
+32 pass, 0 fail
+73 expect() calls
+Ran 32 tests across 2 files
+```
+
+### Feedback Flow
+
+```
+User click (👍/👎)
+    ↓
+FeedbackBar.submitResponseFeedback()
+    ↓
+FeedbackProcessor.process()
+    ├─ Validazione Zod
+    ├─ FeedbackRepo.record() → SQLite
+    ├─ executeLearningActions()
+    │   ├─ updateUserProfileFromFeedback()
+    │   ├─ updateRetrievalSignals()
+    │   ├─ updateProcedureFromFeedback()
+    │   ├─ updateFactConfidence() [se wrong_fact]
+    │   └─ adjustProactivePolicy() [se proactive_action]
+    ├─ AuditRepo.log() per ogni action
+    └─ FeedbackProcessingResult
+```
+
+### Feedback Reason Codes
+
+| Code                   | Description                       |
+| ---------------------- | --------------------------------- |
+| `wrong_fact`           | Factual error in response         |
+| `irrelevant`           | Response doesn't address query    |
+| `too_verbose`          | Excessive verbosity               |
+| `style_mismatch`       | Communication style not preferred |
+| `unsafe`               | Unsafe content generated          |
+| `task_failed`          | Task not completed                |
+| `task_partial`         | Task partially completed          |
+| `expectation_mismatch` | Outcome didn't match expectation  |
+| `other`                | Uncategorized reason              |
+
+### Feedback Target Types
+
+| Type               | Description                 |
+| ------------------ | --------------------------- |
+| `response`         | AI response to user query   |
+| `task`             | Task execution outcome      |
+| `proactive_action` | Proactive suggestion/action |
+| `memory_retrieval` | Retrieved memory/fact       |
+| `session`          | Overall session feedback    |
 
 ---
 

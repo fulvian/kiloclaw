@@ -174,8 +174,10 @@ async function handleNegativeFeedback(
         const fact = await SemanticMemoryRepo.getFact(memoryId)
         if (fact) {
           // Use FeedbackLearner for fact confidence update
-          await SemanticMemoryRepo.updateFact(memoryId, null)
-          result.actions.push(`reduced_confidence:${memoryId}`)
+          const reduction = Math.round((feedback.score ?? 0.5) * 30)
+          const newConfidence = Math.max(0, fact.confidence - reduction)
+          await SemanticMemoryRepo.updateFact(memoryId, null, newConfidence)
+          result.actions.push(`reduced_confidence:${memoryId}:${newConfidence}`)
         }
 
         if (feedback.correction) {

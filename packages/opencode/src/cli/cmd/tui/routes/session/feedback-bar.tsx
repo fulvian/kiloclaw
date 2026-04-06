@@ -290,8 +290,11 @@ export function FeedbackBar(props: FeedbackBarProps) {
                   paddingX={2}
                   paddingY={1}
                   backgroundColor={theme.backgroundElement}
+                  flexDirection="row"
+                  gap={1}
                 >
                   <text fg={theme.error}>{r.icon}</text>
+                  <text fg={theme.text}>{r.label}</text>
                 </box>
               ))}
             </box>
@@ -392,8 +395,11 @@ export function SessionFeedbackDialog(props: SessionFeedbackDialogProps) {
               paddingX={2}
               paddingY={1}
               backgroundColor={theme.backgroundElement}
+              flexDirection="row"
+              gap={1}
             >
               <text fg={theme.error}>{r.icon}</text>
+              <text fg={theme.text}>{r.label}</text>
             </box>
           ))}
         </box>

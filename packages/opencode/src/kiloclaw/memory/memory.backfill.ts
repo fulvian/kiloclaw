@@ -110,7 +110,7 @@ export namespace MemoryBackfill {
       id: `audit_backfill_${Date.now()}`,
       actor: "system",
       action: "backfill",
-      target_type: "memory",
+      target_type: "memory_retrieval",
       target_id: options.tenantId,
       reason: "migration_from_legacy",
       metadata_json: {
@@ -159,7 +159,9 @@ export namespace MemoryBackfill {
     }
 
     const legacyFacts = (await semanticMemory.query()).length
-    const v2Facts = (await SemanticMemoryRepo.queryFacts(options.tenantId, { userId: options.userId, includeExpired: true })).length
+    const v2Facts = (
+      await SemanticMemoryRepo.queryFacts(options.tenantId, { userId: options.userId, includeExpired: true })
+    ).length
     if (legacyFacts !== v2Facts) {
       discrepancies.push(`semantic mismatch: legacy=${legacyFacts} v2=${v2Facts}`)
     }

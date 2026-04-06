@@ -606,7 +606,7 @@ export const MemoryBrokerV2: MemoryBrokerV2 = {
     await FeedbackRepo.record({
       id: crypto.randomUUID(),
       tenant_id: TENANT,
-      target_type: "memory",
+      target_type: "memory_retrieval",
       target_id: targetId,
       vote,
       reason,
@@ -619,7 +619,7 @@ export const MemoryBrokerV2: MemoryBrokerV2 = {
       id: crypto.randomUUID(),
       actor: "user",
       action: vote === "up" ? "feedback_positive" : "feedback_negative",
-      target_type: "memory",
+      target_type: "memory_retrieval",
       target_id: targetId,
       reason: `feedback:${reason}`,
       previous_hash: "",
