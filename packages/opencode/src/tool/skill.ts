@@ -6,20 +6,70 @@ import { Skill } from "../skill"
 import { PermissionNext } from "../permission/next"
 import { Ripgrep } from "../file/ripgrep"
 import { iife } from "@/util/iife"
+import { knowledgeSkills, developmentSkills } from "../kiloclaw/skills" // kilocode_change - agency skills
+import type { Skill as KiloclawSkill } from "../kiloclaw/skill" // kilocode_change
 
 const BUILTIN = Skill.BUILTIN_LOCATION // kilocode_change
 
 export const SkillTool = Tool.define("skill", async (ctx) => {
   const skills = await Skill.all()
 
+  // kilocode_change start - include agency skills (Knowledge + Development)
+  // Convert kiloclaw skills to Skill.Info format
+  // Note: kiloclaw skills have id, name, capabilities, tags but NOT description directly
+  const buildAgencySkillDescription = (s: KiloclawSkill) =>
+    `Agency: ${s.tags.join(", ")} | Capabilities: ${s.capabilities.join(", ")}`
+
+  const agencySkillInfos: Skill.Info[] = [
+    ...knowledgeSkills.map((s) => ({
+      name: s.id as string,
+      description: buildAgencySkillDescription(s),
+      location: "builtin" as const,
+      content: "",
+    })),
+    ...developmentSkills.map((s) => ({
+      name: s.id as string,
+      description: buildAgencySkillDescription(s),
+      location: "builtin" as const,
+      content: "",
+    })),
+  ]
+
+  // Merge agency skills with standard skills (agency skills have priority)
+  const allSkillsList = [...agencySkillInfos, ...Object.values(skills)]
+
   // Filter skills by agent permissions if agent provided
   const agent = ctx?.agent
   const accessibleSkills = agent
-    ? skills.filter((skill) => {
+    ? allSkillsList.filter((skill) => {
         const rule = PermissionNext.evaluate("skill", skill.name, agent.permission)
         return rule.action !== "deny"
       })
-    : skills
+    : allSkillsList
+  // kilocode_change end
+
+  // kilocode_change start - separate standard skills from agency skills for display
+  const standardSkills = accessibleSkills.filter((s) => s.location !== "builtin")
+  const agencySkillsList = accessibleSkills.filter((s) => s.location === "builtin")
+
+  const buildSkillsSection = (skillList: Skill.Info[], title: string) => {
+    if (skillList.length === 0) return ""
+    return [
+      title,
+      "",
+      ...skillList.flatMap((skill) => {
+        const loc = skill.location === BUILTIN ? BUILTIN : pathToFileURL(skill.location).href
+        return [
+          `  <skill>`,
+          `    <name>${skill.name}</name>`,
+          `    <description>${skill.description}</description>`,
+          `    <location>${loc}</location>`,
+          `  </skill>`,
+        ]
+      }),
+      "",
+    ].join("\n")
+  }
 
   const description =
     accessibleSkills.length === 0
@@ -36,21 +86,12 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
           "The following skills provide specialized sets of instructions for particular tasks",
           "Invoke this tool to load a skill when a task matches one of the available skills listed below:",
           "",
-          "<available_skills>",
-          // kilocode_change start - guard pathToFileURL for builtin skills
-          ...accessibleSkills.flatMap((skill) => {
-            const loc = skill.location === BUILTIN ? BUILTIN : pathToFileURL(skill.location).href
-            return [
-              `  <skill>`,
-              `    <name>${skill.name}</name>`,
-              `    <description>${skill.description}</description>`,
-              `    <location>${loc}</location>`,
-              `  </skill>`,
-            ]
-          }),
+          // kilocode_change start - show agency skills separately
+          buildSkillsSection(agencySkillsList, "<!-- Agency Skills (Knowledge + Development) -->"),
+          buildSkillsSection(standardSkills, "<!-- Standard Skills -->"),
           // kilocode_change end
-          "</available_skills>",
         ].join("\n")
+  // kilocode_change end
 
   const examples = accessibleSkills
     .map((skill) => `'${skill.name}'`)
@@ -66,6 +107,47 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
     description,
     parameters,
     async execute(params: z.infer<typeof parameters>, ctx) {
+      // kilocode_change start - check for agency skills first
+      const allKiloclawSkills = [...knowledgeSkills, ...developmentSkills]
+      const agencySkill = allKiloclawSkills.find((s) => s.id === params.name)
+
+      if (agencySkill) {
+        await ctx.ask({
+          permission: "skill",
+          patterns: [params.name],
+          always: [params.name],
+          metadata: {},
+        })
+
+        // Agency skills return content via their execute method
+        const content =
+          typeof agencySkill.execute === "function"
+            ? `Agency Skill: ${agencySkill.id}\nName: ${agencySkill.name}\nCapabilities: ${agencySkill.capabilities.join(", ")}\nTags: ${agencySkill.tags.join(", ")}`
+            : `Agency Skill: ${agencySkill.id}`
+
+        const agencyType = knowledgeSkills.some((s) => s.id === agencySkill.id) ? "knowledge" : "development"
+        const skillName = agencySkill.id as string // Cast branded SkillId to string
+
+        return {
+          title: `Loaded agency skill: ${agencySkill.id}`,
+          output: [
+            `<skill_content name="${agencySkill.id}">`,
+            `# Agency Skill: ${agencySkill.id}`,
+            "",
+            content,
+            "",
+            `This is a ${agencyType === "knowledge" ? "Knowledge" : "Development"} Agency skill.`,
+            "For web search and research tasks, use the websearch tool which routes to Tavily/Firecrawl/Brave providers.",
+            "</skill_content>",
+          ].join("\n"),
+          metadata: {
+            name: skillName,
+            dir: BUILTIN,
+          },
+        }
+      }
+      // kilocode_change end
+
       const skill = await Skill.get(params.name)
 
       if (!skill) {
@@ -86,7 +168,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
           title: `Loaded skill: ${skill.name}`,
           output: [
             `<skill_content name="${skill.name}">`,
-            `# Skill: ${skill.name}`,
+            "# Skill: ${skill.name}",
             "",
             skill.content.trim(),
             "</skill_content>",
@@ -126,7 +208,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
         title: `Loaded skill: ${skill.name}`,
         output: [
           `<skill_content name="${skill.name}">`,
-          `# Skill: ${skill.name}`,
+          "# Skill: ${skill.name}",
           "",
           skill.content.trim(),
           "",

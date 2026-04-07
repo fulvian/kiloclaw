@@ -48,6 +48,7 @@ import { Shell } from "@/shell/shell"
 import { Truncate } from "@/tool/truncation"
 import { PlanFollowup } from "@/kilocaw-legacy/plan-followup" // kilocode_change
 import { environmentDetails } from "@/kilocaw-legacy/editor-context" // kilocode_change
+import { CoreOrchestrator } from "../kiloclaw/orchestrator" // kilocode_change - agency routing
 
 // @ts-ignore
 globalThis.AI_SDK_LOG_WARNINGS = false
@@ -399,6 +400,54 @@ export namespace SessionPrompt {
       })
       const task = tasks.pop()
 
+      // kilocode_change start - Agency routing for knowledge agency
+      // Extract user message text for intent classification
+      let agencyContext: { agencyId: string; confidence: number; reason: string } | null = null
+      if (!task) {
+        // Only route if not handling a subtask
+        try {
+          // Find last user message with parts from msgs array (lastUser is just info, need full message)
+          const lastUserMsg = msgs.findLast((m) => m.info.role === "user")
+          const userText =
+            lastUserMsg?.parts
+              .filter((p): p is MessageV2.TextPart => p.type === "text" && !p.ignored && !p.synthetic)
+              .map((p) => p.text)
+              .join(" ")
+              .trim() ?? ""
+
+          if (userText.length > 0) {
+            // Create intent and route to agency
+            const intent = {
+              id: lastUser.id,
+              type: "chat",
+              description: userText,
+              risk: "low" as const,
+            }
+
+            const orchestrator = CoreOrchestrator.create({})
+            const assignment = await orchestrator.routeIntent(intent)
+            agencyContext = {
+              agencyId: assignment.agencyId,
+              confidence: assignment.confidence,
+              reason: assignment.reason ?? "routed",
+            }
+
+            log.debug("agency routed", {
+              sessionID,
+              agencyId: agencyContext.agencyId,
+              confidence: agencyContext.confidence,
+              textLength: userText.length,
+            })
+          }
+        } catch (err) {
+          log.warn("agency routing failed, continuing without agency context", {
+            sessionID,
+            error: err instanceof Error ? err.message : String(err),
+          })
+        }
+      }
+      // kilocode_change end
+
       // pending subtask
       // TODO: centralize "invoke tool" logic
       if (task?.type === "subtask") {
@@ -661,6 +710,7 @@ export namespace SessionPrompt {
         processor,
         bypassAgentCheck,
         messages: msgs,
+        agencyContext,
       })
 
       // Inject StructuredOutput tool if JSON schema mode enabled
@@ -734,6 +784,25 @@ export namespace SessionPrompt {
       if (format.type === "json_schema") {
         system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
       }
+
+      // kilocode_change start - Inject agency context into system prompt for knowledge agency
+      if (Flag.KILO_ROUTING_AGENCY_CONTEXT_ENABLED && agencyContext && agencyContext.agencyId === "agency-knowledge") {
+        const agencyBlock = [
+          "",
+          "<!-- Agency Context: Knowledge Agency -->",
+          "This conversation has been routed to the Knowledge Agency.",
+          `Routing confidence: ${Math.round(agencyContext.confidence * 100)}%`,
+          `Routing reason: ${agencyContext.reason}`,
+          "",
+          "Knowledge Agency provides: web search, academic research, fact-checking, synthesis, and critical analysis.",
+          "Available tools include: websearch, webfetch, skill (for loading knowledge skills).",
+          "When the user asks to search, research, find information, verify facts, or synthesize knowledge,",
+          "use the websearch tool with Tavily/Firecrawl providers (via the agency catalog) or delegate to knowledge skills.",
+          "",
+        ].join("\n")
+        system.push(agencyBlock)
+      }
+      // kilocode_change end
 
       const result = await processor.process({
         user: lastUser,
@@ -832,9 +901,21 @@ export namespace SessionPrompt {
     processor: SessionProcessor.Info
     bypassAgentCheck: boolean
     messages: MessageV2.WithParts[]
+    agencyContext?: { agencyId: string; confidence: number; reason: string } | null
   }) {
     using _ = log.time("resolveTools")
     const tools: Record<string, AITool> = {}
+
+    // kilocode_change start - filter tools based on agency context
+    // When routed to Knowledge Agency, filter out native model search tools
+    // that bypass the agency catalog (Tavily, Firecrawl, Brave)
+    const isKnowledgeAgency = input.agencyContext?.agencyId === "agency-knowledge"
+    const nativeSearchToolsToFilter = [
+      "exa_search", // Perplexity exa_search - native model search
+      "exa_image_search", // Perplexity image search
+      "exa_news_search", // Perplexity news search
+    ]
+    // kilocode_change end
 
     const context = (args: any, options: ToolCallOptions): Tool.Context => ({
       sessionID: input.session.id,
@@ -875,6 +956,13 @@ export namespace SessionPrompt {
       { modelID: input.model.api.id, providerID: input.model.providerID },
       input.agent,
     )) {
+      // kilocode_change start - filter native search tools when using Knowledge Agency
+      if (isKnowledgeAgency && nativeSearchToolsToFilter.includes(item.id)) {
+        log.debug("filtering native search tool for knowledge agency", { toolId: item.id })
+        continue
+      }
+      // kilocode_change end
+
       const schema = ProviderTransform.schema(input.model, z.toJSONSchema(item.parameters))
       tools[item.id] = tool({
         id: item.id as any,

@@ -972,3 +972,83 @@ Investigated 7 test failures in memory-persistence, memory-retention, smoke-rout
 1. Fix remaining 5 test failures (optional — no production impact)
 2. Enable `KILO_MEMORY_INTENT_CLASSIFIER_V1=true` to add semantic similarity scoring
 3. Add more multilingual recall test cases (EN/IT/ES/FR)
+
+---
+
+## 2026-04-07 - Knowledge Agency Routing Fix
+
+### Problem
+
+When users sent queries requesting online search, the system routed requests to native LLM model tools (like Perplexity's exa_search) instead of using the Knowledge Agency which uses Tavily, Firecrawl, Brave Search, etc.
+
+### Root Cause
+
+The `CoreOrchestrator` and routing infrastructure existed and was complete, but it was **never integrated** into the session message processing flow. The routing sat idle while the LLM made independent tool selection decisions.
+
+### Implementation Completed
+
+**Step 1: Integrate CoreOrchestrator.routeIntent() into session** ✅
+
+Modified `packages/opencode/src/session/prompt.ts`:
+
+- Added `CoreOrchestrator` import
+- In the `loop` function, after task handling, added intent routing logic
+- Extracts user message text and creates an Intent
+- Calls `orchestrator.routeIntent(intent)` to get agency assignment
+- Stores result in `agencyContext` variable
+
+**Step 2: Add agency context injection into system prompt** ✅
+
+Modified `packages/opencode/src/session/prompt.ts`:
+
+- When `KILO_ROUTING_AGENCY_CONTEXT_ENABLED` flag is true and agency is "agency-knowledge"
+- Injects agency context block into system prompt explaining:
+  - Knowledge Agency has been routed
+  - Routing confidence and reason
+  - Available tools (websearch, webfetch, skill)
+  - Guidance to use Tavily/Firecrawl providers via agency catalog
+
+**Step 3: Pass agencyContext to resolveTools** ✅
+
+Modified `packages/opencode/src/session/prompt.ts`:
+
+- Added `agencyContext` optional parameter to `resolveTools` input type
+- Added `isKnowledgeAgency` check and `nativeSearchToolsToFilter` list
+- Filter out native search tools when routed to Knowledge Agency:
+  - `exa_search` (Perplexity exa_search - native model search)
+  - `exa_image_search`
+  - `exa_news_search`
+- Updated call site to pass `agencyContext` to `resolveTools`
+
+### Files Modified
+
+| File                                      | Change                                                                           |
+| ----------------------------------------- | -------------------------------------------------------------------------------- |
+| `packages/opencode/src/session/prompt.ts` | Added CoreOrchestrator integration, agency context injection, and tool filtering |
+
+### Verification
+
+- Typecheck: ✅ PASSED (0 errors)
+- Test suite: 2043 pass, 207 fail (pre-existing failures unrelated to changes)
+
+### Next Steps
+
+1. ~~**Enhance SkillTool** - Optionally expose agency skills (WebResearchSkill, FactCheckSkill, etc.) in the SkillTool description~~ ✅ COMPLETED
+2. **Testing** - Manual verification that queries like "search for X" correctly route to Knowledge Agency
+3. **Documentation** - Update architecture docs with integration details
+
+### SkillTool Enhancement Details
+
+Modified `packages/opencode/src/tool/skill.ts`:
+
+- Added imports for `knowledgeSkills` and `developmentSkills` from kiloclaw/skills
+- Added `buildAgencySkillDescription()` helper to construct descriptions from capabilities and tags
+- Created `agencySkillInfos` array converting kiloclaw skills to Skill.Info format
+- Merged agency skills with standard skills (agency skills have priority)
+- Separated skill display into two sections: "Agency Skills (Knowledge + Development)" and "Standard Skills"
+- Updated execute function to detect and handle agency skills by checking if skill name matches `s.id` from kiloclaw skills
+- Agency skills return metadata with name, dir=builtin, and a message indicating the agency type
+
+**Files Modified:**
+
+- `packages/opencode/src/tool/skill.ts`
