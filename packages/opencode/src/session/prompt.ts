@@ -794,10 +794,15 @@ export namespace SessionPrompt {
           `Routing confidence: ${Math.round(agencyContext.confidence * 100)}%`,
           `Routing reason: ${agencyContext.reason}`,
           "",
+          "CRITICAL TOOL INSTRUCTIONS:",
+          "- For web search, research, and information gathering: use ONLY the 'websearch' tool",
+          "- 'websearch' routes to Tavily/Firecrawl/Brave Search providers via the agency catalog",
+          "- DO NOT use 'codesearch', 'exa_search', 'get_code_context_exa', or any other search tool",
+          "- DO NOT use any MCP-based search tools (like mcp.exa.ai)",
+          "- The only authorized search tool is 'websearch'",
+          "",
           "Knowledge Agency provides: web search, academic research, fact-checking, synthesis, and critical analysis.",
-          "Available tools include: websearch, webfetch, skill (for loading knowledge skills).",
-          "When the user asks to search, research, find information, verify facts, or synthesize knowledge,",
-          "use the websearch tool with Tavily/Firecrawl providers (via the agency catalog) or delegate to knowledge skills.",
+          "Available tools: websearch (REQUIRED for search), webfetch, skill (for loading knowledge skills).",
           "",
         ].join("\n")
         system.push(agencyBlock)
@@ -914,6 +919,7 @@ export namespace SessionPrompt {
       "exa_search", // Perplexity exa_search - native model search
       "exa_image_search", // Perplexity image search
       "exa_news_search", // Perplexity news search
+      "codesearch", // kilocode_change - Exa MCP-based code search, should use websearch instead
     ]
     // kilocode_change end
 
