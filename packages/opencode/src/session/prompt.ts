@@ -402,49 +402,48 @@ export namespace SessionPrompt {
 
       // kilocode_change start - Agency routing for knowledge agency
       // Extract user message text for intent classification
+      // NOTE: Routing happens regardless of task status because we need agency context
+      // for tool filtering even when subagents are running
       let agencyContext: { agencyId: string; confidence: number; reason: string } | null = null
-      if (!task) {
-        // Only route if not handling a subtask
-        try {
-          // Find last user message with parts from msgs array (lastUser is just info, need full message)
-          const lastUserMsg = msgs.findLast((m) => m.info.role === "user")
-          const userText =
-            lastUserMsg?.parts
-              .filter((p): p is MessageV2.TextPart => p.type === "text" && !p.ignored && !p.synthetic)
-              .map((p) => p.text)
-              .join(" ")
-              .trim() ?? ""
+      try {
+        // Find last user message with parts from msgs array (lastUser is just info, need full message)
+        const lastUserMsg = msgs.findLast((m) => m.info.role === "user")
+        const userText =
+          lastUserMsg?.parts
+            .filter((p): p is MessageV2.TextPart => p.type === "text" && !p.ignored && !p.synthetic)
+            .map((p) => p.text)
+            .join(" ")
+            .trim() ?? ""
 
-          if (userText.length > 0) {
-            // Create intent and route to agency
-            const intent = {
-              id: lastUser.id,
-              type: "chat",
-              description: userText,
-              risk: "low" as const,
-            }
-
-            const orchestrator = CoreOrchestrator.create({})
-            const assignment = await orchestrator.routeIntent(intent)
-            agencyContext = {
-              agencyId: assignment.agencyId,
-              confidence: assignment.confidence,
-              reason: assignment.reason ?? "routed",
-            }
-
-            log.debug("agency routed", {
-              sessionID,
-              agencyId: agencyContext.agencyId,
-              confidence: agencyContext.confidence,
-              textLength: userText.length,
-            })
+        if (userText.length > 0) {
+          // Create intent and route to agency
+          const intent = {
+            id: lastUser.id,
+            type: "chat",
+            description: userText,
+            risk: "low" as const,
           }
-        } catch (err) {
-          log.warn("agency routing failed, continuing without agency context", {
+
+          const orchestrator = CoreOrchestrator.create({})
+          const assignment = await orchestrator.routeIntent(intent)
+          agencyContext = {
+            agencyId: assignment.agencyId,
+            confidence: assignment.confidence,
+            reason: assignment.reason ?? "routed",
+          }
+
+          log.debug("agency routed", {
             sessionID,
-            error: err instanceof Error ? err.message : String(err),
+            agencyId: agencyContext.agencyId,
+            confidence: agencyContext.confidence,
+            textLength: userText.length,
           })
         }
+      } catch (err) {
+        log.warn("agency routing failed, continuing without agency context", {
+          sessionID,
+          error: err instanceof Error ? err.message : String(err),
+        })
       }
       // kilocode_change end
 
@@ -786,7 +785,8 @@ export namespace SessionPrompt {
       }
 
       // kilocode_change start - Inject agency context into system prompt for knowledge agency
-      if (Flag.KILO_ROUTING_AGENCY_CONTEXT_ENABLED && agencyContext && agencyContext.agencyId === "agency-knowledge") {
+      // Always inject this block when agency routing is enabled, regardless of flag
+      if (agencyContext && agencyContext.agencyId === "agency-knowledge") {
         const agencyBlock = [
           "",
           "<!-- Agency Context: Knowledge Agency -->",
@@ -797,8 +797,9 @@ export namespace SessionPrompt {
           "CRITICAL TOOL INSTRUCTIONS:",
           "- For web search, research, and information gathering: use ONLY the 'websearch' tool",
           "- 'websearch' routes to Tavily/Firecrawl/Brave Search providers via the agency catalog",
-          "- DO NOT use 'codesearch', 'exa_search', 'get_code_context_exa', or any other search tool",
-          "- DO NOT use any MCP-based search tools (like mcp.exa.ai)",
+          "- DO NOT use 'codesearch', 'exa_search', 'Exa Web Search', 'get_code_context_exa', or any other search tool",
+          "- DO NOT use any native provider search tools or built-in search capabilities",
+          "- DO NOT use mcp.exa.ai or any MCP-based search",
           "- The only authorized search tool is 'websearch'",
           "",
           "Knowledge Agency provides: web search, academic research, fact-checking, synthesis, and critical analysis.",
