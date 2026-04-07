@@ -167,16 +167,21 @@ export namespace Lifecycle {
       const data = await response.json()
 
       // Check if model is in the loaded models list
+      // LM Studio API: loaded models have non-empty loaded_instances array
       if (Array.isArray(data.models)) {
-        return data.models.some(
-          (model: { id?: string; model?: string; loaded?: boolean }) =>
-            (model.id === modelId || model.model === modelId) && model.loaded,
-        )
+        return data.models.some((model: { id?: string; model?: string; loaded_instances?: unknown[] }) => {
+          const isMatch = model.id === modelId || model.model === modelId
+          const isLoaded = Array.isArray(model.loaded_instances) && model.loaded_instances.length > 0
+          return isMatch && isLoaded
+        })
       }
 
       // Alternative format with data array
       if (Array.isArray(data.data)) {
-        return data.data.some((model: { id?: string; loaded?: boolean }) => model.id === modelId && model.loaded)
+        return data.data.some(
+          (model: { id?: string; loaded_instances?: unknown[] }) =>
+            model.id === modelId && Array.isArray(model.loaded_instances) && model.loaded_instances.length > 0,
+        )
       }
 
       return false

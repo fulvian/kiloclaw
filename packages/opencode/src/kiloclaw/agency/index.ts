@@ -140,6 +140,33 @@ export {
 // Phase 5: IntentClassifier
 export { IntentClassifier } from "./routing/intent-classifier"
 
+// Phase 6: Semantic Router v2 - Capability-Based Dynamic Routing
+export {
+  SemanticRouter,
+  getSemanticRouter,
+  CapabilityRegistry,
+  getCapabilityRegistry,
+  CapabilityExtractor,
+  HybridRouter,
+  bootstrapAllCapabilities,
+  bootstrapWithEmbeddings,
+  bootstrapCapabilitiesFromSkills,
+  type SemanticIntent,
+  type RoutingResult,
+  type DomainDetectionResult,
+  type CapabilityMatchingResult,
+  type SkillSelectionResult,
+  type ToolResolutionResult,
+  type SemanticRouterConfig,
+  type CapabilityDescriptor,
+  type CapabilityMatch,
+  type CapabilityConstraints,
+  type HybridRoutingResult,
+  type HybridIntentRouter,
+  DEFAULT_SEMANTIC_ROUTER_CONFIG,
+  ROUTING_THRESHOLDS,
+} from "./routing/semantic"
+
 // AgentFactory
 export { AgentFactory } from "./factory"
 

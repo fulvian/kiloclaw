@@ -13,6 +13,7 @@
 import { Log } from "@/util/log"
 import { Flag } from "@/flag/flag"
 import { Router, type IntentRouter } from "../../router"
+import { HybridRouter, type HybridIntentRouter, type HybridRoutingResult } from "./semantic/hybrid-router"
 import { CapabilityRouter, CapabilityDeniedError } from "./capability-router"
 import { AgencyRegistry } from "../registry/agency-registry"
 import { RoutingMetrics } from "../../telemetry/routing.metrics"
@@ -249,27 +250,56 @@ export namespace RoutingPipeline {
 
   /**
    * L0: Agency routing - classify intent and resolve agency
+   * Uses HybridRouter for semantic + keyword fallback when enabled
    */
   async function routeL0(intent: Intent): Promise<L0Result> {
     const startTime = Date.now()
 
-    // Performance: Use cached Router instance if LRU is enabled
-    let router: IntentRouter
+    let routingResult: HybridRoutingResult
 
-    if (Flag.KILO_ROUTING_LRU_ENABLED) {
-      const routerCache = getRouterCache()
-      const cachedRouter = routerCache.get("default") as IntentRouter | undefined
-      if (cachedRouter) {
-        router = cachedRouter
+    // Use HybridRouter for semantic + keyword fallback when enabled
+    if (Flag.KILO_SEMANTIC_ROUTING_ENABLED) {
+      if (Flag.KILO_ROUTING_LRU_ENABLED) {
+        const routerCache = getRouterCache()
+        const cachedRouter = routerCache.get("hybrid") as HybridIntentRouter | undefined
+        if (cachedRouter) {
+          routingResult = await cachedRouter.route(intent)
+        } else {
+          const hybridRouter = HybridRouter.getInstance()
+          routerCache.set("hybrid", hybridRouter)
+          routingResult = await hybridRouter.route(intent)
+        }
       } else {
-        router = Router.create({})
-        routerCache.set("default", router)
+        const hybridRouter = HybridRouter.getInstance()
+        routingResult = await hybridRouter.route(intent)
       }
     } else {
-      router = Router.create({})
-    }
+      // Legacy keyword-based routing
+      let router: IntentRouter
 
-    const routingResult = await router.route(intent)
+      if (Flag.KILO_ROUTING_LRU_ENABLED) {
+        const routerCache = getRouterCache()
+        const cachedRouter = routerCache.get("default") as IntentRouter | undefined
+        if (cachedRouter) {
+          router = cachedRouter
+        } else {
+          router = Router.create({})
+          routerCache.set("default", router)
+        }
+      } else {
+        router = Router.create({})
+      }
+
+      const keywordResult = await router.route(intent)
+      routingResult = {
+        agencyId: keywordResult.agencyId,
+        confidence: keywordResult.confidence,
+        matchedDomain: keywordResult.matchedDomain,
+        scores: keywordResult.scores,
+        reasoning: keywordResult.reasoning,
+        routingMethod: "keyword",
+      }
+    }
 
     const latencyMs = Date.now() - startTime
 

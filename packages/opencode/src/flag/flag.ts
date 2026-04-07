@@ -108,6 +108,12 @@ export namespace Flag {
   export const KILO_ROUTING_CACHE_TTL_MS = number("KILO_ROUTING_CACHE_TTL_MS") ?? 60_000 // 1 minute default
   export const KILO_ROUTING_CAPABILITY_CACHE_TTL_MS = number("KILO_ROUTING_CAPABILITY_CACHE_TTL_MS") ?? 300_000 // 5 minutes default
   export const KILO_ROUTING_MANIFEST_CACHE_TTL_MS = number("KILO_ROUTING_MANIFEST_CACHE_TTL_MS") ?? 60_000 // 1 minute default
+
+  // Semantic Router v2 - Capability-Based Dynamic Routing
+  // Enabled by default - set KILO_SEMANTIC_ROUTING_ENABLED=false to disable
+  export const KILO_SEMANTIC_ROUTING_ENABLED = !falsy("KILO_SEMANTIC_ROUTING_ENABLED")
+  export const KILO_SEMANTIC_ROUTING_THRESHOLD = number("KILO_SEMANTIC_ROUTING_THRESHOLD") ?? 0.5
+  export const KILO_SEMANTIC_ROUTING_FALLBACK_TO_KEYWORD = !falsy("KILO_SEMANTIC_ROUTING_FALLBACK_TO_KEYWORD")
   // kilocode_change end
 }
 
