@@ -51,14 +51,15 @@ See [docs/plans/KILOCLAW_FOUNDATION_PLAN.md](docs/plans/KILOCLAW_FOUNDATION_PLAN
 
 ## Key Documents
 
-| Document                                                     | Description                                      |
-| ------------------------------------------------------------ | ------------------------------------------------ |
-| [BLUEPRINT](docs/foundation/KILOCLAW_BLUEPRINT.md)           | Vision, principles, architecture target          |
-| [FOUNDATION_PLAN](docs/plans/KILOCLAW_FOUNDATION_PLAN.md)    | 16-week implementation roadmap                   |
-| [ADR-001](docs/adr/ADR-001_Runtime_Hierarchy.md)             | Runtime hierarchy (Core→Agency→Agent→Skill→Tool) |
-| [ADR-002](docs/adr/ADR-002_Memory_4_Layer.md)                | 4-layer memory architecture                      |
-| [ADR-003](docs/adr/ADR-003_Safety_Guardrails_Proactivity.md) | Safety, guardrails, proactivity policy           |
-| [ADR-004](docs/adr/ADR-004_Isolation_from_KiloCode.md)       | Isolation from KiloCode runtime                  |
+| Document                                                                                                        | Description                                      |
+| --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| [BLUEPRINT](docs/foundation/KILOCLAW_BLUEPRINT.md)                                                              | Vision, principles, architecture target          |
+| [AGENCY_AGENT_SKILL_TOOL_GUIDE](docs/guide/KILOCLAW_AGENCY_AGENT_SKILL_TOOL_IMPLEMENTATION_GUIDE_2026-04-07.md) | Canonical implementation guide for agency stack  |
+| [FOUNDATION_PLAN](docs/plans/KILOCLAW_FOUNDATION_PLAN.md)                                                       | 16-week implementation roadmap                   |
+| [ADR-001](docs/adr/ADR-001_Runtime_Hierarchy.md)                                                                | Runtime hierarchy (Core→Agency→Agent→Skill→Tool) |
+| [ADR-002](docs/adr/ADR-002_Memory_4_Layer.md)                                                                   | 4-layer memory architecture                      |
+| [ADR-003](docs/adr/ADR-003_Safety_Guardrails_Proactivity.md)                                                    | Safety, guardrails, proactivity policy           |
+| [ADR-004](docs/adr/ADR-004_Isolation_from_KiloCode.md)                                                          | Isolation from KiloCode runtime                  |
 
 ## Getting Started
 
