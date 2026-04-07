@@ -53,6 +53,12 @@ KILOCLAW_HYBRID_BM25_WEIGHT=0.3            # BM25 weight (ReMe paper)
 
 **Tests:** 23 new tests + 707 existing tests passing
 
+### Bug Fixes in 7.4.0 (2026-04-07)
+
+| Issue                                           | Description                                                                                                                                                                                                                                                                      | Fix                                                                                                                |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| **Semantic trigger read from ephemeral memory** | `SemanticTriggerPolicy` was calling `EpisodicMemory.getRecentEpisodes()` which uses an in-memory `Map` that clears on restart. Users' queries about previously discussed topics (e.g., "motherboards") returned no recall because episodes were not persisted in the same store. | Changed to use `EpisodicMemoryRepo.getRecentEpisodes(TENANT, count)` which reads from SQLite (persistent storage). |
+
 ---
 
 ## Migration from 7.3.0

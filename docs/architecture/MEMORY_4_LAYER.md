@@ -1,8 +1,8 @@
 # Memory 4-Layer Architecture
 
-> **Status**: Implemented + Enhanced + Semantic Trigger V1  
+> **Status**: Implemented + Enhanced + Semantic Trigger V1 (Bug Fixed)  
 > **Date**: 2026-04-05  
-> **Last Updated**: 2026-04-07 (Semantic Memory Trigger - Keyword-free Recall)  
+> **Last Updated**: 2026-04-07 (Semantic Memory Trigger Bug Fix - Persistent Storage)  
 > **ADR**: ADR-002, ADR-005  
 > **Implementation**: Phase 3 (Base) + KILOCLAW_MEMORY_ENHANCEMENT_PLAN (SOTA) + KILOCLAW_SEMANTIC_MEMORY_TRIGGER_PLAN
 
@@ -504,6 +504,8 @@ The **Semantic Trigger** replaces hardcoded keyword-based recall with pure embed
 | Italian "conversazione" | Not recognized             | Recognized     |
 | Maintenance             | Manual keyword updates     | Automatic      |
 | Accuracy                | Fragile                    | Probabilistic  |
+
+> **⚠️ Bug Fixed (2026-04-07):** The semantic trigger initially read from `EpisodicMemory.getRecentEpisodes()` which uses an ephemeral in-memory Map. This caused recall failures for previously discussed topics across restarts. Fixed by using `EpisodicMemoryRepo.getRecentEpisodes()` which reads from persistent SQLite storage.
 
 ### Recall Policy Engine (2026-04-06)
 
