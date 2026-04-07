@@ -30,6 +30,16 @@ A "How To Test" section can look something like this:
 
 -->
 
+## Agency/Agent/Skill/Tool Checklist (required)
+
+Reference: `docs/guide/KILOCLAW_AGENCY_AGENT_SKILL_TOOL_IMPLEMENTATION_GUIDE_2026-04-07.md`
+
+- [ ] Runtime hard-gate is enforced for agency/agent/skill/tool boundaries
+- [ ] Capability allowlist is deny-by-default
+- [ ] Audit coverage is defined and validated across L0-L3
+- [ ] Regression tests are added/updated for agency/agent/skill/tool flows
+- [ ] Core remains agnostic (no domain coupling introduced)
+
 ## Get in Touch
 
 <!-- We'd love to have a way to chat with you about your changes if necessary. If you're in the [Kilo Code Discord](https://kilo.ai/discord), please share your handle here. -->

@@ -53,6 +53,7 @@ Use best judgement when processing input.
 - Does it follow existing patterns and conventions?
 - Are there established abstractions it should use but doesn't?
 - Excessive nesting that could be flattened with early returns or extraction
+- For agency/agent/skill/tool additions or reviews, verify alignment with `docs/guide/KILOCLAW_AGENCY_AGENT_SKILL_TOOL_IMPLEMENTATION_GUIDE_2026-04-07.md`
 
 **Performance** - Only flag if obviously problematic.
 - O(n²) on unbounded data, N+1 queries, blocking I/O on hot paths
