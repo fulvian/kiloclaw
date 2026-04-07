@@ -1,10 +1,10 @@
 # Memory 4-Layer Architecture
 
-> **Status**: Implemented + Enhanced  
+> **Status**: Implemented + Enhanced + Semantic Trigger V1  
 > **Date**: 2026-04-05  
-> **Last Updated**: 2026-04-06 (Recall Policy + Preference Reuse)  
+> **Last Updated**: 2026-04-07 (Semantic Memory Trigger - Keyword-free Recall)  
 > **ADR**: ADR-002, ADR-005  
-> **Implementation**: Phase 3 (Base) + KILOCLAW_MEMORY_ENHANCEMENT_PLAN (SOTA)
+> **Implementation**: Phase 3 (Base) + KILOCLAW_MEMORY_ENHANCEMENT_PLAN (SOTA) + KILOCLAW_SEMANTIC_MEMORY_TRIGGER_PLAN
 
 ## Overview
 
@@ -458,6 +458,52 @@ Intercepts queries matching recall patterns and injects context:
 - **Injection**: appends `<system-reminder>` block with recovered context to user message
 
 This enables the router agent to answer questions about previous conversations by recovering context from the 4-layer memory system.
+
+### Semantic Memory Trigger V1 (2026-04-07)
+
+The **Semantic Trigger** replaces hardcoded keyword-based recall with pure embedding-based semantic similarity:
+
+**Key Benefits:**
+
+- **Zero hardcoded keywords** - works for ALL languages automatically
+- **Multilingual** - Italian, English, any language without configuration
+- **BM25 Fallback** - lexical matching when LM Studio unavailable
+- **Hybrid Retrieval** - Vector (0.7) + BM25 (0.3) fusion per ReMe paper
+
+**Algorithm:**
+
+```
+1. Embed user query
+2. Fetch N most recent episodes
+3. Embed each episode text
+4. Compute cosine similarity between query and each episode
+5. If max_similarity > threshold → recall/shadow
+```
+
+**Configuration (2026-04-07):**
+
+| Flag                                 | Default | Description                     |
+| ------------------------------------ | ------- | ------------------------------- |
+| `KILOCLAW_SEMANTIC_TRIGGER_V1`       | `true`  | Enable semantic trigger         |
+| `KILOCLAW_SEMANTIC_THRESHOLD_RECALL` | `0.42`  | Similarity threshold for recall |
+| `KILOCLAW_SEMANTIC_THRESHOLD_SHADOW` | `0.28`  | Similarity threshold for shadow |
+| `KILOCLAW_HYBRID_VECTOR_WEIGHT`      | `0.7`   | Vector search weight            |
+| `KILOCLAW_HYBRID_BM25_WEIGHT`        | `0.3`   | BM25 lexical weight             |
+
+**Files:**
+
+- `semantic-trigger.policy.ts` - Core semantic trigger (pure embedding-based)
+- `hybrid-retriever.ts` - Vector + BM25 fusion retrieval
+- `memory.recall-policy.ts` - Updated to delegate to semantic trigger
+
+**Comparison:**
+
+| Aspect                  | Old (Keyword-based)        | New (Semantic) |
+| ----------------------- | -------------------------- | -------------- |
+| Languages               | Language-specific keywords | Universal      |
+| Italian "conversazione" | Not recognized             | Recognized     |
+| Maintenance             | Manual keyword updates     | Automatic      |
+| Accuracy                | Fragile                    | Probabilistic  |
 
 ### Recall Policy Engine (2026-04-06)
 

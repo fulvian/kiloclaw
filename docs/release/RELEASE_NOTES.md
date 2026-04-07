@@ -1,3 +1,70 @@
+# Kiloclaw 7.4.0 Release Notes
+
+> **Release Date:** 2026-04-07  
+> **Version:** 7.4.0  
+> **Type:** Semantic Memory Major Release  
+> **Status:** Production Ready
+
+---
+
+## Executive Summary
+
+Kiloclaw 7.4.0 introduces the **Semantic Memory Trigger** - replacing hardcoded keyword-based recall with pure embedding-based semantic similarity. This enables multilingual recall without language-specific keyword maintenance.
+
+---
+
+## What's New in 7.4.0
+
+### Semantic Memory Trigger (Major)
+
+| Feature                   | Description                                                     | Status |
+| ------------------------- | --------------------------------------------------------------- | ------ |
+| **Pure Semantic Trigger** | Zero hardcoded keywords - works for ALL languages automatically | ✅     |
+| **BM25 Fallback**         | Lexical fallback when LM Studio unavailable                     | ✅     |
+| **Hybrid Retrieval**      | Vector (0.7) + BM25 (0.3) fusion (ReMe paper)                   | ✅     |
+| **Multilingual Support**  | Italian, English, any language without keyword config           | ✅     |
+
+**Architecture:**
+
+```
+User Query → SemanticTriggerPolicy → Embed + Cosine Similarity → Threshold Decision
+                                    ↓
+                            Recent Episodes Embedding
+                                    ↓
+                            max_similarity > threshold → recall/shadow/skip
+```
+
+**Feature Flags:**
+
+```bash
+KILOCLAW_SEMANTIC_TRIGGER_V1=true           # Semantic trigger PRIMARY (default)
+KILOCLAW_SEMANTIC_THRESHOLD_RECALL=0.42    # Recall threshold
+KILOCLAW_SEMANTIC_THRESHOLD_SHADOW=0.28    # Shadow threshold
+KILOCLAW_HYBRID_VECTOR_WEIGHT=0.7          # Vector weight (ReMe paper)
+KILOCLAW_HYBRID_BM25_WEIGHT=0.3            # BM25 weight (ReMe paper)
+```
+
+**Files:**
+
+- `semantic-trigger.policy.ts` - Core semantic trigger
+- `hybrid-retriever.ts` - Vector + BM25 fusion
+- `memory.recall-policy.ts` - Updated to use semantic trigger
+- `plugin.ts` - Simplified (regex arrays removed)
+
+**Tests:** 23 new tests + 707 existing tests passing
+
+---
+
+## Migration from 7.3.0
+
+Semantic Memory Trigger is **enabled by default**. To disable:
+
+```bash
+export KILOCLAW_SEMANTIC_TRIGGER_V1=false
+```
+
+---
+
 # Kiloclaw 7.3.0 Release Notes
 
 > **Release Date:** 2026-04-04  

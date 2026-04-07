@@ -16,47 +16,6 @@ const log = Log.create({ service: "kiloclaw.memory.plugin" })
 
 log.info("createMemoryContextPlugin loaded")
 
-const RECALL = [
-  // Italian patterns
-  /ultim[ea]\s+conversaz/i,
-  /cronolog/i,
-  /di\s+cosa\s+abbiamo\s+parlato/i,
-  /di\s+cosa\s+si\s+è\s+parlato/i,
-  /cosa\s+abbiamo\s+fatto\s+ultim/i,
-  /cosa\s+abbiamo\s+trattat/i,
-  /argoment[io]\s+(?:precedenti|passat|scors)/i,
-  /session[ie]\s+precedenti/i,
-  /nostr[ei]\s+conversation/i,
-  /ricord/i,
-  // English patterns
-  /previous\s+conversation/i,
-  /what\s+did\s+we\s+talk\s+about/i,
-  /last\s+conversations?/i,
-  /remember\s+our\s+past/i,
-  /what\s+were?\s+we\s+(?:working\s+on|talking\s+about|discussing)/i,
-  /previous\s+(?:session|meeting|discussion)/i,
-  /recall\s+(?:past|previous)/i,
-  /history\s+of\s+(?:our|our\s+)?conversations/i,
-  // Implicit references to memory/history
-  /memoria/i,
-  /gust[oi]/i,
-  /preferenz/i,
-  /in\s+base\s+ai\s+miei\s+gusti/i,
-  /sulla\s+base\s+dei\s+miei\s+gusti/i,
-  /based\s+on\s+my\s+tastes?/i,
-  /based\s+on\s+my\s+preferences/i,
-  /passato/i,
-  /storico/i,
-]
-
-async function needsRecallAsync(text: string): Promise<boolean> {
-  if (RECALL.some((re) => re.test(text))) {
-    return true
-  }
-  const out = await MemoryRecallPolicy.evaluate(text)
-  return out.decision === "recall"
-}
-
 function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4)
 }
@@ -95,13 +54,6 @@ export async function createMemoryContextPlugin(_input: PluginInput): Promise<Ho
         lang: policy.intent.lang,
         reasons: policy.reasons,
       })
-
-      if (!Flag.KILO_MEMORY_RECALL_POLICY_V1) {
-        if (!(await needsRecallAsync(text))) {
-          console.log("[MEMORY-PLUGIN] recall NOT needed")
-          return
-        }
-      }
 
       if (policy.decision === "skip") {
         console.log("[MEMORY-PLUGIN] recall NOT needed")

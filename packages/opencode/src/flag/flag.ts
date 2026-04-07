@@ -83,6 +83,19 @@ export namespace Flag {
   export const KILOCLAW_KNOWLEDGE_FORCE_PROVIDER = process.env["KILOCLAW_KNOWLEDGE_FORCE_PROVIDER"]
   // kilocode_change end
 
+  // Semantic Memory Trigger (Phase 1 - Deprecate Keyword-based Recall)
+  // kilocode_change start
+  // Enabled by default - set KILOCLAW_SEMANTIC_TRIGGER_V1=false to disable
+  export const KILOCLAW_SEMANTIC_TRIGGER_V1 = !falsy("KILOCLAW_SEMANTIC_TRIGGER_V1")
+  export const KILOCLAW_SEMANTIC_TRIGGER_BM25_FALLBACK = !falsy("KILOCLAW_SEMANTIC_TRIGGER_BM25_FALLBACK")
+  export const KILOCLAW_SEMANTIC_THRESHOLD_RECALL = number("KILOCLAW_SEMANTIC_THRESHOLD_RECALL") ?? 0.42
+  export const KILOCLAW_SEMANTIC_THRESHOLD_SHADOW = number("KILOCLAW_SEMANTIC_THRESHOLD_SHADOW") ?? 0.28
+  export const KILOCLAW_SEMANTIC_EPISODES_COUNT = number("KILOCLAW_SEMANTIC_EPISODES_COUNT") ?? 20
+  // Hybrid Retriever weights (ReMe paper: Vector 0.7 + BM25 0.3)
+  export const KILOCLAW_HYBRID_VECTOR_WEIGHT = number("KILOCLAW_HYBRID_VECTOR_WEIGHT") ?? 0.7
+  export const KILOCLAW_HYBRID_BM25_WEIGHT = number("KILOCLAW_HYBRID_BM25_WEIGHT") ?? 0.3
+  // kilocode_change end
+
   // Routing Dynamic Multi-Level SOTA 2026
   // kilocode_change start
   export const KILO_ROUTING_DYNAMIC_ENABLED = !falsy("KILO_ROUTING_DYNAMIC_ENABLED")

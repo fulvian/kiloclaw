@@ -29,6 +29,20 @@ type RecallGatePoint = {
   ts: number
 }
 
+type SemanticTriggerPoint = {
+  triggerType: "semantic" | "bm25_fallback" | "keyword_legacy"
+  semanticScore: number
+  topEpisodeSimilarity: number
+  episodesCompared: number
+  lmStudioAvailable: boolean
+  decision: "recall" | "shadow" | "skip"
+  confidence: number
+  fallbackUsed: boolean
+  fallbackReason?: string
+  latencyMs: number
+  ts: number
+}
+
 type InjectionPoint = {
   mode: "minimal" | "standard" | "proactive"
   tokens: number
@@ -42,6 +56,7 @@ const purge: PurgePoint[] = []
 const shadow: ShadowPoint[] = []
 const gate: RecallGatePoint[] = []
 const inject: InjectionPoint[] = []
+const semanticTrigger: SemanticTriggerPoint[] = []
 
 const MAX = 5000
 
@@ -93,6 +108,34 @@ export namespace MemoryMetrics {
     trim(inject)
   }
 
+  export function observeSemanticTrigger(input: {
+    triggerType: "semantic" | "bm25_fallback" | "keyword_legacy"
+    semanticScore?: number
+    topEpisodeSimilarity?: number
+    episodesCompared?: number
+    lmStudioAvailable?: boolean
+    decision: "recall" | "shadow" | "skip"
+    confidence: number
+    fallbackUsed: boolean
+    fallbackReason?: string
+    latencyMs?: number
+  }): void {
+    semanticTrigger.push({
+      triggerType: input.triggerType,
+      semanticScore: input.semanticScore ?? 0,
+      topEpisodeSimilarity: input.topEpisodeSimilarity ?? 0,
+      episodesCompared: input.episodesCompared ?? 0,
+      lmStudioAvailable: input.lmStudioAvailable ?? false,
+      decision: input.decision,
+      confidence: input.confidence,
+      fallbackUsed: input.fallbackUsed,
+      fallbackReason: input.fallbackReason,
+      latencyMs: input.latencyMs ?? 0,
+      ts: Date.now(),
+    })
+    trim(semanticTrigger)
+  }
+
   export function snapshot() {
     const p95 = percentile(
       retrieval.map((x) => x.latencyMs),
@@ -109,6 +152,13 @@ export namespace MemoryMetrics {
     const avgInjectedTokens = avg(inject.map((x) => x.tokens))
     const avgInjectedCount = avg(inject.map((x) => x.count))
     const avgInjectedDiversity = avg(inject.map((x) => x.diversity))
+    const semanticRecallRate = ratio(
+      semanticTrigger.filter((x) => x.decision === "recall").length,
+      semanticTrigger.length,
+    )
+    const semanticFallbackRate = ratio(semanticTrigger.filter((x) => x.fallbackUsed).length, semanticTrigger.length)
+    const avgSemanticLatencyMs = avg(semanticTrigger.map((x) => x.latencyMs))
+    const avgSemanticScore = avg(semanticTrigger.map((x) => x.semanticScore))
 
     return {
       retrieval: {
@@ -136,6 +186,13 @@ export namespace MemoryMetrics {
         avgTokens: avgInjectedTokens,
         avgCount: avgInjectedCount,
         avgDiversity: avgInjectedDiversity,
+      },
+      semanticTrigger: {
+        samples: semanticTrigger.length,
+        recallRate: semanticRecallRate,
+        fallbackRate: semanticFallbackRate,
+        avgLatencyMs: avgSemanticLatencyMs,
+        avgScore: avgSemanticScore,
       },
       slo: {
         retrievalP95Ok: p95 <= 300,
