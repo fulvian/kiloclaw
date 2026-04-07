@@ -2044,9 +2044,10 @@ function CodeSearch(props: ToolProps<any>) {
 function WebSearch(props: ToolProps<any>) {
   const input = props.input as any
   const metadata = props.metadata as any
+  const count = metadata.resultCount ?? metadata.numResults
   return (
     <InlineTool icon="◈" pending="Searching web..." complete={input.query} part={props.part}>
-      Exa Web Search "{input.query}" <Show when={metadata.numResults}>({metadata.numResults} results)</Show>
+      Web Search "{input.query}" <Show when={count}>({count} results)</Show>
     </InlineTool>
   )
 }

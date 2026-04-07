@@ -17,10 +17,10 @@ export const WebSearchTool = Tool.define("websearch", async () => {
       query: z.string().describe("Websearch query"),
       numResults: z.number().optional().describe("Number of search results to return (default: 8)"),
       provider: z
-        .enum(["tavily", "firecrawl", "ddg", "auto"])
+        .enum(["tavily", "firecrawl", "brave", "ddg", "wikipedia", "auto"])
         .optional()
         .describe(
-          "Search provider to use: 'tavily', 'firecrawl', 'ddg', or 'auto' (default: auto - uses first available)",
+          "Search provider to use: 'tavily', 'firecrawl', 'brave', 'ddg', 'wikipedia', or 'auto' (default: auto - uses first available)",
         ),
     }),
     async execute(params, ctx) {
@@ -62,14 +62,15 @@ export const WebSearchTool = Tool.define("websearch", async () => {
           return (aIdx === -1 ? 999 : aIdx) - (bIdx === -1 ? 999 : bIdx)
         })
 
-        let lastError: Error | null = null
         let results: any[] = []
         let providerUsed = ""
-        const errors: string[] = []
+        const errorsByProvider: Record<string, string> = {}
+        const fallbackChainTried: string[] = []
 
         // Try providers in order
         for (const prov of sortedProviders) {
           if (results.length >= numResults) break
+          fallbackChainTried.push(prov.name)
 
           try {
             const searchResults = await prov.search({
@@ -84,8 +85,7 @@ export const WebSearchTool = Tool.define("websearch", async () => {
             }
           } catch (err) {
             const errMsg = err instanceof Error ? err.message : String(err)
-            errors.push(`${prov.name}: ${errMsg}`)
-            lastError = err instanceof Error ? err : new Error(String(err))
+            errorsByProvider[prov.name] = errMsg
             // Continue to next provider
           }
         }
@@ -93,6 +93,7 @@ export const WebSearchTool = Tool.define("websearch", async () => {
         clearTimeout()
 
         if (results.length === 0) {
+          const errors = Object.entries(errorsByProvider).map(([prov, err]) => `${prov}: ${err}`)
           const errorDetails = errors.length > 0 ? `\nProvider errors: ${errors.join("; ")}` : ""
           const hint = errors.some((e) => e.includes("No available API keys"))
             ? "\nHint: Set TAVILY_API_KEY, FIRECRAWL_API_KEY, or BRAVE_API_KEY for better results. DDG is available as a free fallback."
@@ -100,7 +101,13 @@ export const WebSearchTool = Tool.define("websearch", async () => {
           return {
             output: `No search results found. Please try a different query.${errorDetails}${hint}`,
             title: `Web search: ${params.query}`,
-            metadata: { provider: "none", errors },
+            metadata: {
+              provider: "none",
+              providerUsed: "none",
+              fallbackChainTried,
+              errorsByProvider,
+              resultCount: 0,
+            },
           }
         }
 
@@ -114,6 +121,9 @@ export const WebSearchTool = Tool.define("websearch", async () => {
 
         const metadata: Record<string, unknown> = {
           provider: providerUsed,
+          providerUsed,
+          fallbackChainTried,
+          errorsByProvider,
         }
         if (results.length > 0) {
           metadata.resultCount = results.length

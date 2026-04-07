@@ -55,6 +55,7 @@ export interface L3Result {
   toolsResolved: number
   toolsDenied: number
   deniedTools: string[]
+  blockedTools?: string[]
   fallbackUsed: boolean
   fallbackReason?: string
   latencyMs: number
@@ -106,6 +107,8 @@ export namespace RoutingPipeline {
 
     // L1: Skill discovery (only if dynamic routing enabled)
     let l1Result: L1Result | undefined
+    let l2Result: L2Result | undefined
+    let l3Result: L3Result | undefined
     let fallbackUsed = false
     let fallbackReason: string | undefined
 
@@ -134,6 +137,16 @@ export namespace RoutingPipeline {
           latencyMs: l1LatencyMs,
         })
       }
+
+      if (l1Result.routeResult) {
+        l2Result = await selectAgent(l0Result.agencyId, l1Result.capabilities)
+        l3Result = await resolveTools(l0Result.agencyId, l1Result.routeResult.skill, l2Result.agentId ?? undefined)
+        fallbackUsed = fallbackUsed || l2Result.agentId === null || l3Result.fallbackUsed
+        fallbackReason = fallbackReason ?? (l3Result.fallbackUsed ? l3Result.fallbackReason : undefined)
+      } else {
+        fallbackUsed = true
+        fallbackReason = "capability routing fallback"
+      }
     } else {
       // Legacy fallback path
       fallbackUsed = true
@@ -151,6 +164,8 @@ export namespace RoutingPipeline {
       layers: {
         L0: l0Result,
         ...(l1Result && { L1: l1Result }),
+        ...(l2Result && { L2: l2Result }),
+        ...(l3Result && { L3: l3Result }),
       },
       fallbackUsed,
       fallbackReason,
@@ -230,20 +245,71 @@ export namespace RoutingPipeline {
   /**
    * L3: Tool resolution with policy, budget, and fallback
    */
-  export async function resolveTools(agencyId: string, skillId?: string, agentId?: string): Promise<L3Result> {
+  export async function resolveTools(
+    agencyId: string,
+    skillId?: string,
+    agentId?: string,
+    requestedTools?: string[],
+  ): Promise<L3Result> {
     const startTime = Date.now()
+    const agency = AgencyRegistry.getAgency(agencyId)
+    if (!agency) {
+      const latencyMs = Date.now() - startTime
+      return {
+        toolsRequested: 0,
+        toolsResolved: 0,
+        toolsDenied: 0,
+        deniedTools: [],
+        fallbackUsed: true,
+        fallbackReason: "agency not found",
+        latencyMs,
+      }
+    }
 
-    // TODO: Integrate real tool registry and policy checks
-    // For now, return a placeholder result
+    const capabilities = agency.policies.allowedCapabilities
+    const mapped = capabilities.flatMap((cap) => {
+      if (["search", "web-search", "academic-research"].includes(cap)) return ["websearch"]
+      if (["fact-checking", "verification", "source_grounding"].includes(cap)) return ["webfetch"]
+      if (["synthesis", "information_gathering"].includes(cap)) return ["skill"]
+      return []
+    })
+    const allowlist = Array.from(
+      new Set(agencyId === "agency-knowledge" ? ["websearch", "webfetch", "skill", ...mapped] : mapped),
+    )
+    const candidates = requestedTools ?? allowlist
+    const deniedTools = candidates.filter((tool) => !allowlist.includes(tool))
+    const blockedTools = deniedTools
+    const toolsResolved = candidates.length - deniedTools.length
 
     const latencyMs = Date.now() - startTime
 
+    if (Flag.KILO_ROUTING_SHADOW_ENABLED) {
+      await RoutingMetrics.recordLayer3({
+        correlationId: "",
+        agencyId,
+        skillId,
+        agentId,
+        toolsRequested: candidates.length,
+        toolsResolved,
+        toolsDenied: deniedTools.length,
+        deniedTools,
+        blockedTools,
+        fallbackUsed: toolsResolved === 0,
+        fallbackReason: toolsResolved === 0 ? "no tools resolved by policy" : undefined,
+        decision: toolsResolved === 0 ? "fallback" : "allowed",
+        reason: toolsResolved === 0 ? "no tools resolved by policy" : "tools resolved by agency policy",
+        latencyMs,
+      })
+    }
+
     return {
-      toolsRequested: 0,
-      toolsResolved: 0,
-      toolsDenied: 0,
-      deniedTools: [],
-      fallbackUsed: false,
+      toolsRequested: candidates.length,
+      toolsResolved,
+      toolsDenied: deniedTools.length,
+      deniedTools,
+      blockedTools,
+      fallbackUsed: toolsResolved === 0,
+      fallbackReason: toolsResolved === 0 ? "no tools resolved by policy" : undefined,
       latencyMs,
     }
   }

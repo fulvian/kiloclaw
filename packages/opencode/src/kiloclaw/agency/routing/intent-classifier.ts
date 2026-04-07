@@ -8,8 +8,8 @@ const log = Log.create({ service: "kiloclaw.routing.intent-classifier" })
 
 // Known capability keywords for natural language extraction
 const CAPABILITY_KEYWORDS: Record<string, string[]> = {
-  search: ["search", "find", "look up", "query", "retrieve"],
-  web: ["web", "internet", "online"],
+  search: ["search", "find", "look up", "query", "retrieve", "cerca", "ricerca", "ricrca", "annunci"],
+  web: ["web", "internet", "online", "sito", "siti"],
   analyze: ["analyze", "analysis", "examine", "investigate", "study"],
   generate: ["generate", "create", "make", "produce", "write"],
   coding: ["code", "coding", "program", "develop", "implement"],
@@ -19,6 +19,34 @@ const CAPABILITY_KEYWORDS: Record<string, string[]> = {
   planning: ["plan", "planning", "planify", "schedule"],
   research: ["research", "investigate", "survey"],
   knowledge: ["knowledge", "information", "learn"],
+}
+
+function norm(input: string): string {
+  return input
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+}
+
+function grams(input: string): string[] {
+  if (input.length < 2) return [input]
+  return Array.from({ length: input.length - 1 }, (_, idx) => input.slice(idx, idx + 2))
+}
+
+function sim(a: string, b: string): number {
+  const aa = grams(a)
+  const bb = grams(b)
+  const hit = aa.filter((x) => bb.includes(x)).length
+  const den = aa.length + bb.length
+  return den > 0 ? (2 * hit) / den : 0
+}
+
+function fuzzy(tok: string, key: string): boolean {
+  if (tok.includes(key) || key.includes(tok)) return true
+  const lenGap = Math.abs(tok.length - key.length)
+  if (lenGap > 2) return false
+  if (tok.length < 4 || key.length < 4) return false
+  return sim(tok, key) >= 0.72
 }
 
 // Check if input looks like a legacy TaskType string
@@ -67,21 +95,17 @@ function isLegacyTaskType(input: unknown): boolean {
 
 // Extract capabilities from natural language
 function extractCapabilitiesFromNaturalLanguage(input: string): string[] {
-  const lowerInput = input.toLowerCase()
-  const foundCapabilities: string[] = []
-
-  for (const [capability, keywords] of Object.entries(CAPABILITY_KEYWORDS)) {
-    for (const keyword of keywords) {
-      if (lowerInput.includes(keyword)) {
-        if (!foundCapabilities.includes(capability)) {
-          foundCapabilities.push(capability)
-        }
-        break
-      }
-    }
-  }
-
-  return foundCapabilities
+  const text = norm(input)
+  const toks = text.split(/[^a-z0-9]+/).filter(Boolean)
+  return Object.entries(CAPABILITY_KEYWORDS)
+    .filter(([_, keys]) =>
+      keys.some((raw) => {
+        const key = norm(raw)
+        if (text.includes(key)) return true
+        return toks.some((tok) => fuzzy(tok, key))
+      }),
+    )
+    .map(([cap]) => cap)
 }
 
 export namespace IntentClassifier {

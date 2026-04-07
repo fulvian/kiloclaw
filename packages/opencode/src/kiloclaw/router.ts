@@ -112,6 +112,34 @@ const DOMAIN_KEYWORDS: Record<string, string[]> = {
   custom: [],
 }
 
+function norm(input: string): string {
+  return input
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+}
+
+function grams(input: string): string[] {
+  if (input.length < 2) return [input]
+  return Array.from({ length: input.length - 1 }, (_, idx) => input.slice(idx, idx + 2))
+}
+
+function sim(a: string, b: string): number {
+  const aa = grams(a)
+  const bb = grams(b)
+  const hit = aa.filter((x) => bb.includes(x)).length
+  const den = aa.length + bb.length
+  return den > 0 ? (2 * hit) / den : 0
+}
+
+function fuzzyTokenMatch(tok: string, key: string): boolean {
+  if (tok.includes(key) || key.includes(tok)) return true
+  const lenGap = Math.abs(tok.length - key.length)
+  if (lenGap > 2) return false
+  if (tok.length < 4 || key.length < 4) return false
+  return sim(tok, key) >= 0.72
+}
+
 export const Router = {
   create: fn(z.object({}), () => {
     const log = Log.create({ service: "kiloclaw.router" })
@@ -122,11 +150,14 @@ export const Router = {
       const keywords = DOMAIN_KEYWORDS[domain]
       if (!keywords || keywords.length === 0) return 0
 
-      const text = `${intent.type} ${intent.description}`.toLowerCase()
-      let matches = 0
-      for (const keyword of keywords) {
-        if (text.includes(keyword)) matches++
-      }
+      const text = norm(`${intent.type} ${intent.description}`)
+      const toks = text.split(/[^a-z0-9]+/).filter(Boolean)
+      const matches = keywords.filter((raw) => {
+        const key = norm(raw.trim())
+        if (!key) return false
+        if (text.includes(key)) return true
+        return toks.some((tok) => fuzzyTokenMatch(tok, key))
+      }).length
       return matches / keywords.length
     }
 

@@ -100,6 +100,7 @@ export const Layer3DecisionSchema = z.object({
   toolsResolved: z.number().int().nonnegative(),
   toolsDenied: z.number().int().nonnegative(),
   deniedTools: z.array(z.string()).optional(),
+  blockedTools: z.array(z.string()).optional(),
   fallbackUsed: z.boolean(),
   fallbackReason: z.string().optional(),
   decision: RoutingDecision,
@@ -236,6 +237,7 @@ export namespace RoutingMetrics {
     toolsResolved: number
     toolsDenied: number
     deniedTools?: string[]
+    blockedTools?: string[]
     fallbackUsed: boolean
     fallbackReason?: string
     decision: RoutingDecision

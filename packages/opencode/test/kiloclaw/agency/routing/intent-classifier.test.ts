@@ -68,6 +68,12 @@ describe("IntentClassifier", () => {
       expect(caps).toContain("analyze")
     })
 
+    test("given italian typo search text when extractCapabilities then detects search", () => {
+      const caps = IntentClassifier.extractCapabilities("ricrca annunci macbook pro usato")
+
+      expect(caps).toContain("search")
+    })
+
     test("given TaskIntent with capabilities when extractCapabilities then returns capabilities", () => {
       const input = {
         intent: "test",

@@ -49,6 +49,8 @@ import { Truncate } from "@/tool/truncation"
 import { PlanFollowup } from "@/kilocaw-legacy/plan-followup" // kilocode_change
 import { environmentDetails } from "@/kilocaw-legacy/editor-context" // kilocode_change
 import { CoreOrchestrator } from "../kiloclaw/orchestrator" // kilocode_change - agency routing
+import { RoutingPipeline, type PipelineResult } from "@/kiloclaw/agency/routing/pipeline"
+import { resolveAgencyAllowedTools } from "./tool-policy"
 
 // @ts-ignore
 globalThis.AI_SDK_LOG_WARNINGS = false
@@ -64,6 +66,16 @@ IMPORTANT:
 const STRUCTURED_OUTPUT_SYSTEM_PROMPT = `IMPORTANT: The user has requested structured output. You MUST use the StructuredOutput tool to provide your final response. Do NOT respond with plain text - you MUST call the StructuredOutput tool with your answer formatted according to the schema.`
 
 export namespace SessionPrompt {
+  type AgencyContext = {
+    agencyId: string
+    confidence: number
+    reason: string
+    routeSource: "pipeline" | "orchestrator"
+    fallbackUsed?: boolean
+    fallbackReason?: string
+    layers?: PipelineResult["layers"]
+  }
+
   // kilocode_change start - share follow-up trigger logic with tests
   export function shouldAskPlanFollowup(input: { messages: MessageV2.WithParts[]; abort: AbortSignal }) {
     if (input.abort.aborted) return false
@@ -402,8 +414,8 @@ export namespace SessionPrompt {
 
       // kilocode_change start - Agency routing for knowledge agency
       // Extract user message text for intent classification
-      let agencyContext: { agencyId: string; confidence: number; reason: string } | null = null
-      if (!task) {
+      let agencyContext: AgencyContext | null = null
+      if (!task && Flag.KILO_ROUTING_AGENCY_CONTEXT_ENABLED) {
         // Only route if not handling a subtask
         try {
           // Find last user message with parts from msgs array (lastUser is just info, need full message)
@@ -424,26 +436,102 @@ export namespace SessionPrompt {
               risk: "low" as const,
             }
 
-            const orchestrator = CoreOrchestrator.create({})
-            const assignment = await orchestrator.routeIntent(intent)
+            const assignment = await RoutingPipeline.route(intent)
             agencyContext = {
               agencyId: assignment.agencyId,
               confidence: assignment.confidence,
               reason: assignment.reason ?? "routed",
+              routeSource: "pipeline",
+              fallbackUsed: assignment.fallbackUsed,
+              fallbackReason: assignment.fallbackReason,
+              layers: assignment.layers,
             }
 
             log.debug("agency routed", {
               sessionID,
               agencyId: agencyContext.agencyId,
               confidence: agencyContext.confidence,
+              routeSource: agencyContext.routeSource,
+              fallbackUsed: agencyContext.fallbackUsed,
+              hasL1: Boolean(agencyContext.layers?.L1),
+              hasL2: Boolean(agencyContext.layers?.L2),
+              hasL3: Boolean(agencyContext.layers?.L3),
               textLength: userText.length,
+            })
+
+            log.info("agency routing audit trail", {
+              sessionID,
+              agencyId: agencyContext.agencyId,
+              confidence: agencyContext.confidence,
+              routeSource: agencyContext.routeSource,
+              fallbackUsed: agencyContext.fallbackUsed,
+              fallbackReason: agencyContext.fallbackReason,
+              L0: agencyContext.layers?.L0
+                ? {
+                    domain: agencyContext.layers.L0.domain,
+                    reasoning: agencyContext.layers.L0.reasoning,
+                    latencyMs: agencyContext.layers.L0.latencyMs,
+                  }
+                : undefined,
+              L1: agencyContext.layers?.L1
+                ? {
+                    capabilities: agencyContext.layers.L1.capabilities,
+                    routeType: agencyContext.layers.L1.routeResult?.type,
+                    routeReason: agencyContext.layers.L1.routeResult?.reason,
+                  }
+                : undefined,
+              L2: agencyContext.layers?.L2
+                ? {
+                    agentId: agencyContext.layers.L2.agentId,
+                    agentScore: agencyContext.layers.L2.agentScore,
+                    agentHealth: agencyContext.layers.L2.agentHealth,
+                  }
+                : undefined,
+              L3: agencyContext.layers?.L3
+                ? {
+                    toolsResolved: agencyContext.layers.L3.toolsResolved,
+                    blockedTools: agencyContext.layers.L3.blockedTools,
+                    fallbackUsed: agencyContext.layers.L3.fallbackUsed,
+                  }
+                : undefined,
             })
           }
         } catch (err) {
-          log.warn("agency routing failed, continuing without agency context", {
-            sessionID,
-            error: err instanceof Error ? err.message : String(err),
-          })
+          try {
+            const lastUserMsg = msgs.findLast((m) => m.info.role === "user")
+            const userText =
+              lastUserMsg?.parts
+                .filter((p): p is MessageV2.TextPart => p.type === "text" && !p.ignored && !p.synthetic)
+                .map((p) => p.text)
+                .join(" ")
+                .trim() ?? ""
+            if (!userText.length) throw err
+            const intent = {
+              id: lastUser.id,
+              type: "chat",
+              description: userText,
+              risk: "low" as const,
+            }
+            const orchestrator = CoreOrchestrator.create({})
+            const fallback = await orchestrator.routeIntent(intent)
+            agencyContext = {
+              agencyId: fallback.agencyId,
+              confidence: fallback.confidence,
+              reason: fallback.reason ?? "routed",
+              routeSource: "orchestrator",
+            }
+            log.warn("agency pipeline routing failed; using orchestrator fallback", {
+              sessionID,
+              agencyId: agencyContext.agencyId,
+              confidence: agencyContext.confidence,
+              error: err instanceof Error ? err.message : String(err),
+            })
+          } catch (fallbackErr) {
+            log.warn("agency routing failed, continuing without agency context", {
+              sessionID,
+              error: fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr),
+            })
+          }
         }
       }
       // kilocode_change end
@@ -786,13 +874,33 @@ export namespace SessionPrompt {
       }
 
       // kilocode_change start - Inject agency context into system prompt for knowledge agency
-      if (agencyContext && agencyContext.agencyId === "agency-knowledge") {
+      if (Flag.KILO_ROUTING_AGENCY_CONTEXT_ENABLED && agencyContext && agencyContext.agencyId === "agency-knowledge") {
         const agencyBlock = [
           "",
           "<!-- Agency Context: Knowledge Agency -->",
           "This conversation has been routed to the Knowledge Agency.",
           `Routing confidence: ${Math.round(agencyContext.confidence * 100)}%`,
           `Routing reason: ${agencyContext.reason}`,
+          `Routing source: ${agencyContext.routeSource}`,
+          ...(agencyContext.fallbackUsed ? [`Routing fallback: ${agencyContext.fallbackReason ?? "none"}`] : []),
+          ...(agencyContext.layers?.L1
+            ? [
+                `L1 capabilities: ${agencyContext.layers.L1.capabilities.join(", ") || "none"}`,
+                `L1 route type: ${agencyContext.layers.L1.routeResult?.type ?? "fallback"}`,
+              ]
+            : []),
+          ...(agencyContext.layers?.L2
+            ? [
+                `L2 agent: ${agencyContext.layers.L2.agentId ?? "none"}`,
+                `L2 health: ${agencyContext.layers.L2.agentHealth}`,
+              ]
+            : []),
+          ...(agencyContext.layers?.L3
+            ? [
+                `L3 tools denied: ${agencyContext.layers.L3.toolsDenied}`,
+                `L3 fallback used: ${agencyContext.layers.L3.fallbackUsed}`,
+              ]
+            : []),
           "",
           "CRITICAL TOOL INSTRUCTIONS:",
           "- For web search, research, and information gathering: use ONLY the 'websearch' tool",
@@ -906,22 +1014,22 @@ export namespace SessionPrompt {
     processor: SessionProcessor.Info
     bypassAgentCheck: boolean
     messages: MessageV2.WithParts[]
-    agencyContext?: { agencyId: string; confidence: number; reason: string } | null
+    agencyContext?: AgencyContext | null
   }) {
     using _ = log.time("resolveTools")
     const tools: Record<string, AITool> = {}
 
-    // kilocode_change start - filter tools based on agency context
-    // When routed to Knowledge Agency, filter out native model search tools
-    // that bypass the agency catalog (Tavily, Firecrawl, Brave)
-    const isKnowledgeAgency = input.agencyContext?.agencyId === "agency-knowledge"
-    const nativeSearchToolsToFilter = [
-      "exa_search", // Perplexity exa_search - native model search
-      "exa_image_search", // Perplexity image search
-      "exa_news_search", // Perplexity news search
-      "codesearch", // kilocode_change - Exa MCP-based code search, should use websearch instead
-    ]
-    // kilocode_change end
+    const agencyCapabilities = await import("@/kiloclaw/agency/registry/agency-registry")
+      .then((x) => x.AgencyRegistry.getAgency("agency-knowledge")?.policies.allowedCapabilities ?? [])
+      .catch(() => [])
+    const agencyTools = resolveAgencyAllowedTools({
+      agencyId: input.agencyContext?.agencyId,
+      enabled: Flag.KILO_ROUTING_AGENCY_CONTEXT_ENABLED,
+      capabilities: agencyCapabilities,
+    })
+    const enabledAgency = input.agencyContext?.agencyId
+    const blockedTools: string[] = []
+    const allowedTools: string[] = []
 
     const context = (args: any, options: ToolCallOptions): Tool.Context => ({
       sessionID: input.session.id,
@@ -962,12 +1070,11 @@ export namespace SessionPrompt {
       { modelID: input.model.api.id, providerID: input.model.providerID },
       input.agent,
     )) {
-      // kilocode_change start - filter native search tools when using Knowledge Agency
-      if (isKnowledgeAgency && nativeSearchToolsToFilter.includes(item.id)) {
-        log.debug("filtering native search tool for knowledge agency", { toolId: item.id })
+      if (agencyTools.enabled && !agencyTools.allowedTools.includes(item.id)) {
+        blockedTools.push(item.id)
         continue
       }
-      // kilocode_change end
+      allowedTools.push(item.id)
 
       const schema = ProviderTransform.schema(input.model, z.toJSONSchema(item.parameters))
       tools[item.id] = tool({
@@ -1015,6 +1122,11 @@ export namespace SessionPrompt {
     for (const [key, item] of Object.entries(await MCP.tools())) {
       const execute = item.execute
       if (!execute) continue
+      if (agencyTools.enabled && !agencyTools.allowedTools.includes(key)) {
+        blockedTools.push(key)
+        continue
+      }
+      allowedTools.push(key)
 
       const transformed = ProviderTransform.schema(input.model, asSchema(item.inputSchema).jsonSchema)
       item.inputSchema = jsonSchema(transformed)
@@ -1103,6 +1215,15 @@ export namespace SessionPrompt {
         }
       }
       tools[key] = item
+    }
+
+    if (enabledAgency) {
+      log.debug("agency tool policy applied", {
+        agencyId: enabledAgency,
+        policyEnforced: agencyTools.enabled,
+        allowedTools,
+        blockedTools,
+      })
     }
 
     return tools
