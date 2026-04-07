@@ -7,9 +7,9 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "bun:test"
 import { SemanticTriggerPolicy } from "@/kiloclaw/memory/semantic-trigger.policy"
-import { EpisodicMemory } from "@/kiloclaw/memory/episodic"
 import { MemoryEmbedding } from "@/kiloclaw/memory/memory.embedding"
 import { RECALL_TEST_CASES } from "./recall-test-cases"
+import { EpisodicMemoryRepo } from "@/kiloclaw/memory/memory.repository"
 
 // Mock the dependencies
 vi.mock("@/kiloclaw/memory/memory.embedding", () => ({
@@ -21,23 +21,21 @@ vi.mock("@/kiloclaw/memory/memory.embedding", () => ({
   },
 }))
 
-vi.mock("@/kiloclaw/memory/episodic", () => ({
-  EpisodicMemory: {
-    record: vi.fn(),
-    recordTask: vi.fn(),
-    getEpisode: vi.fn(),
+vi.mock("@/kiloclaw/memory/memory.repository", () => ({
+  EpisodicMemoryRepo: {
     getRecentEpisodes: vi.fn(),
-    getEventsByType: vi.fn(),
-    getTimeline: vi.fn(),
-    getStats: vi.fn(),
-    clear: vi.fn(),
+    getEpisode: vi.fn(),
+    recordEpisode: vi.fn(),
+  },
+  SemanticMemoryRepo: {
+    similaritySearch: vi.fn(),
   },
 }))
 
 describe("SemanticTriggerPolicy", () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    EpisodicMemory.getRecentEpisodes = vi.fn().mockResolvedValue([])
+    EpisodicMemoryRepo.getRecentEpisodes = vi.fn().mockResolvedValue([])
   })
 
   afterEach(() => {
@@ -46,7 +44,7 @@ describe("SemanticTriggerPolicy", () => {
 
   describe("Italian queries trigger recall via semantic similarity", () => {
     it("returns skip when no episodes exist", async () => {
-      EpisodicMemory.getRecentEpisodes = vi.fn().mockResolvedValue([])
+      EpisodicMemoryRepo.getRecentEpisodes = vi.fn().mockResolvedValue([])
 
       const result = await SemanticTriggerPolicy.evaluate("suggeriscimi delle schede madri")
 
@@ -70,7 +68,7 @@ describe("SemanticTriggerPolicy", () => {
           events: [],
         },
       ]
-      EpisodicMemory.getRecentEpisodes = vi.fn().mockResolvedValue(mockEpisodes)
+      EpisodicMemoryRepo.getRecentEpisodes = vi.fn().mockResolvedValue(mockEpisodes)
 
       // Mock embedding to return high similarity
       const queryEmbedding = [0.1, 0.2, 0.3, 0.4, 0.5]
@@ -103,7 +101,7 @@ describe("SemanticTriggerPolicy", () => {
           events: [],
         },
       ]
-      EpisodicMemory.getRecentEpisodes = vi.fn().mockResolvedValue(mockEpisodes)
+      EpisodicMemoryRepo.getRecentEpisodes = vi.fn().mockResolvedValue(mockEpisodes)
 
       // Mock embedding to fail (simulating LM Studio unavailable)
       MemoryEmbedding.embed = vi.fn().mockRejectedValue(new Error("LM Studio unavailable"))
@@ -119,7 +117,7 @@ describe("SemanticTriggerPolicy", () => {
   describe("Regression: no false positives on pure coding tasks", () => {
     it("should NOT trigger recall for pure coding tasks", async () => {
       // Setup: no relevant episodes
-      EpisodicMemory.getRecentEpisodes = vi.fn().mockResolvedValue([])
+      EpisodicMemoryRepo.getRecentEpisodes = vi.fn().mockResolvedValue([])
 
       const codingTasks = [
         "fix lint errors in src/index.ts",
@@ -139,7 +137,7 @@ describe("SemanticTriggerPolicy", () => {
   describe("Test cases from RECALL_TEST_CASES", () => {
     for (const testCase of RECALL_TEST_CASES.shouldSkip) {
       it(`should skip: ${testCase.id} - "${testCase.text}"`, async () => {
-        EpisodicMemory.getRecentEpisodes = vi.fn().mockResolvedValue([])
+        EpisodicMemoryRepo.getRecentEpisodes = vi.fn().mockResolvedValue([])
 
         const result = await SemanticTriggerPolicy.evaluate(testCase.text)
         expect(result.decision).toBe("skip")
@@ -163,7 +161,7 @@ describe("SemanticTriggerPolicy", () => {
           events: [],
         },
       ]
-      EpisodicMemory.getRecentEpisodes = vi.fn().mockResolvedValue(mockEpisodes)
+      EpisodicMemoryRepo.getRecentEpisodes = vi.fn().mockResolvedValue(mockEpisodes)
 
       // Mock embedding with known values
       const queryEmbedding = [1.0, 0.0, 0.0]
@@ -192,7 +190,7 @@ describe("SemanticTriggerPolicy", () => {
           events: [],
         },
       ]
-      EpisodicMemory.getRecentEpisodes = vi.fn().mockResolvedValue(mockEpisodes)
+      EpisodicMemoryRepo.getRecentEpisodes = vi.fn().mockResolvedValue(mockEpisodes)
 
       // Mock embedding with orthogonal vectors (zero similarity)
       const queryEmbedding = [1.0, 0.0, 0.0]
@@ -222,7 +220,7 @@ describe("SemanticTriggerPolicy", () => {
           events: [],
         },
       ]
-      EpisodicMemory.getRecentEpisodes = vi.fn().mockResolvedValue(mockEpisodes)
+      EpisodicMemoryRepo.getRecentEpisodes = vi.fn().mockResolvedValue(mockEpisodes)
 
       // No embedding calls should happen for empty text
       MemoryEmbedding.embed = vi.fn()

@@ -20,9 +20,11 @@
 import { Log } from "@/util/log"
 import { Flag } from "@/flag/flag"
 import { MemoryEmbedding } from "./memory.embedding"
-import { EpisodicMemory } from "./episodic"
+import { SemanticMemoryRepo, EpisodicMemoryRepo } from "./memory.repository"
 import { MemoryMetrics } from "./memory.metrics"
 import type { EpisodeId } from "./types"
+
+const TENANT = "default"
 
 const log = Log.create({ service: "kiloclaw.memory.semantic-trigger" })
 
@@ -58,10 +60,10 @@ export namespace SemanticTriggerPolicy {
     const start = performance.now()
     const count = options?.episodeCount ?? RECENT_EPISODES_COUNT
 
-    // Step 1: Fetch recent episodes (already stored from previous sessions)
+    // Step 1: Fetch recent episodes from persistent storage (SQLite via EpisodicMemoryRepo)
     let episodes: any[] = []
     try {
-      episodes = await EpisodicMemory.getRecentEpisodes(count)
+      episodes = await EpisodicMemoryRepo.getRecentEpisodes(TENANT, count)
     } catch (err) {
       log.warn("failed to fetch episodes for semantic trigger", { err: String(err) })
       return {
