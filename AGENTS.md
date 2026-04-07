@@ -7,6 +7,12 @@ Kilo CLI is an open source AI coding agent that generates code from natural lang
 - Prefer automation: execute requested actions without confirmation unless blocked by missing info or safety/irreversibility
 - You may be running in a git worktree. All changes must be in your current working directory — never modify files in the main repo checkout
 
+## Canonical Implementation Guide (Agency Stack)
+
+- For any new `agency` / `agent` / `skill` / `tool` implementation, follow:
+  - `docs/guide/KILOCLAW_AGENCY_AGENT_SKILL_TOOL_IMPLEMENTATION_GUIDE_2026-04-07.md`
+- Treat this guide as the mandatory reference for architecture, runtime policy enforcement, observability, testing, and rollout.
+
 ## Build / Lint / Test Commands
 
 ### Root level
