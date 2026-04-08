@@ -406,7 +406,20 @@ export function DialogTaskWizard(props: { taskId?: string; onComplete?: () => vo
     if (evt.name === "escape") {
       handleCancel()
     }
-    if (evt.name === "return" && evt.ctrl) {
+    if (evt.name === "arrow_left" && evt.ctrl) {
+      prevStep()
+      return
+    }
+    if (evt.name === "arrow_right" && evt.ctrl) {
+      if (step() === "review") {
+        handleSave()
+      } else {
+        nextStep()
+      }
+      return
+    }
+    const allowPlainEnter = step() !== "intent"
+    if (evt.name === "return" && (evt.ctrl || allowPlainEnter)) {
       if (step() === "review") {
         handleSave()
       } else {
@@ -533,8 +546,19 @@ export function DialogTaskWizard(props: { taskId?: string; onComplete?: () => vo
           >
             <text fg={theme.textMuted}>{advanced() ? "Hide advanced" : "Show advanced"}</text>
           </box>
+          <text fg={theme.textMuted}>Ctrl+← back</text>
+          <text fg={theme.textMuted}>Ctrl+→ next</text>
         </box>
         <box flexDirection="row" gap={1}>
+          <Show when={step() !== "intent" && step() !== "review"}>
+            <text fg={theme.textMuted}>Enter next</text>
+          </Show>
+          <Show when={step() === "review"}>
+            <text fg={theme.textMuted}>Enter save</text>
+          </Show>
+          <Show when={step() === "intent"}>
+            <text fg={theme.textMuted}>Ctrl+Enter next</text>
+          </Show>
           <Show when={step() !== "review"}>
             <box paddingLeft={3} paddingRight={3} backgroundColor={theme.primary} onMouseUp={nextStep}>
               <text fg={theme.background}>Next →</text>
