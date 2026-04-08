@@ -1,6 +1,6 @@
 # Task Plan — Kiloclaw Foundation Rebuild
 
-## Status: Phase 5 - Delivery (Wave 6 Readiness) (IN PROGRESS)
+## Status: Phase 5 - Delivery (Wave 6 Technical Complete, External Sign-Off Pending)
 
 ## Re-baseline Plan (2026-04-07)
 
@@ -17,11 +17,18 @@
 - [x] Wave 4: Safe proactivity controls + evidence/rationale for decisions
 - [x] Wave 5: Isolation guard and namespace boundary tests
 - [x] Wave 6.1: Release readiness report and gate matrix
-- [x] Wave 6.2: Full kiloclaw regression verification (382/382)
-- [x] Wave 6.3a: Staging canary/rollback technical execution
+- [x] Wave 6.2: Full kiloclaw regression verification (804 pass, 3 skip, 0 fail)
+- [x] Wave 6.3a: Staging preflight/canary/rollback technical execution (`kind-kiloclaw-staging`)
 - [ ] Wave 6.3b: Leadership/security sign-off completion
 
-**Current Gate Target**: Wave 6 readiness and final HITL approval
+**Current Gate Target**: External leadership/security sign-off only
+
+### Wave 6 sign-off checklist (organizational)
+
+- [ ] Engineering signature recorded in `docs/release/WAVE6_SIGNOFF_PACKET_2026-04-07.md`
+- [ ] QA signature recorded in `docs/release/WAVE6_SIGNOFF_PACKET_2026-04-07.md`
+- [ ] Security signature recorded in `docs/release/WAVE6_SIGNOFF_PACKET_2026-04-07.md`
+- [ ] Leadership signature recorded in `docs/release/WAVE6_SIGNOFF_PACKET_2026-04-07.md`
 
 ## Phase 1 Foundation - COMPLETED ✅
 
@@ -113,6 +120,59 @@
 - [ ] Rollback tested end-to-end in staging pre-go-live
 - [ ] Observability active on technical KPIs and safety
 - [ ] Support readiness completed with clear ownership
+
+## Scheduled Tasks Critical Fixes (2026-04-08) - COMPLETED ✅
+
+During Phase 7, critical bugs were discovered and fixed in the scheduled tasks system:
+
+### Bug 1: Engine Never Started
+
+**Problem**: `ProactiveSchedulerEngine.start()` was never called after `init()`. The engine was initialized but remained stopped, so scheduled tasks were never executed.
+
+**Fixes Applied**:
+
+- `scheduler.ts`: Added `ProactiveSchedulerEngine.start()` after init in `initializePersistentMode()`
+- `task.ts`: Added `ProactiveSchedulerEngine.start()` after init for `task run-now` command
+- `app.tsx`: Added engine init/start check before `onRunNow` and `DLQ Replay` actions
+
+### Bug 2: Database Path Inconsistency
+
+**Problem**: Database path used `.kilocode` instead of `.kiloclaw`, causing path mismatch.
+
+**Fix Applied**:
+
+- `scheduler.store.ts`: Changed `XDG_DATA_HOME/.kilocode/proactive.db` → `XDG_DATA_HOME/.kiloclaw/proactive.db`
+
+### Bug 3: Missing Delete Button
+
+**Problem**: The `onDelete` callback was defined in `DialogTaskDetail` but no button triggered it, making task deletion impossible from UI.
+
+**Fix Applied**:
+
+- `dialog-task-detail.tsx`: Added Delete button with red styling and telemetry
+
+### Bug 4: TUI Flag Guard for Run Now
+
+**Problem**: Run Now and DLQ Replay were gated behind `KILOCLAW_TASK_ACTIONS_EXEC=false` by default (opt-in), causing confusion.
+
+**Note**: Flag remains opt-in for safety. To enable execution:
+
+```bash
+export KILOCLAW_TASK_ACTIONS_EXEC=true
+export KILOCLAW_TENANT_ID=your-tenant-id
+export KILOCLAW_DAEMON_RUNTIME_ENABLED=true
+```
+
+### Commit
+
+```
+dba829e fix(scheduler): enable task execution engine and add Delete button
+```
+
+### Test Results
+
+- Typecheck: ✅ Pass
+- Scheduler tests: ✅ 7 pass, 0 fail
 
 ## Timeline (16 weeks)
 

@@ -31,6 +31,8 @@ import { PrCommand } from "./cli/cmd/pr"
 import { SessionCommand } from "./cli/cmd/session"
 import { RemoteCommand } from "./cli/cmd/remote" // kilocode_change
 import { KiloclawCommand } from "./cli/cmd/kiloclaw"
+import { TaskCommand } from "./cli/cmd/task"
+import { DaemonCommand } from "./cli/cmd/daemon"
 // kilocode_change start - Import telemetry, instance disposal, and legacy migration
 import { Telemetry } from "@kilocode/kilo-telemetry"
 import { Instance } from "./project/instance" // kilocode_change
@@ -197,6 +199,8 @@ let cli = yargs(hideBin(process.argv))
   .command(SessionCommand)
   .command(RemoteCommand) // kilocode_change
   .command(DbCommand)
+  .command(TaskCommand)
+  .command(DaemonCommand)
   .command(KiloclawCommand)
 
 if (Installation.isLocal()) {

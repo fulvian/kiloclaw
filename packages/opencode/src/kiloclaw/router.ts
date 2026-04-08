@@ -40,6 +40,8 @@ const DOMAIN_KEYWORDS: Record<string, string[]> = {
     "class",
     "file",
     "project",
+    "react",
+    "component",
     // Italian keywords
     "codice",
     "debug",
@@ -119,25 +121,10 @@ function norm(input: string): string {
     .toLowerCase()
 }
 
-function grams(input: string): string[] {
-  if (input.length < 2) return [input]
-  return Array.from({ length: input.length - 1 }, (_, idx) => input.slice(idx, idx + 2))
-}
-
-function sim(a: string, b: string): number {
-  const aa = grams(a)
-  const bb = grams(b)
-  const hit = aa.filter((x) => bb.includes(x)).length
-  const den = aa.length + bb.length
-  return den > 0 ? (2 * hit) / den : 0
-}
-
-function fuzzyTokenMatch(tok: string, key: string): boolean {
-  if (tok.includes(key) || key.includes(tok)) return true
-  const lenGap = Math.abs(tok.length - key.length)
-  if (lenGap > 2) return false
-  if (tok.length < 4 || key.length < 4) return false
-  return sim(tok, key) >= 0.72
+function tokenMatch(tok: string, key: string): boolean {
+  if (tok === key) return true
+  if (tok.length >= 5 && key.length >= 3 && tok.startsWith(key)) return true
+  return false
 }
 
 export const Router = {
@@ -155,10 +142,23 @@ export const Router = {
       const matches = keywords.filter((raw) => {
         const key = norm(raw.trim())
         if (!key) return false
-        if (text.includes(key)) return true
-        return toks.some((tok) => fuzzyTokenMatch(tok, key))
+        if (key.includes(" ")) return text.includes(key)
+        return toks.some((tok) => tokenMatch(tok, key))
       }).length
-      return matches / keywords.length
+      const base = matches / keywords.length
+      const type = norm(intent.type)
+      const typeBoost =
+        domain === "weather" && type.includes("weather")
+          ? 0.2
+          : domain === "development" && (type.includes("code") || type.includes("build") || type.includes("debug"))
+            ? 0.2
+            : domain === "knowledge" && (type.includes("search") || type.includes("research"))
+              ? 0.2
+              : domain === "nutrition" &&
+                  (type.includes("nutrition") || type.includes("diet") || type.includes("recipe"))
+                ? 0.2
+                : 0
+      return Math.min(1, base + typeBoost)
     }
 
     // Calculate risk-adjusted score

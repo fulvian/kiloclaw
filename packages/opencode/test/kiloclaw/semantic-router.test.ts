@@ -13,25 +13,22 @@ import {
   type Intent,
   type CapabilityMatch,
 } from "../../src/kiloclaw/agency/routing/semantic"
+import { MemoryEmbedding } from "../../src/kiloclaw/memory/memory.embedding"
 
-// Mock MemoryEmbedding to avoid LM Studio dependency in tests
-vi.mock("@/kiloclaw/memory", () => ({
-  MemoryEmbedding: {
-    embed: vi.fn().mockImplementation(async (text: string) => {
-      // Return a simple mock embedding based on text hash
-      const hash = text.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0)
-      const dim = 384
-      return Array.from({ length: dim }, (_, i) => Math.sin(hash * (i + 1)))
-    }),
-    embedBatch: vi.fn().mockImplementation(async (texts: string[]) => {
-      return texts.map((text) => {
-        const hash = text.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0)
-        const dim = 384
-        return Array.from({ length: dim }, (_, i) => Math.sin(hash * (i + 1)))
-      })
-    }),
-  },
-}))
+const mockVec = (text: string) => {
+  const hash = text.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0)
+  const dim = 384
+  return Array.from({ length: dim }, (_, i) => Math.sin(hash * (i + 1)))
+}
+
+beforeEach(() => {
+  vi.spyOn(MemoryEmbedding, "embed").mockImplementation(async (text: string) => mockVec(text))
+  vi.spyOn(MemoryEmbedding, "embedBatch").mockImplementation(async (texts: string[]) => texts.map(mockVec))
+})
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
 
 describe("Utility Functions", () => {
   describe("cosineSimilarity", () => {

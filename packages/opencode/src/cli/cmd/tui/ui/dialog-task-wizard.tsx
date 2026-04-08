@@ -1,9 +1,8 @@
-import { TextAttributes, TextareaRenderable, Renderable } from "@opentui/core"
-import { createSignal, createMemo, For, Show, batch } from "solid-js"
+import { InputRenderable, TextAttributes, TextareaRenderable, Renderable } from "@opentui/core"
+import { createSignal, createMemo, For, Show, batch, createEffect, onMount } from "solid-js"
 import { useTheme } from "@tui/context/theme"
 import { useDialog } from "./dialog"
 import { useKeyboard, useRenderer } from "@opentui/solid"
-import { useKV } from "../context/kv"
 import { useTaskWizardDraft, type TaskWizardDraft } from "../context/task-draft"
 import {
   ScheduledTaskCreateSchema,
@@ -118,8 +117,15 @@ const STEP_LABELS: Record<WizardStep, string> = {
 export function DialogTaskWizard(props: { taskId?: string; onComplete?: () => void }) {
   const dialog = useDialog()
   const { theme } = useTheme()
-  const kv = useKV()
+  const renderer = useRenderer()
   const draftHelper = useTaskWizardDraft()
+
+  let scheduleTimeInput: InputRenderable | undefined
+  let scheduleCronInput: InputRenderable | undefined
+  let intentNameInput: InputRenderable | undefined
+  let intentPromptInput: InputRenderable | undefined
+  let reliabilityRetryInput: InputRenderable | undefined
+  let policyQuietStartInput: InputRenderable | undefined
 
   const isEditing = () => !!props.taskId
 
@@ -289,6 +295,9 @@ export function DialogTaskWizard(props: { taskId?: string; onComplete?: () => vo
   })
 
   const nextRunsPreview = createMemo(() => {
+    if (!useCustomCron() && !isValidTime(scheduleTime())) {
+      return []
+    }
     const tz = timezone() === "local" ? Intl.DateTimeFormat().resolvedOptions().timeZone : timezone()
     const validation = validateSchedule({ cron: computedCron(), timezone: tz })
     if (!validation.ok) return []
@@ -325,7 +334,7 @@ export function DialogTaskWizard(props: { taskId?: string; onComplete?: () => vo
       case "schedule":
         return useCustomCron() ? "Enter cron expression manually" : "Select category, time, then Next"
       case "intent":
-        return "Name + prompt required. Ctrl+Enter advances."
+        return "Name + prompt required. Ctrl+W advances."
       case "reliability":
         return "Configure retry and concurrency"
       case "policy":
@@ -338,6 +347,55 @@ export function DialogTaskWizard(props: { taskId?: string; onComplete?: () => vo
   })
 
   const currentStepIndex = createMemo(() => STEPS.indexOf(step()) + 1)
+
+  function getStepFocusTarget(): Renderable | undefined {
+    if (step() === "schedule") {
+      if (useCustomCron()) return scheduleCronInput
+      return scheduleTimeInput
+    }
+    if (step() === "intent") return intentNameInput
+    if (step() === "reliability") return reliabilityRetryInput
+    if (step() === "policy") return policyQuietStartInput
+    return undefined
+  }
+
+  function focusCurrentStepInput() {
+    setTimeout(() => {
+      const target = getStepFocusTarget()
+      if (!target || target.isDestroyed) return
+      target.focus()
+    }, 1)
+  }
+
+  function isEditingTextField() {
+    const focused = renderer.currentFocusedRenderable
+    if (!focused) return false
+    return focused instanceof InputRenderable || focused instanceof TextareaRenderable
+  }
+
+  function handleIntentTab() {
+    const focused = renderer.currentFocusedRenderable
+    if (focused === intentNameInput) {
+      intentPromptInput?.focus()
+      return
+    }
+    intentNameInput?.focus()
+  }
+
+  onMount(() => {
+    focusCurrentStepInput()
+  })
+
+  createEffect(() => {
+    step()
+    useCustomCron()
+    focusCurrentStepInput()
+  })
+
+  const mergedStepErrors = createMemo(() => ({
+    ...fieldErrors(),
+    ...currentStepErrors(),
+  }))
 
   // ---------------------------------------------------------------------------
   // Data building
@@ -550,21 +608,32 @@ export function DialogTaskWizard(props: { taskId?: string; onComplete?: () => vo
   // - Escape: always closes
   // - Ctrl+Arrow: navigate steps
   // - Plain Enter: advance on non-intent steps when valid
-  // - Ctrl+Enter: always advance
+  // - Ctrl+W: always advance
   // ---------------------------------------------------------------------------
   useKeyboard((evt) => {
     // Escape always closes
     if (evt.name === "escape") {
+      evt.preventDefault()
+      evt.stopPropagation()
       handleCancel()
+      return
+    }
+
+    if (evt.name === "tab" && step() === "intent") {
+      evt.preventDefault()
+      evt.stopPropagation()
+      handleIntentTab()
       return
     }
 
     // Ctrl+Arrow navigation
     if (evt.name === "arrow_left" && evt.ctrl) {
+      if (isEditingTextField()) return
       prevStep()
       return
     }
     if (evt.name === "arrow_right" && evt.ctrl) {
+      if (isEditingTextField()) return
       if (step() === "review") {
         handleSave()
       } else {
@@ -575,6 +644,23 @@ export function DialogTaskWizard(props: { taskId?: string; onComplete?: () => vo
 
     // Plain Enter - only advance if not on intent step and validation passes
     if (evt.name === "return" && !evt.ctrl) {
+      if (step() === "intent") {
+        const focused = renderer.currentFocusedRenderable
+        if (focused === intentNameInput) {
+          evt.preventDefault()
+          evt.stopPropagation()
+          intentPromptInput?.focus()
+          return
+        }
+        if (focused === intentPromptInput && canAdvance()) {
+          evt.preventDefault()
+          evt.stopPropagation()
+          nextStep()
+          return
+        }
+      }
+
+      if (isEditingTextField()) return
       if (step() !== "intent" && canAdvance()) {
         evt.preventDefault()
         if (step() === "review") {
@@ -586,9 +672,10 @@ export function DialogTaskWizard(props: { taskId?: string; onComplete?: () => vo
       return
     }
 
-    // Ctrl+Enter - always advances (required for intent step with textarea)
-    if (evt.name === "return" && evt.ctrl) {
+    // Ctrl+W - always advances
+    if (evt.name === "w" && evt.ctrl) {
       evt.preventDefault()
+      evt.stopPropagation()
       if (step() === "review") {
         handleSave()
       } else {
@@ -660,11 +747,21 @@ export function DialogTaskWizard(props: { taskId?: string; onComplete?: () => vo
             customCron={customCron}
             setCustomCron={setCustomCron}
             nextRunsPreview={nextRunsPreview}
-            errors={fieldErrors()}
+            errors={mergedStepErrors()}
+            setTimeRef={(r) => (scheduleTimeInput = r)}
+            setCustomCronRef={(r) => (scheduleCronInput = r)}
           />
         </Show>
         <Show when={step() === "intent"}>
-          <IntentStep name={name} setName={setName} prompt={prompt} setPrompt={setPrompt} errors={fieldErrors()} />
+          <IntentStep
+            name={name}
+            setName={setName}
+            prompt={prompt}
+            setPrompt={setPrompt}
+            errors={mergedStepErrors()}
+            setNameRef={(r) => (intentNameInput = r)}
+            setPromptRef={(r) => (intentPromptInput = r)}
+          />
         </Show>
         <Show when={step() === "reliability"}>
           <ReliabilityStep
@@ -683,6 +780,7 @@ export function DialogTaskWizard(props: { taskId?: string; onComplete?: () => vo
             startingDeadlineMs={startingDeadlineMs}
             setStartingDeadlineMs={setStartingDeadlineMs}
             advanced={advanced()}
+            setRetryAttemptsRef={(r) => (reliabilityRetryInput = r)}
           />
         </Show>
         <Show when={step() === "policy"}>
@@ -693,6 +791,7 @@ export function DialogTaskWizard(props: { taskId?: string; onComplete?: () => vo
             setQuietHoursStart={setQuietHoursStart}
             quietHoursEnd={quietHoursEnd}
             setQuietHoursEnd={setQuietHoursEnd}
+            setQuietHoursStartRef={(r) => (policyQuietStartInput = r)}
           />
         </Show>
         <Show when={step() === "review"}>
@@ -781,6 +880,8 @@ function ScheduleStep(props: {
   setCustomCron: (v: string) => void
   nextRunsPreview: () => string[]
   errors: Record<string, string>
+  setTimeRef: (r: InputRenderable) => void
+  setCustomCronRef: (r: InputRenderable) => void
 }) {
   const { theme } = useTheme()
 
@@ -813,6 +914,7 @@ function ScheduleStep(props: {
           <input
             value={props.time()}
             onInput={(val) => props.setTime(val)}
+            ref={(r) => props.setTimeRef(r)}
             placeholder="09:00"
             width={10}
             backgroundColor={theme.backgroundElement}
@@ -909,6 +1011,7 @@ function ScheduleStep(props: {
         <input
           value={props.customCron()}
           onInput={(val) => props.setCustomCron(val)}
+          ref={(r) => props.setCustomCronRef(r)}
           placeholder="0 9 * * 1-5"
           backgroundColor={theme.backgroundElement}
           textColor={theme.text}
@@ -940,9 +1043,10 @@ function IntentStep(props: {
   prompt: () => string
   setPrompt: (v: string) => void
   errors: Record<string, string>
+  setNameRef: (r: InputRenderable) => void
+  setPromptRef: (r: InputRenderable) => void
 }) {
   const { theme } = useTheme()
-  let textareaRef: TextareaRenderable | undefined
 
   return (
     <box flexDirection="column" gap={2}>
@@ -955,6 +1059,7 @@ function IntentStep(props: {
         <input
           value={props.name()}
           onInput={(val) => props.setName(val)}
+          ref={(r) => props.setNameRef(r)}
           placeholder="e.g., Daily repo summary"
           backgroundColor={theme.backgroundElement}
           textColor={theme.text}
@@ -966,16 +1071,11 @@ function IntentStep(props: {
 
       <box flexDirection="column" gap={0}>
         <text fg={theme.textMuted}>Prompt payload *</text>
-        <textarea
-          ref={(r) => {
-            textareaRef = r
-          }}
-          initialValue={props.prompt()}
-          onContentChange={() => {
-            if (textareaRef) props.setPrompt(textareaRef.plainText)
-          }}
+        <input
+          ref={(r) => props.setPromptRef(r)}
+          value={props.prompt()}
+          onInput={(val) => props.setPrompt(val)}
           placeholder="What should this task do?"
-          minHeight={6}
           backgroundColor={theme.backgroundElement}
           textColor={theme.text}
         />
@@ -1006,6 +1106,7 @@ function ReliabilityStep(props: {
   startingDeadlineMs: () => number
   setStartingDeadlineMs: (v: number) => void
   advanced: boolean
+  setRetryAttemptsRef: (r: InputRenderable) => void
 }) {
   const { theme } = useTheme()
 
@@ -1021,6 +1122,7 @@ function ReliabilityStep(props: {
           <input
             value={String(props.retryAttempts())}
             onInput={(val) => props.setRetryAttempts(parseInt(val) || 3)}
+            ref={(r) => props.setRetryAttemptsRef(r)}
             backgroundColor={theme.backgroundElement}
             textColor={theme.text}
           />
@@ -1109,6 +1211,7 @@ function PolicyStep(props: {
   setQuietHoursStart: (v: string) => void
   quietHoursEnd: () => string
   setQuietHoursEnd: (v: string) => void
+  setQuietHoursStartRef: (r: InputRenderable) => void
 }) {
   const { theme } = useTheme()
 
@@ -1139,6 +1242,7 @@ function PolicyStep(props: {
           <input
             value={props.quietHoursStart()}
             onInput={(val) => props.setQuietHoursStart(val)}
+            ref={(r) => props.setQuietHoursStartRef(r)}
             placeholder="HH:MM"
             width={10}
             backgroundColor={theme.backgroundElement}
@@ -1233,7 +1337,7 @@ function ReviewStep(props: {
       </box>
 
       <box paddingTop={1}>
-        <text fg={theme.textMuted}>Press Ctrl+Enter or click "Save Task" to create this scheduled task.</text>
+        <text fg={theme.textMuted}>Press Ctrl+W or click "Save Task" to create this scheduled task.</text>
       </box>
     </box>
   )

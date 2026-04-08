@@ -9,34 +9,26 @@ import {
   type HybridRoutingResult,
 } from "../../src/kiloclaw/agency/routing/semantic/hybrid-router"
 import type { Intent } from "../../src/kiloclaw/agency/routing/semantic"
+import { MemoryEmbedding } from "../../src/kiloclaw/memory/memory.embedding"
 
-// Mock MemoryEmbedding to avoid LM Studio dependency in tests
-vi.mock("@/kiloclaw/memory", () => ({
-  MemoryEmbedding: {
-    embed: vi.fn().mockImplementation(async (text: string) => {
-      const hash = text.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0)
-      const dim = 384
-      return Array.from({ length: dim }, (_, i) => Math.sin(hash * (i + 1)))
-    }),
-    embedBatch: vi.fn().mockImplementation(async (texts: string[]) => {
-      return texts.map((text) => {
-        const hash = text.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0)
-        const dim = 384
-        return Array.from({ length: dim }, (_, i) => Math.sin(hash * (i + 1)))
-      })
-    }),
-  },
-}))
+const mockVec = (text: string) => {
+  const hash = text.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0)
+  const dim = 384
+  return Array.from({ length: dim }, (_, i) => Math.sin(hash * (i + 1)))
+}
 
 describe("HybridRouter", () => {
   let router: HybridIntentRouter
 
   beforeEach(() => {
+    vi.spyOn(MemoryEmbedding, "embed").mockImplementation(async (text: string) => mockVec(text))
+    vi.spyOn(MemoryEmbedding, "embedBatch").mockImplementation(async (texts: string[]) => texts.map(mockVec))
     HybridRouter.reset()
     router = HybridRouter.create()
   })
 
   afterEach(() => {
+    vi.restoreAllMocks()
     HybridRouter.reset()
   })
 

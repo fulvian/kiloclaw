@@ -2,6 +2,7 @@
 
 export * from "./types"
 export * from "./agency"
+export * from "./agency/index"
 export * from "./agent"
 export * from "./skill"
 export * from "./tool"
@@ -43,6 +44,16 @@ export type {
 } from "./memory/types.js"
 export { MemoryLifecycle, memoryLifecycle } from "./memory/lifecycle.js"
 export { workingMemory, episodicMemory, semanticMemory, proceduralMemory } from "./memory/index.js"
+
+// Memory persistence (ADR-005) - exports for V2 feature
+export { MemoryDb } from "./memory/memory.db.js"
+export { MemoryState, ensureMemoryInit } from "./memory/memory.state.js"
+export { MemoryBrokerV2 } from "./memory/memory.broker.v2.js"
+export { getOrchestratorMemory, writeEntry, readEntries, purgeEntry } from "./memory.adapter.js"
+
+// Service health check (ADR-005)
+export { ServiceHealth } from "./service-health.js"
+export { AuditRepo } from "./memory/memory.repository.js"
 
 // Skills (Wave 1 - Development and Knowledge agencies)
 export * from "./skills"

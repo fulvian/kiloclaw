@@ -119,13 +119,17 @@ export const CoreOrchestrator = {
           const evalResult = policy.evaluate(actionCtx, action)
           const isCriticalIntent = context.intent?.risk === "critical"
           const isHighIntent = context.intent?.risk === "high"
-          const baseRequiresApproval = evalResult.escalationRequired || isHighIntent || isCriticalIntent
+          const hasHighRiskAction = /delete|rm|remove|drop|destroy|truncate|wipe/i.test(action.type)
+          const baseRequiresApproval =
+            evalResult.escalationRequired || isHighIntent || isCriticalIntent || hasHighRiskAction
+          const approved = !!context.userApproved
+          const missingApproval = baseRequiresApproval && !approved
           const strictOut = {
-            allowed: evalResult.allowed && !isCriticalIntent,
-            reason: evalResult.reason,
+            allowed: evalResult.allowed && !missingApproval,
+            reason: missingApproval ? "action requires explicit approval by policy" : evalResult.reason,
             requiresApproval: baseRequiresApproval,
           }
-          const compatFallback = !strictOut.allowed || isCriticalIntent || isHighIntent
+          const compatFallback = !strictOut.allowed || isCriticalIntent || isHighIntent || hasHighRiskAction
           const compatOut = {
             allowed: true,
             reason: compatFallback ? `[compat-fallback] ${evalResult.reason}` : evalResult.reason,

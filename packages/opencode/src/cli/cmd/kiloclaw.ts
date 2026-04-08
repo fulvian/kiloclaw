@@ -8,6 +8,7 @@ import { allSkills, knowledgeSkills, developmentSkills, nutritionSkills, weather
 import { Log } from "@/util/log"
 import { EOL } from "os"
 import { Agent } from "../../agent/agent" // kilocode_change - for unified agent list
+import { TaskCommand } from "./task"
 
 const log = Log.create({ service: "kiloclaw.cli" })
 
@@ -501,6 +502,12 @@ export const KiloclawCommand = cmd({
   command: "kiloclaw",
   describe: "Kiloclaw agency-based AI agent system",
   builder: (yargs) =>
-    yargs.command(AgencyCommand).command(SkillCommand).command(ProviderCommand).command(AgentCommand).demandCommand(),
+    yargs
+      .command(AgencyCommand)
+      .command(SkillCommand)
+      .command(ProviderCommand)
+      .command(AgentCommand)
+      .command(TaskCommand)
+      .demandCommand(),
   async handler() {},
 })

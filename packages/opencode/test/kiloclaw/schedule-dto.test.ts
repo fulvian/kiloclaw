@@ -171,6 +171,31 @@ describe("scheduled task schema", () => {
     expect((out.nextRuns ?? []).length).toBeGreaterThanOrEqual(1)
   })
 
+  it("returns ok false and does not throw for invalid minute field", () => {
+    expect(() => validateSchedule({ cron: "undefined 0 * * *", timezone: "UTC" })).not.toThrow()
+    const out = validateSchedule({ cron: "undefined 0 * * *", timezone: "UTC" })
+    expect(out.ok).toBe(false)
+    expect(out.error).toBeDefined()
+  })
+
+  it("returns ok false for empty cron", () => {
+    const out = validateSchedule({ cron: "", timezone: "UTC" })
+    expect(out.ok).toBe(false)
+    expect(out.error).toBeDefined()
+  })
+
+  it("accepts dynamic presets with custom times", () => {
+    const out = validateSchedule({ preset: "daily-15:50", timezone: "UTC" })
+    expect(out.ok).toBe(true)
+    expect(out.schedule).toBe("50 15 * * *")
+  })
+
+  it("returns ok false for invalid preset strings", () => {
+    const out = validateSchedule({ preset: "dayly 15:50", timezone: "UTC" })
+    expect(out.ok).toBe(false)
+    expect(out.error).toBeDefined()
+  })
+
   it("builds task payload with default preset", () => {
     const out = buildCreate({
       name: "daily repo scan",

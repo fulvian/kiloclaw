@@ -48,8 +48,8 @@ export function useTaskWizardDraft() {
 
   function deleteDraft(sessionOrGlobal: "session" | "global", draftId?: string): void {
     const key = getDraftKey(sessionOrGlobal, draftId)
-    // Remove from KV store by setting to undefined
-    // Note: KV doesn't have delete, but we can track drafts in a list
+    kv.set(key, undefined)
+
     const draftsListKey = `${DRAFT_PREFIX}list`
     const draftsList = kv.get(draftsListKey, []) as string[]
     const updatedList = draftsList.filter((k) => k !== key)

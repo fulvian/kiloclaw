@@ -11,31 +11,18 @@ import { MemoryEmbedding } from "@/kiloclaw/memory/memory.embedding"
 import { RECALL_TEST_CASES } from "./recall-test-cases"
 import { EpisodicMemoryRepo } from "@/kiloclaw/memory/memory.repository"
 
-// Mock the dependencies
-vi.mock("@/kiloclaw/memory/memory.embedding", () => ({
-  MemoryEmbedding: {
-    embed: vi.fn(),
-    embedBatch: vi.fn(),
-    model: () => "test-model",
-    baseURL: () => "http://localhost:1234",
-  },
-}))
-
-vi.mock("@/kiloclaw/memory/memory.repository", () => ({
-  EpisodicMemoryRepo: {
-    getRecentEpisodes: vi.fn(),
-    getEpisode: vi.fn(),
-    recordEpisode: vi.fn(),
-  },
-  SemanticMemoryRepo: {
-    similaritySearch: vi.fn(),
-  },
-}))
+const mockVec = (text: string) => {
+  const hash = text.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0)
+  const dim = 384
+  return Array.from({ length: dim }, (_, i) => Math.sin(hash * (i + 1)))
+}
 
 describe("SemanticTriggerPolicy", () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    EpisodicMemoryRepo.getRecentEpisodes = vi.fn().mockResolvedValue([])
+    vi.spyOn(MemoryEmbedding, "embed").mockImplementation(async (text: string) => mockVec(text))
+    vi.spyOn(MemoryEmbedding, "embedBatch").mockImplementation(async (texts: string[]) => texts.map(mockVec))
+    vi.spyOn(EpisodicMemoryRepo, "getRecentEpisodes").mockResolvedValue([])
   })
 
   afterEach(() => {

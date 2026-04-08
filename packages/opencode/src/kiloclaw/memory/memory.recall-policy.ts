@@ -111,6 +111,13 @@ export namespace MemoryRecallPolicy {
    */
   async function evaluateLegacy(text: string): Promise<RecallEval> {
     const intent = await MemoryIntent.classify(text)
+    const conversationalRef = /(conversaz|sessioni?|discusso|discussed)/i.test(text)
+    const contextBoost =
+      conversationalRef && intent.feats.temporal > 0 && intent.feats.referential > 0
+        ? 0.16
+        : conversationalRef && (intent.feats.temporal > 0 || intent.feats.referential > 0)
+          ? 0.1
+          : 0
     const boost =
       intent.kind === "explicit_recall"
         ? 0.18
@@ -119,7 +126,7 @@ export namespace MemoryRecallPolicy {
           : intent.kind === "continuation"
             ? 0.1
             : 0
-    const score = clamp(intent.score + boost)
+    const score = clamp(intent.score + boost + contextBoost)
 
     if (intent.kind === "preference_reuse" && PREF_HARD_RECALL.some((re) => re.test(text))) {
       const out = {

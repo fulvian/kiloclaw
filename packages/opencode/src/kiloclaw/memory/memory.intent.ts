@@ -37,6 +37,8 @@ const IT = [
   "avevamo",
   "parlato",
   "discusso",
+  "conversazione",
+  "conversazioni",
   "feedback",
   "preferenze",
   "gusto",
@@ -92,6 +94,8 @@ const EXPLICIT_RECALL = [
   /di\s+cosa\s+abbiamo\s+(?:parlato|discusso|trattato)/i,
   /cosa\s+abbiamo\s+(?:fatto|detto)\s+(?:ultimamente|nelle\s+ultime\s+chat|nelle\s+ultime\s+sessioni)/i,
   /di\s+cosa\s+si\s+è\s+parlato/i,
+  /nostr[aoe]?\s+conversaz(?:ione|ioni)/i,
+  /conversaz(?:ione|ioni).*(?:precedent|recent)/i,
   /what\s+did\s+we\s+(?:talk\s+about|discuss)\s+(?:recently|in\s+the\s+last\s+sessions?)/i,
   /what\s+have\s+we\s+been\s+(?:working\s+on|discussing)/i,
 ]
@@ -248,6 +252,12 @@ function hasExplicitRecallCue(text: string): boolean {
     /\b(ultimamente|ultime\s+chat|ultime\s+sessioni|precedenti\s+sessioni)\b/i.test(text) &&
     /\b(abbiamo|we)\b/i.test(text)
   ) {
+    return true
+  }
+  if (/\b(nostr[aoe]?\s+conversaz(?:ione|ioni)|conversaz(?:ione|ioni)\s+precedent)\b/i.test(text)) {
+    return true
+  }
+  if (text.includes("conversaz") && /(nostr|recent|precedent)/i.test(text)) {
     return true
   }
   return false

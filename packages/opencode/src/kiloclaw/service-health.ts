@@ -15,6 +15,9 @@ import { dirname } from "path"
 import { HealthCheck as LMStudioHealth } from "@/kiloclaw/lmstudio/health"
 import { AutoStart as LMStudioAutoStart } from "@/kiloclaw/lmstudio/autostart"
 import { AuditRepo } from "@/kiloclaw/memory/memory.repository"
+import { DaemonRuntime } from "@/kiloclaw/proactive/runtime/daemon"
+import { ProactiveTaskStore } from "@/kiloclaw/proactive/scheduler.store"
+import { Instance } from "@/project/instance"
 
 const log = Log.create({ service: "kiloclaw.service.health" })
 
@@ -358,6 +361,88 @@ export namespace ServiceHealth {
   }
 
   /**
+   * Check scheduled task daemon health
+   */
+  async function checkScheduledDaemon(): Promise<CheckResult> {
+    const required = Flag.KILOCLAW_DAEMON_RUNTIME_ENABLED
+
+    if (!required) {
+      return {
+        name: "scheduled-daemon",
+        status: "healthy",
+        message: "Daemon runtime disabled (KILOCLAW_DAEMON_RUNTIME_ENABLED=false)",
+        canStartup: true,
+        requiresStartup: false,
+      }
+    }
+
+    try {
+      const lease = ProactiveTaskStore.getLease("scheduled_runtime")
+      if (!lease) {
+        return {
+          name: "scheduled-daemon",
+          status: "unavailable",
+          message: "Daemon not running - lease not acquired",
+          error: "run 'kiloclaw daemon run --project <path>' or 'kiloclaw daemon install'",
+          canStartup: true,
+          requiresStartup: true,
+        }
+      }
+
+      if (lease.expiresAt < Date.now()) {
+        return {
+          name: "scheduled-daemon",
+          status: "unavailable",
+          message: "Daemon lease expired",
+          error: "run 'kiloclaw daemon run --project <path>' to restart",
+          canStartup: true,
+          requiresStartup: true,
+        }
+      }
+
+      return {
+        name: "scheduled-daemon",
+        status: "healthy",
+        message: `Daemon running as lease holder: ${lease.ownerId}`,
+        canStartup: true,
+        requiresStartup: false,
+      }
+    } catch (err) {
+      return {
+        name: "scheduled-daemon",
+        status: "degraded",
+        message: "Could not check daemon status",
+        error: String(err),
+        canStartup: true,
+        requiresStartup: false,
+      }
+    }
+  }
+
+  /**
+   * Try to auto-start the scheduled daemon
+   */
+  async function tryStartScheduledDaemon(): Promise<void> {
+    if (!Flag.KILOCLAW_DAEMON_RUNTIME_ENABLED) {
+      return
+    }
+
+    try {
+      const projectPath = Instance.directory ?? process.cwd()
+
+      DaemonRuntime.init({
+        ownerId: `auto-start-${process.pid}-${Date.now()}`,
+        projectPath,
+      })
+
+      await DaemonRuntime.start()
+      log.info("scheduled daemon auto-started successfully")
+    } catch (err) {
+      log.error("failed to auto-start scheduled daemon", { err })
+    }
+  }
+
+  /**
    * Service descriptors - define all services to check
    */
   const services: ServiceDescriptor[] = [
@@ -391,6 +476,12 @@ export namespace ServiceHealth {
       required: false,
       check: checkPolicyAuditTrail,
     },
+    {
+      name: "scheduled-daemon",
+      required: Flag.KILOCLAW_DAEMON_RUNTIME_ENABLED,
+      check: checkScheduledDaemon,
+      startup: tryStartScheduledDaemon,
+    },
   ]
 
   /**
@@ -413,6 +504,23 @@ export namespace ServiceHealth {
     for (let i = 0; i < results.length; i++) {
       const result = results[i]
       const service = services[i]
+
+      // If service is unavailable and has a startup function, try to start it
+      if (result.status === "unavailable" && service.startup) {
+        log.info(`attempting to auto-start ${service.name}...`)
+        try {
+          await service.startup()
+          // Re-check after starting
+          const recheck = await service.check()
+          if (recheck.status === "healthy") {
+            log.info(`${service.name} auto-started successfully`)
+            report.healthy.push(service)
+            continue
+          }
+        } catch (err) {
+          log.error(`failed to auto-start ${service.name}`, { err })
+        }
+      }
 
       switch (result.status) {
         case "healthy":

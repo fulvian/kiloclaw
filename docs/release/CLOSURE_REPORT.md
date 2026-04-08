@@ -5,15 +5,15 @@
 > **Start Date:** 2026-04-02  
 > **Completion Date:** TBD  
 > **Duration:** Ongoing (re-baselined on 2026-04-07)  
-> **Status:** WAVE 6 READINESS IN PROGRESS - Go-live pending staging sign-off
+> **Status:** WAVE 6 READINESS VERIFIED - Go-live pending organizational sign-off
 
 ---
 
 ## 1. Executive Summary
 
-The Kiloclaw Foundation Rebuild has completed implementation scope through Wave 5 and is executing Wave 6 release-readiness gates. Latest local verification shows `bun run --cwd packages/opencode test test/kiloclaw/` at 382 pass and 0 fail, while go-live remains blocked on staging sign-off.
+The Kiloclaw Foundation Rebuild has completed implementation scope through Wave 5 and completed Wave 6 technical release-readiness gates in local and staging preflight. Latest verification shows `bun run --cwd packages/opencode test test/kiloclaw/` at 804 pass, 3 skip, and 0 fail, `bun run --cwd packages/opencode test test/cli/task-command.test.ts` at 2 pass and 0 fail, and `bash script/wave6-staging-gates.sh` succeeded on context `kind-kiloclaw-staging`.
 
-**Overall Assessment:** ⏳ IMPLEMENTATION COMPLETE (WAVE 1-5) - RELEASE READINESS IN PROGRESS
+**Overall Assessment:** ⏳ TECHNICAL READINESS COMPLETE - AWAITING EXTERNAL SIGN-OFF
 
 ---
 
@@ -212,11 +212,12 @@ Acceleration factors recorded in the original baseline:
 
 ### 9.1 Open Issues
 
-| Issue                                | Severity | Owner  | Target Resolution |
-| ------------------------------------ | -------- | ------ | ----------------- |
-| tsgo typecheck environment issue     | Low      | DevOps | Post-release      |
-| CI integration for new test suites   | Medium   | DevOps | Post-release      |
-| Production deployment infrastructure | High     | DevOps | Phase 7 (Go-Live) |
+| Issue                                | Severity | Owner                 | Target Resolution    |
+| ------------------------------------ | -------- | --------------------- | -------------------- |
+| tsgo typecheck environment issue     | Low      | DevOps                | Post-release         |
+| CI integration for new test suites   | Medium   | DevOps                | Post-release         |
+| Production deployment infrastructure | High     | DevOps                | Phase 7 (Go-Live)    |
+| External Wave 6 sign-off signatures  | High     | Leadership + Security | Required for go-live |
 
 ### 9.2 Backlog Items (Post-Foundation)
 
@@ -234,15 +235,15 @@ Acceleration factors recorded in the original baseline:
 
 ### Project Completion Status
 
-| Milestone          | Status                  | Date       |
-| ------------------ | ----------------------- | ---------- |
-| Foundation         | ✅ COMPLETE             | 2026-04-02 |
-| Core Runtime       | ✅ COMPLETE             | 2026-04-02 |
-| Memory             | ✅ COMPLETE             | 2026-04-02 |
-| Agency Migration   | ✅ COMPLETE             | 2026-04-02 |
-| Proactivity/Safety | ✅ COMPLETE             | 2026-04-02 |
-| Verification       | ✅ COMPLETE             | 2026-04-02 |
-| Release            | ⏳ IN PROGRESS (Wave 6) | TBD        |
+| Milestone          | Status                        | Date       |
+| ------------------ | ----------------------------- | ---------- |
+| Foundation         | ✅ COMPLETE                   | 2026-04-02 |
+| Core Runtime       | ✅ COMPLETE                   | 2026-04-02 |
+| Memory             | ✅ COMPLETE                   | 2026-04-02 |
+| Agency Migration   | ✅ COMPLETE                   | 2026-04-02 |
+| Proactivity/Safety | ✅ COMPLETE                   | 2026-04-02 |
+| Verification       | ✅ COMPLETE                   | 2026-04-02 |
+| Release            | ⏳ AWAITING EXTERNAL SIGN-OFF | TBD        |
 
 ### Final Approval
 

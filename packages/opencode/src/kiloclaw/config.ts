@@ -79,6 +79,10 @@ function isBlocked(key: string): boolean {
   return BLOCKED_PREFIXES.some((prefix) => key.startsWith(prefix))
 }
 
+function hasLegacyEnv(): boolean {
+  return Object.keys(process.env).some((key) => BLOCKED_PREFIXES.some((prefix) => key.startsWith(prefix)))
+}
+
 // Convert KILOCLAW_* env vars to config object
 function envToConfig(): Partial<ConfigInfo> {
   const log = Log.create({ service: "kiloclaw.config" })
@@ -142,6 +146,10 @@ export const Config = {
     }),
     (input) => {
       const log = Log.create({ service: "kiloclaw.config" })
+
+      if (process.env["KILOCLAW_STRICT_ENV"] === "true" && hasLegacyEnv()) {
+        throw new Error("KILOCLAW_STRICT_ENV=true blocks legacy env prefixes (ARIA_, KILO_, OPENCODE_)")
+      }
 
       // Validate no blocked prefixes are used
       for (const key of Object.keys(process.env)) {
