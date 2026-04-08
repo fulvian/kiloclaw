@@ -15,53 +15,30 @@ import {
   ProceduralMemoryRepo,
 } from "@/kiloclaw/memory/memory.repository"
 
-// Mock the dependencies
-vi.mock("@/kiloclaw/memory/memory.embedding", () => ({
-  MemoryEmbedding: {
-    embed: vi.fn(),
-    embedBatch: vi.fn(),
-    model: () => "test-model",
-    baseURL: () => "http://localhost:1234",
-  },
-}))
-
-vi.mock("@/kiloclaw/memory/memory.repository", () => ({
-  SemanticMemoryRepo: {
-    similaritySearch: vi.fn(),
-    queryFacts: vi.fn(),
-    assertFact: vi.fn(),
-    storeVector: vi.fn(),
-  },
-  EpisodicMemoryRepo: {
-    getRecentEpisodes: vi.fn(),
-    recordEpisode: vi.fn(),
-    recordEvent: vi.fn(),
-  },
-  WorkingMemoryRepo: {
-    getMany: vi.fn(),
-    set: vi.fn(),
-    get: vi.fn(),
-    delete: vi.fn(),
-  },
-  ProceduralMemoryRepo: {
-    list: vi.fn(),
-    register: vi.fn(),
-    get: vi.fn(),
-  },
-  UserProfileRepo: {
-    get: vi.fn(),
-  },
-  FeedbackRepo: {
-    record: vi.fn(),
-  },
-  AuditRepo: {
-    log: vi.fn(),
-  },
-}))
-
 describe("HybridRetriever", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+
+    vi.spyOn(MemoryEmbedding, "embed").mockResolvedValue(Array.from({ length: 384 }, () => 0.1))
+    vi.spyOn(MemoryEmbedding, "embedBatch").mockResolvedValue([Array.from({ length: 384 }, () => 0.1)])
+
+    vi.spyOn(SemanticMemoryRepo, "similaritySearch").mockResolvedValue([])
+    vi.spyOn(SemanticMemoryRepo, "queryFacts").mockResolvedValue([])
+    vi.spyOn(SemanticMemoryRepo, "assertFact").mockResolvedValue("fact_mock")
+    vi.spyOn(SemanticMemoryRepo, "storeVector").mockResolvedValue("vec_mock")
+
+    vi.spyOn(EpisodicMemoryRepo, "getRecentEpisodes").mockResolvedValue([])
+    vi.spyOn(EpisodicMemoryRepo, "recordEpisode").mockResolvedValue("ep_mock")
+    vi.spyOn(EpisodicMemoryRepo, "recordEvent").mockResolvedValue("evt_mock")
+
+    vi.spyOn(WorkingMemoryRepo, "getMany").mockResolvedValue({})
+    vi.spyOn(WorkingMemoryRepo, "set").mockResolvedValue(undefined)
+    vi.spyOn(WorkingMemoryRepo, "get").mockResolvedValue(undefined)
+    vi.spyOn(WorkingMemoryRepo, "delete").mockResolvedValue(undefined)
+
+    vi.spyOn(ProceduralMemoryRepo, "list").mockResolvedValue([])
+    vi.spyOn(ProceduralMemoryRepo, "register").mockResolvedValue("proc_mock")
+    vi.spyOn(ProceduralMemoryRepo, "get").mockResolvedValue(null)
   })
 
   afterEach(() => {
@@ -70,10 +47,10 @@ describe("HybridRetriever", () => {
 
   describe("Basic retrieval", () => {
     it("returns empty result when no data available", async () => {
-      SemanticMemoryRepo.similaritySearch = vi.fn().mockResolvedValue([])
-      EpisodicMemoryRepo.getRecentEpisodes = vi.fn().mockResolvedValue([])
-      WorkingMemoryRepo.getMany = vi.fn().mockResolvedValue({})
-      ProceduralMemoryRepo.list = vi.fn().mockResolvedValue([])
+      ;(SemanticMemoryRepo.similaritySearch as ReturnType<typeof vi.fn>).mockResolvedValue([])
+      ;(EpisodicMemoryRepo.getRecentEpisodes as ReturnType<typeof vi.fn>).mockResolvedValue([])
+      ;(WorkingMemoryRepo.getMany as ReturnType<typeof vi.fn>).mockResolvedValue({})
+      ;(ProceduralMemoryRepo.list as ReturnType<typeof vi.fn>).mockResolvedValue([])
 
       const result = await HybridRetriever.retrieve({ query: "test query" })
 
@@ -93,14 +70,15 @@ describe("HybridRetriever", () => {
           confidence: 90,
         },
       ]
-      SemanticMemoryRepo.similaritySearch = vi.fn().mockResolvedValue([{ fact: mockFacts[0], similarity: 0.85 }])
+      ;(SemanticMemoryRepo.similaritySearch as ReturnType<typeof vi.fn>).mockResolvedValue([
+        { fact: mockFacts[0], similarity: 0.85 },
+      ])
 
       // Mock empty BM25 results for other layers
-      EpisodicMemoryRepo.getRecentEpisodes = vi.fn().mockResolvedValue([])
-      WorkingMemoryRepo.getMany = vi.fn().mockResolvedValue({})
-      ProceduralMemoryRepo.list = vi.fn().mockResolvedValue([])
-
-      MemoryEmbedding.embed = vi.fn().mockResolvedValue([0.1, 0.2, 0.3])
+      ;(EpisodicMemoryRepo.getRecentEpisodes as ReturnType<typeof vi.fn>).mockResolvedValue([])
+      ;(WorkingMemoryRepo.getMany as ReturnType<typeof vi.fn>).mockResolvedValue({})
+      ;(ProceduralMemoryRepo.list as ReturnType<typeof vi.fn>).mockResolvedValue([])
+      ;(MemoryEmbedding.embed as ReturnType<typeof vi.fn>).mockResolvedValue([0.1, 0.2, 0.3])
 
       const result = await HybridRetriever.retrieve({ query: "ASUS ROG preference", limit: 10 })
 
@@ -114,7 +92,7 @@ describe("HybridRetriever", () => {
   describe("BM25 lexical fallback", () => {
     it("includes BM25 results when vector search returns nothing", async () => {
       // Mock empty semantic results
-      SemanticMemoryRepo.similaritySearch = vi.fn().mockResolvedValue([])
+      ;(SemanticMemoryRepo.similaritySearch as ReturnType<typeof vi.fn>).mockResolvedValue([])
 
       // Mock episodic results
       const mockEpisodes = [
@@ -124,16 +102,15 @@ describe("HybridRetriever", () => {
           outcome: "User prefers ASUS",
         },
       ]
-      EpisodicMemoryRepo.getRecentEpisodes = vi.fn().mockResolvedValue(mockEpisodes)
+      ;(EpisodicMemoryRepo.getRecentEpisodes as ReturnType<typeof vi.fn>).mockResolvedValue(mockEpisodes)
 
       // Mock empty working and procedural
-      WorkingMemoryRepo.getMany = vi.fn().mockResolvedValue({})
-      ProceduralMemoryRepo.list = vi.fn().mockResolvedValue([])
+      ;(WorkingMemoryRepo.getMany as ReturnType<typeof vi.fn>).mockResolvedValue({})
+      ;(ProceduralMemoryRepo.list as ReturnType<typeof vi.fn>).mockResolvedValue([])
 
       // Mock query facts for BM25 fallback
-      SemanticMemoryRepo.queryFacts = vi.fn().mockResolvedValue([])
-
-      MemoryEmbedding.embed = vi.fn().mockRejectedValue(new Error("LM Studio unavailable"))
+      ;(SemanticMemoryRepo.queryFacts as ReturnType<typeof vi.fn>).mockResolvedValue([])
+      ;(MemoryEmbedding.embed as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("LM Studio unavailable"))
 
       const result = await HybridRetriever.retrieve({ query: "schede madri MSI", limit: 10 })
 
@@ -143,10 +120,10 @@ describe("HybridRetriever", () => {
 
   describe("Layer filtering", () => {
     it("respects layer filter option", async () => {
-      SemanticMemoryRepo.similaritySearch = vi.fn().mockResolvedValue([])
-      EpisodicMemoryRepo.getRecentEpisodes = vi.fn().mockResolvedValue([])
-      WorkingMemoryRepo.getMany = vi.fn().mockResolvedValue({})
-      ProceduralMemoryRepo.list = vi.fn().mockResolvedValue([])
+      ;(SemanticMemoryRepo.similaritySearch as ReturnType<typeof vi.fn>).mockResolvedValue([])
+      ;(EpisodicMemoryRepo.getRecentEpisodes as ReturnType<typeof vi.fn>).mockResolvedValue([])
+      ;(WorkingMemoryRepo.getMany as ReturnType<typeof vi.fn>).mockResolvedValue({})
+      ;(ProceduralMemoryRepo.list as ReturnType<typeof vi.fn>).mockResolvedValue([])
 
       const result = await HybridRetriever.retrieve({
         query: "test",
@@ -170,13 +147,13 @@ describe("HybridRetriever", () => {
           confidence: 90,
         },
       ]
-      SemanticMemoryRepo.similaritySearch = vi.fn().mockResolvedValue([{ fact: mockFacts[0], similarity: 0.85 }])
-
-      EpisodicMemoryRepo.getRecentEpisodes = vi.fn().mockResolvedValue([])
-      WorkingMemoryRepo.getMany = vi.fn().mockResolvedValue({})
-      ProceduralMemoryRepo.list = vi.fn().mockResolvedValue([])
-
-      MemoryEmbedding.embed = vi.fn().mockResolvedValue([0.1, 0.2, 0.3])
+      ;(SemanticMemoryRepo.similaritySearch as ReturnType<typeof vi.fn>).mockResolvedValue([
+        { fact: mockFacts[0], similarity: 0.85 },
+      ])
+      ;(EpisodicMemoryRepo.getRecentEpisodes as ReturnType<typeof vi.fn>).mockResolvedValue([])
+      ;(WorkingMemoryRepo.getMany as ReturnType<typeof vi.fn>).mockResolvedValue({})
+      ;(ProceduralMemoryRepo.list as ReturnType<typeof vi.fn>).mockResolvedValue([])
+      ;(MemoryEmbedding.embed as ReturnType<typeof vi.fn>).mockResolvedValue([0.1, 0.2, 0.3])
 
       const result = await HybridRetriever.retrieve({ query: "ASUS ROG preference" })
 
@@ -195,15 +172,13 @@ describe("HybridRetriever", () => {
         confidence: 80,
       }))
 
-      SemanticMemoryRepo.similaritySearch = vi
-        .fn()
-        .mockResolvedValue(manyFacts.map((f) => ({ fact: f, similarity: 0.8 })))
-
-      EpisodicMemoryRepo.getRecentEpisodes = vi.fn().mockResolvedValue([])
-      WorkingMemoryRepo.getMany = vi.fn().mockResolvedValue({})
-      ProceduralMemoryRepo.list = vi.fn().mockResolvedValue([])
-
-      MemoryEmbedding.embed = vi.fn().mockResolvedValue([0.1, 0.2, 0.3])
+      ;(SemanticMemoryRepo.similaritySearch as ReturnType<typeof vi.fn>).mockResolvedValue(
+        manyFacts.map((f) => ({ fact: f, similarity: 0.8 })),
+      )
+      ;(EpisodicMemoryRepo.getRecentEpisodes as ReturnType<typeof vi.fn>).mockResolvedValue([])
+      ;(WorkingMemoryRepo.getMany as ReturnType<typeof vi.fn>).mockResolvedValue({})
+      ;(ProceduralMemoryRepo.list as ReturnType<typeof vi.fn>).mockResolvedValue([])
+      ;(MemoryEmbedding.embed as ReturnType<typeof vi.fn>).mockResolvedValue([0.1, 0.2, 0.3])
 
       const result = await HybridRetriever.retrieve({ query: "preference", limit: 5 })
 

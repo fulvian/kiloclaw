@@ -141,6 +141,28 @@ export namespace Flag {
 
   // Draft TTL in days (default 7)
   export const KILOCLAW_SCHEDULED_TASKS_DRAFT_TTL_DAYS = number("KILOCLAW_SCHEDULED_TASKS_DRAFT_TTL_DAYS") ?? 7
+
+  // Daemon runtime - disabled by default, enable with KILOCLAW_DAEMON_RUNTIME_ENABLED=true
+  export const KILOCLAW_DAEMON_RUNTIME_ENABLED = truthy("KILOCLAW_DAEMON_RUNTIME_ENABLED")
+
+  // =============================================================================
+  // Scheduled Tasks Enhancement (Phases 0-5)
+  // =============================================================================
+
+  // Phase 0: Instrument - metrics, timeline fields, dual timestamps
+  export const KILOCLAW_TASK_TIMELINE_V1 = truthy("KILOCLAW_TASK_TIMELINE_V1")
+
+  // Phase 1: Correct schedule engine - timezone-aware post-run recompute
+  export const KILOCLAW_SCHEDULER_NEXTRUN_UNIFIED = truthy("KILOCLAW_SCHEDULER_NEXTRUN_UNIFIED")
+
+  // Phase 2: State machine + archive UX - durable states, completed/archived surfaces
+  export const KILOCLAW_TASK_STATE_V2 = truthy("KILOCLAW_TASK_STATE_V2")
+
+  // Phase 3: Real run/replay actions - replace placeholders with execution intents
+  export const KILOCLAW_TASK_ACTIONS_EXEC = truthy("KILOCLAW_TASK_ACTIONS_EXEC")
+
+  // Phase 4: Notifications - channel fanout (toast, webhook, email)
+  export const KILOCLAW_TASK_NOTIFY_V1 = truthy("KILOCLAW_TASK_NOTIFY_V1")
 }
 
 // Dynamic getter for KILO_DISABLE_PROJECT_CONFIG

@@ -8,6 +8,9 @@ import { ProactiveTaskStore, type ProactiveTask, type RunOutcome } from "./sched
 import { BudgetManager } from "./budget"
 import { ProactivityLimitsManager } from "./limits"
 import type { TriggerEvent } from "./trigger"
+import { createHash } from "node:crypto"
+import { nextRuns } from "./schedule-parse"
+import { Flag } from "@/flag/flag"
 
 // =============================================================================
 // Types
@@ -309,7 +312,14 @@ export const ProactiveSchedulerEngine = {
   },
 
   async executeTaskInternal(task: ProactiveTask): Promise<boolean> {
-    const runId = `run-${Date.now()}-${task.id}`
+    const runId = `run_${crypto.randomUUID()}`
+    const scheduledFor = task.nextRunAt ?? Date.now()
+    const attempt = task.retryCount + 1
+    const cfg = this.taskConfig(task)
+    const salt = typeof cfg.idempotencySalt === "string" ? cfg.idempotencySalt : task.id
+    const correlationId = `corr_${crypto.randomUUID()}`
+    const idempotencyKey = createHash("sha256").update(`${task.id}:${scheduledFor}:${attempt}:${salt}`).digest("hex")
+    const traceId = `trace_${crypto.randomUUID()}`
 
     if (this.inFlightTasks.has(task.id)) {
       this.log.debug("task already in flight", { taskId: task.id })
@@ -338,7 +348,13 @@ export const ProactiveSchedulerEngine = {
           blockers: gateResult.blockers,
         })
 
-        this.recordTaskRun(runId, task, outcome, startedAt, gateResult, null)
+        this.recordTaskRun(runId, task, outcome, startedAt, gateResult, null, {
+          attempt,
+          scheduledFor,
+          correlationId,
+          idempotencyKey,
+          traceId,
+        })
         this.tasksBlocked++
         this.tasksProcessed++
 
@@ -347,7 +363,13 @@ export const ProactiveSchedulerEngine = {
 
       if (!this.executeWithBudget(task)) {
         outcome = "budget_exceeded"
-        this.recordTaskRun(runId, task, outcome, startedAt, gateResult, null)
+        this.recordTaskRun(runId, task, outcome, startedAt, gateResult, null, {
+          attempt,
+          scheduledFor,
+          correlationId,
+          idempotencyKey,
+          traceId,
+        })
         this.tasksBlocked++
         this.tasksProcessed++
 
@@ -361,9 +383,15 @@ export const ProactiveSchedulerEngine = {
       }
 
       outcome = "success"
-      this.recordTaskRun(runId, task, outcome, startedAt, gateResult, null)
+      this.recordTaskRun(runId, task, outcome, startedAt, gateResult, null, {
+        attempt,
+        scheduledFor,
+        correlationId,
+        idempotencyKey,
+        traceId,
+      })
 
-      const nextRunAt = this.calculateNextRun(task.scheduleCron ?? null)
+      const nextRunAt = this.calculateNextRun(task)
       ProactiveTaskStore.update(task.id, {
         status: "active",
         nextRunAt,
@@ -433,7 +461,21 @@ export const ProactiveSchedulerEngine = {
         })
       }
 
-      this.recordTaskRun(runId, task, outcome, startedAt, gateResult, { error: errorMsg })
+      this.recordTaskRun(
+        runId,
+        task,
+        outcome,
+        startedAt,
+        gateResult,
+        { error: errorMsg },
+        {
+          attempt,
+          scheduledFor,
+          correlationId,
+          idempotencyKey,
+          traceId,
+        },
+      )
       this.tasksFailed++
       this.tasksProcessed++
 
@@ -454,6 +496,13 @@ export const ProactiveSchedulerEngine = {
     startedAt: number,
     gateResult: GateResult | null,
     errorInfo: { error: string } | null,
+    meta?: {
+      attempt: number
+      scheduledFor: number
+      correlationId: string
+      idempotencyKey: string
+      traceId: string
+    },
   ): void {
     const durationMs = Date.now() - startedAt
 
@@ -470,16 +519,55 @@ export const ProactiveSchedulerEngine = {
     ProactiveTaskStore.recordRun({
       id: runId,
       taskId: task.id,
+      runType: "scheduled",
+      attempt: meta?.attempt,
+      scheduledFor: meta?.scheduledFor,
+      startedAt,
+      finishedAt: Date.now(),
       outcome,
       durationMs,
       gateDecisions,
+      errorCode: errorInfo
+        ? "task_execution_failed"
+        : outcome === "policy_denied"
+          ? "policy_denied"
+          : outcome === "budget_exceeded"
+            ? "budget_exceeded"
+            : null,
+      errorMessage: errorInfo?.error ?? null,
+      correlationId: meta?.correlationId,
+      idempotencyKey: meta?.idempotencyKey,
+      traceId: meta?.traceId,
       evidenceRefs: null,
     })
   },
 
-  calculateNextRun(cron: string | null): number | null {
+  taskConfig(task: ProactiveTask): Record<string, unknown> {
+    try {
+      return JSON.parse(task.triggerConfig) as Record<string, unknown>
+    } catch {
+      return {}
+    }
+  },
+
+  calculateNextRun(task: ProactiveTask): number | null {
+    const cron = task.scheduleCron
     if (!cron) return null
 
+    // Use unified timezone-aware scheduler if flag is enabled
+    if (Flag.KILOCLAW_SCHEDULER_NEXTRUN_UNIFIED) {
+      try {
+        const config = this.taskConfig(task)
+        const timezone =
+          typeof config.timezone === "string" ? config.timezone : Intl.DateTimeFormat().resolvedOptions().timeZone
+        const runs = nextRuns({ cron, timezone, count: 1 })
+        return runs[0] ?? null
+      } catch (err) {
+        this.log.warn("failed to compute next run with nextRuns", { taskId: task.id, err })
+      }
+    }
+
+    // Fallback to legacy behavior
     try {
       const parts = cron.split(" ")
       if (parts.length >= 2) {

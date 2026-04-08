@@ -10,7 +10,7 @@ export const SchedulePreset = z.enum([
 
 export type SchedulePreset = z.infer<typeof SchedulePreset>
 
-export const ScheduleKind = z.enum(["preset", "cron"])
+export const ScheduleKind = z.enum(["preset", "cron", "one_shot"])
 export type ScheduleKind = z.infer<typeof ScheduleKind>
 
 export const ScheduleCategory = z.enum(["daily", "weekdays", "weekly", "monthly"])
@@ -149,11 +149,20 @@ export function isValidTimezone(timezone: string): boolean {
   }
 }
 
-export function resolveSchedule(input: { preset?: SchedulePreset | null; cron?: string | null }): {
+export function resolveSchedule(input: {
+  preset?: string | null
+  cron?: string | null
+  mode?: "one_shot" | "recurring"
+}): {
   kind: ScheduleKind
   expr: string
-  preset?: SchedulePreset
+  preset?: string
 } {
+  // Explicit one-shot mode: single execution, no recurrence
+  if (input.mode === "one_shot") {
+    return { kind: "one_shot", expr: "0 0 * * *" }
+  }
+
   const cron = input.cron?.trim()
   if (cron) {
     const valid = validateCron(cron)
@@ -164,9 +173,23 @@ export function resolveSchedule(input: { preset?: SchedulePreset | null; cron?: 
   }
 
   const preset = input.preset ?? DEFAULT_PRESET
+  const knownPreset = SchedulePreset.safeParse(preset)
+  if (knownPreset.success) {
+    return {
+      kind: "preset",
+      expr: presetToCron(knownPreset.data),
+      preset: knownPreset.data,
+    }
+  }
+
+  const parsedPreset = parsePresetToCategory(preset)
+  if (!parsedPreset) {
+    throw new Error(`invalid preset: ${preset}`)
+  }
+
   return {
     kind: "preset",
-    expr: presetToCron(preset),
+    expr: scheduleToCron(parsedPreset),
     preset,
   }
 }

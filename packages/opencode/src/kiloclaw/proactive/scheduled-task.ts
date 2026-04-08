@@ -1,12 +1,5 @@
 import z from "zod"
-import {
-  DEFAULT_PRESET,
-  type SchedulePreset,
-  isValidTimezone,
-  nextRuns,
-  resolveSchedule,
-  validateCron,
-} from "./schedule-parse"
+import { DEFAULT_PRESET, isValidTimezone, nextRuns, resolveSchedule, validateCron } from "./schedule-parse"
 
 export const DstPolicy = z.enum(["skip-duplicate", "run-twice"])
 export type DstPolicy = z.infer<typeof DstPolicy>
@@ -22,6 +15,25 @@ export type MissedRunPolicy = z.infer<typeof MissedRunPolicy>
 
 export const ApprovalPolicy = z.enum(["auto", "always", "never-low-risk"])
 export type ApprovalPolicy = z.infer<typeof ApprovalPolicy>
+
+// Notification channels
+export const NotificationChannel = z.enum(["toast", "webhook", "email", "none"])
+export type NotificationChannel = z.infer<typeof NotificationChannel>
+
+// Notification severity thresholds
+export const NotificationSeverity = z.enum(["all", "success", "warning", "error", "critical"])
+export type NotificationSeverity = z.infer<typeof NotificationSeverity>
+
+// Notification config for tasks
+export const NotificationConfig = z.object({
+  channel: NotificationChannel.default("toast"),
+  severityThreshold: NotificationSeverity.default("error"),
+  digestMode: z.boolean().default(false),
+  webhookUrl: z.string().url().nullable().optional(),
+  emailTo: z.string().email().nullable().optional(),
+})
+
+export type NotificationConfig = z.infer<typeof NotificationConfig>
 
 export const QuietHours = z
   .object({
@@ -50,6 +62,7 @@ export const ScheduledTaskCreateSchema = z.object({
   requireApproval: ApprovalPolicy.default("auto"),
   quietHours: z.string().optional(),
   enabled: z.boolean().default(true),
+  notifications: NotificationConfig.optional(),
 })
 
 export type ScheduledTaskCreateInput = z.infer<typeof ScheduledTaskCreateSchema>
@@ -71,6 +84,10 @@ export function buildCreate(
     name: string
     triggerConfig: string
     scheduleCron: string
+    scheduleType: "one_shot" | "recurring"
+    timezone: string
+    displaySchedule: string
+    state: "active" | "paused" | "running" | "completed" | "archived" | "dlq" | "failed"
     nextRunAt: number | null
     maxRetries: number
   }
@@ -86,8 +103,12 @@ export function buildCreate(
   const schedule = resolveSchedule({ preset, cron: input.cron })
   const runList = nextRuns({ cron: schedule.expr, timezone, count: 2 })
   const quiet = parseQuietHours(input.quietHours)
+
+  // Determine schedule type based on whether it's a one-shot preset or cron with count=1
+  const scheduleType: "one_shot" | "recurring" = schedule.kind === "one_shot" ? "one_shot" : "recurring"
+
   const cfg = {
-    schema: "kiloclaw.scheduled.v1",
+    schema: "kilocclaw.scheduled.v1",
     prompt: input.prompt,
     mode: schedule.kind,
     preset: schedule.preset ?? null,
@@ -108,6 +129,7 @@ export function buildCreate(
     quietHours: quiet,
     enabled: input.enabled,
     idempotencySalt: crypto.randomUUID(),
+    notifications: input.notifications ?? { channel: "toast", severityThreshold: "error", digestMode: false },
   }
 
   return {
@@ -117,6 +139,10 @@ export function buildCreate(
       name: input.name,
       triggerConfig: JSON.stringify(cfg),
       scheduleCron: schedule.expr,
+      scheduleType,
+      timezone,
+      displaySchedule: schedule.expr,
+      state: input.enabled ? "active" : "paused",
       nextRunAt: runList[0] ?? null,
       maxRetries: input.retryMaxAttempts,
     },
@@ -125,6 +151,7 @@ export function buildCreate(
       name: input.name,
       status: input.enabled ? "active" : "paused",
       schedule: schedule.expr,
+      scheduleType,
       timezone,
       nextRuns: runList,
       runtime: {
@@ -221,28 +248,36 @@ export function validateSchedule(input: { cron?: string; preset?: string; timezo
     return { ok: false, error: `invalid timezone: ${timezone}` }
   }
 
-  const preset = toPreset(input.preset)
-  const schedule = resolveSchedule({ preset, cron: input.cron })
-  const valid = validateCron(schedule.expr)
-  if (!valid.ok) {
-    return { ok: false, error: valid.error }
+  const cron = input.cron?.trim()
+  if (input.cron !== undefined && !cron) {
+    return { ok: false, error: "cron expression is required" }
   }
 
-  return {
-    ok: true,
-    schedule: schedule.expr,
-    timezone,
-    nextRuns: nextRuns({ cron: schedule.expr, timezone, count: 2 }),
+  try {
+    const preset = toPreset(input.preset)
+    const schedule = resolveSchedule({ preset, cron })
+    const valid = validateCron(schedule.expr)
+    if (!valid.ok) {
+      return { ok: false, error: valid.error }
+    }
+
+    return {
+      ok: true,
+      schedule: schedule.expr,
+      timezone,
+      nextRuns: nextRuns({ cron: schedule.expr, timezone, count: 2 }),
+    }
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "invalid schedule",
+    }
   }
 }
 
-function toPreset(input?: string): SchedulePreset | undefined {
+function toPreset(input?: string): string | undefined {
   if (!input) return DEFAULT_PRESET
-  const parsed = z
-    .enum(["hourly", "daily-09:00", "weekdays-09:00", "weekly-mon-09:00", "monthly-1st-09:00"])
-    .safeParse(input)
-  if (parsed.success) return parsed.data
-  throw new Error(`invalid preset: ${input}`)
+  return input.trim()
 }
 
 function parseQuietHours(input?: string): QuietHours {

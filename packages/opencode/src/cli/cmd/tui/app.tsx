@@ -7,6 +7,8 @@ import { Switch, Match, createEffect, untrack, ErrorBoundary, createSignal, onMo
 import { win32DisableProcessedInput, win32FlushInputBuffer, win32InstallCtrlCGuard } from "./win32"
 import { Installation } from "@/installation"
 import { Flag } from "@/flag/flag"
+import { ProactiveTaskStore } from "@/kiloclaw/proactive/scheduler.store"
+import { ProactiveSchedulerEngine } from "@/kiloclaw/proactive/scheduler.engine"
 import { DialogProvider, useDialog } from "@tui/ui/dialog"
 import { DialogProvider as DialogProviderList } from "@tui/component/dialog-provider"
 import { SDKProvider, useSDK } from "@tui/context/sdk"
@@ -872,9 +874,28 @@ function App() {
             handleTaskNavigate("show", taskId)
           }}
           onRunNow={() => {
-            queueMicrotask(() =>
-              toast.show({ variant: "info", message: "Task run triggered (Phase 4)", duration: 2000 }),
-            )
+            if (Flag.KILOCLAW_TASK_ACTIONS_EXEC) {
+              // Real execution via scheduler engine
+              const task = ProactiveTaskStore.get(taskId)
+              if (!task) {
+                queueMicrotask(() => toast.show({ variant: "error", message: "Task not found", duration: 2000 }))
+                return
+              }
+              // Execute immediately by setting nextRunAt to now and triggering
+              ProactiveTaskStore.update(taskId, { nextRunAt: Date.now() })
+              ProactiveSchedulerEngine.executeTask({ taskId }).then((ok) => {
+                if (ok) {
+                  queueMicrotask(() => toast.show({ variant: "success", message: "Task executed", duration: 2000 }))
+                } else {
+                  queueMicrotask(() =>
+                    toast.show({ variant: "error", message: "Task execution failed", duration: 2000 }),
+                  )
+                }
+                handleTaskNavigate("show", taskId)
+              })
+            } else {
+              queueMicrotask(() => toast.show({ variant: "info", message: "Run now is not enabled", duration: 2000 }))
+            }
           }}
           onDelete={() => {
             const { ProactiveTaskStore } = require("@/kiloclaw/proactive/scheduler.store")
@@ -911,8 +932,32 @@ function App() {
       dialog.replace(() => (
         <DialogTaskDLQ
           taskId={taskId}
-          onReplayEntry={() => {
-            queueMicrotask(() => toast.show({ variant: "info", message: "Replay triggered (Phase 4)", duration: 2000 }))
+          onReplayEntry={(entryId) => {
+            if (Flag.KILOCLAW_TASK_ACTIONS_EXEC) {
+              // Replay DLQ entry - re-queue the task for immediate execution
+              const entry = ProactiveTaskStore.getDLQEntry(entryId)
+              if (!entry) {
+                queueMicrotask(() => toast.show({ variant: "error", message: "DLQ entry not found", duration: 2000 }))
+                return
+              }
+              // Move task back to active and execute
+              ProactiveTaskStore.update(entry.taskId, {
+                status: "active",
+                nextRunAt: Date.now(),
+              })
+              ProactiveTaskStore.removeFromDLQ(entryId)
+              ProactiveSchedulerEngine.executeTask({ taskId: entry.taskId }).then((ok) => {
+                if (ok) {
+                  queueMicrotask(() =>
+                    toast.show({ variant: "success", message: "DLQ entry replayed", duration: 2000 }),
+                  )
+                } else {
+                  queueMicrotask(() => toast.show({ variant: "error", message: "Replay failed", duration: 2000 }))
+                }
+              })
+            } else {
+              queueMicrotask(() => toast.show({ variant: "info", message: "Replay is not enabled", duration: 2000 }))
+            }
           }}
           onRemoveEntry={(entryId) => {
             const { ProactiveTaskStore } = require("@/kiloclaw/proactive/scheduler.store")
