@@ -807,17 +807,19 @@ function App() {
       case "new":
         // Wizard gate - allow if wizard enabled or if no specific wizard flag (backward compat)
         if (!Flag.KILOCLAW_SCHEDULED_TASKS_WIZARD_ENABLED && Flag.KILOCLAW_SCHEDULED_TASKS_ENABLED) {
-          toast.show({ variant: "error", message: "Task wizard is disabled", duration: 2000 })
+          queueMicrotask(() => toast.show({ variant: "error", message: "Task wizard is disabled", duration: 2000 }))
           return
         }
         dialog.replace(() => (
           <DialogTaskWizard
             taskId={taskId}
             onComplete={() => {
-              toast.show({
-                variant: "success",
-                message: taskId ? "Task updated successfully" : "Task created successfully",
-                duration: 3000,
+              queueMicrotask(() => {
+                toast.show({
+                  variant: "success",
+                  message: taskId ? "Task updated successfully" : "Task created successfully",
+                  duration: 3000,
+                })
               })
             }}
           />
@@ -826,7 +828,7 @@ function App() {
       case "list":
         // Views gate
         if (!Flag.KILOCLAW_SCHEDULED_TASKS_VIEWS_ENABLED && Flag.KILOCLAW_SCHEDULED_TASKS_ENABLED) {
-          toast.show({ variant: "error", message: "Task views are disabled", duration: 2000 })
+          queueMicrotask(() => toast.show({ variant: "error", message: "Task views are disabled", duration: 2000 }))
           return
         }
         dialog.replace(() => (
@@ -845,7 +847,7 @@ function App() {
       case "edit":
         // Views gate
         if (!Flag.KILOCLAW_SCHEDULED_TASKS_VIEWS_ENABLED && Flag.KILOCLAW_SCHEDULED_TASKS_ENABLED) {
-          toast.show({ variant: "error", message: "Task views are disabled", duration: 2000 })
+          queueMicrotask(() => toast.show({ variant: "error", message: "Task views are disabled", duration: 2000 }))
           return
         }
         if (!taskId) {
@@ -868,23 +870,25 @@ function App() {
             onPause={() => {
               const { ProactiveTaskStore } = require("@/kiloclaw/proactive/scheduler.store")
               ProactiveTaskStore.update(taskId, { status: "paused" })
-              toast.show({ variant: "info", message: "Task paused", duration: 2000 })
+              queueMicrotask(() => toast.show({ variant: "info", message: "Task paused", duration: 2000 }))
               // Refresh the detail view
               Bus.publish(TuiEvent.TaskNavigate, { action: "show", taskId })
             }}
             onResume={() => {
               const { ProactiveTaskStore } = require("@/kiloclaw/proactive/scheduler.store")
               ProactiveTaskStore.update(taskId, { status: "active" })
-              toast.show({ variant: "info", message: "Task resumed", duration: 2000 })
+              queueMicrotask(() => toast.show({ variant: "info", message: "Task resumed", duration: 2000 }))
               Bus.publish(TuiEvent.TaskNavigate, { action: "show", taskId })
             }}
             onRunNow={() => {
-              toast.show({ variant: "info", message: "Task run triggered (Phase 4)", duration: 2000 })
+              queueMicrotask(() =>
+                toast.show({ variant: "info", message: "Task run triggered (Phase 4)", duration: 2000 }),
+              )
             }}
             onDelete={() => {
               const { ProactiveTaskStore } = require("@/kiloclaw/proactive/scheduler.store")
               ProactiveTaskStore.remove(taskId)
-              toast.show({ variant: "info", message: "Task deleted", duration: 2000 })
+              queueMicrotask(() => toast.show({ variant: "info", message: "Task deleted", duration: 2000 }))
               dialog.clear()
             }}
             onClose={() => dialog.clear()}
@@ -894,11 +898,13 @@ function App() {
       case "runs":
         // Views gate
         if (!Flag.KILOCLAW_SCHEDULED_TASKS_VIEWS_ENABLED && Flag.KILOCLAW_SCHEDULED_TASKS_ENABLED) {
-          toast.show({ variant: "error", message: "Task views are disabled", duration: 2000 })
+          queueMicrotask(() => toast.show({ variant: "error", message: "Task views are disabled", duration: 2000 }))
           return
         }
         if (!taskId) {
-          toast.show({ variant: "error", message: "Task ID required for runs view", duration: 2000 })
+          queueMicrotask(() =>
+            toast.show({ variant: "error", message: "Task ID required for runs view", duration: 2000 }),
+          )
           return
         }
         dialog.replace(() => <DialogTaskRuns taskId={taskId} onClose={() => dialog.clear()} />)
@@ -906,14 +912,16 @@ function App() {
       case "dlq":
         // Views gate
         if (!Flag.KILOCLAW_SCHEDULED_TASKS_VIEWS_ENABLED && Flag.KILOCLAW_SCHEDULED_TASKS_ENABLED) {
-          toast.show({ variant: "error", message: "Task views are disabled", duration: 2000 })
+          queueMicrotask(() => toast.show({ variant: "error", message: "Task views are disabled", duration: 2000 }))
           return
         }
         dialog.replace(() => (
           <DialogTaskDLQ
             taskId={taskId}
             onReplayEntry={() => {
-              toast.show({ variant: "info", message: "Replay triggered (Phase 4)", duration: 2000 })
+              queueMicrotask(() =>
+                toast.show({ variant: "info", message: "Replay triggered (Phase 4)", duration: 2000 }),
+              )
             }}
             onRemoveEntry={(entryId) => {
               const { ProactiveTaskStore } = require("@/kiloclaw/proactive/scheduler.store")
