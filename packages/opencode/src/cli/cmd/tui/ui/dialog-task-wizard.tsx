@@ -165,14 +165,23 @@ export function DialogTaskWizard(props: { taskId?: string; onComplete?: () => vo
   // ---------------------------------------------------------------------------
   // Load existing draft or create new
   // ---------------------------------------------------------------------------
-  const existingDraft = isEditing() ? draftHelper.loadDraft("global", props.taskId) : draftHelper.loadDraft("global")
+  // IMPORTANT: For NEW tasks (/tasks new), always start fresh - don't load old drafts
+  // For EDITING existing tasks, load the draft or task from store
 
   function getInitialDraft(): TaskWizardDraft {
+    // When creating a new task, always start fresh at "schedule" step
+    if (!isEditing()) {
+      return draftHelper.createNewDraft()
+    }
+
+    // For editing: try to load existing draft first
+    const existingDraft = draftHelper.loadDraft("global", props.taskId)
     if (existingDraft) return existingDraft
 
     const newDraft = draftHelper.createNewDraft(props.taskId)
 
-    if (isEditing() && props.taskId) {
+    // Try to load task from store
+    if (props.taskId) {
       try {
         const { ProactiveTaskStore } = require("@/kiloclaw/proactive/scheduler.store")
         const existing = ProactiveTaskStore.get(props.taskId)
