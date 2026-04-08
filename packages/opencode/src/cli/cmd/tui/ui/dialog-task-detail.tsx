@@ -294,6 +294,17 @@ export function DialogTaskDetail(props: {
           <box
             paddingLeft={1}
             paddingRight={1}
+            backgroundColor={theme.error}
+            onMouseUp={() => {
+              publishTaskAction("task_delete", { taskId: props.taskId })
+              props.onDelete?.()
+            }}
+          >
+            <text fg={theme.background}>Delete</text>
+          </box>
+          <box
+            paddingLeft={1}
+            paddingRight={1}
             backgroundColor={theme.primary}
             onMouseUp={() => {
               publishTaskAction("wizard_start", { taskId: props.taskId })

@@ -87,6 +87,8 @@ export class ProactiveScheduler {
       }
     })
 
+    ProactiveSchedulerEngine.start()
+
     this.log.info("persistent mode initialized", { tenantId: this.tenantId })
   }
 
@@ -252,6 +254,7 @@ export class ProactiveScheduler {
       ProactiveTaskStore.recordRun({
         id: `run-${Date.now()}-${taskId}`,
         taskId,
+        runType: "scheduled",
         outcome: "success",
         durationMs: Date.now() - startedAt,
       })
@@ -307,6 +310,7 @@ export class ProactiveScheduler {
       ProactiveTaskStore.recordRun({
         id: `run-${Date.now()}-${taskId}`,
         taskId,
+        runType: "scheduled",
         outcome: "failed",
         durationMs: 0,
         gateDecisions: { error },

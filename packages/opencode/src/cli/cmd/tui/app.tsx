@@ -881,6 +881,11 @@ function App() {
                 queueMicrotask(() => toast.show({ variant: "error", message: "Task not found", duration: 2000 }))
                 return
               }
+              // Ensure engine is initialized and started before execution
+              if (!ProactiveSchedulerEngine.getIsRunning()) {
+                ProactiveSchedulerEngine.init({})
+                ProactiveSchedulerEngine.start()
+              }
               // Execute immediately by setting nextRunAt to now and triggering
               ProactiveTaskStore.update(taskId, { nextRunAt: Date.now() })
               ProactiveSchedulerEngine.executeTask({ taskId }).then((ok) => {
@@ -939,6 +944,11 @@ function App() {
               if (!entry) {
                 queueMicrotask(() => toast.show({ variant: "error", message: "DLQ entry not found", duration: 2000 }))
                 return
+              }
+              // Ensure engine is initialized and started before execution
+              if (!ProactiveSchedulerEngine.getIsRunning()) {
+                ProactiveSchedulerEngine.init({})
+                ProactiveSchedulerEngine.start()
               }
               // Move task back to active and execute
               ProactiveTaskStore.update(entry.taskId, {

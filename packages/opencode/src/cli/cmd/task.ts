@@ -275,6 +275,7 @@ export const TaskRunNowCommand = cmd({
       }
 
       ProactiveSchedulerEngine.init({})
+      ProactiveSchedulerEngine.start()
       const accepted = await ProactiveSchedulerEngine.executeTask({ taskId: task.id })
       const run = ProactiveTaskStore.getRuns(task.id, 1)[0] ?? null
       publishCliTaskAction("task_run_now", task.id, accepted)

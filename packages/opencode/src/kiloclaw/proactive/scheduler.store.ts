@@ -288,7 +288,7 @@ CREATE INDEX IF NOT EXISTS proactive_lease_expires_idx ON proactive_runtime_leas
 
 /**
  * Get the path for the proactive task database.
- * Uses XDG_DATA_HOME/.kilocode/proactive.db to match the rest of the system.
+ * Uses XDG_DATA_HOME/.kiloclaw/proactive.db to match the rest of the system.
  */
 function getProactiveDbPath(): string {
   if (process.env["KILOCLAW_PROACTIVE_DB_PATH"]) {
@@ -296,7 +296,7 @@ function getProactiveDbPath(): string {
   }
   const xdgDataHome =
     process.env["XDG_DATA_HOME"] ?? join(process.env["HOME"] ?? "/home/fulvio", ".local", "share", "kiloclaw")
-  return join(xdgDataHome, ".kilocode", "proactive.db")
+  return join(xdgDataHome, ".kiloclaw", "proactive.db")
 }
 
 const PROACTIVE_DB_PATH = getProactiveDbPath()
