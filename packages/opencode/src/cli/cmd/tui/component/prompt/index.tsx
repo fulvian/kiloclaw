@@ -24,7 +24,6 @@ import { useExit } from "../../context/exit"
 import { Clipboard } from "../../util/clipboard"
 import type { FilePart } from "@kilocode/sdk/v2"
 import { TuiEvent } from "../../event"
-import { Bus } from "@/bus"
 import { iife } from "@/util/iife"
 import { Locale } from "@/util/locale"
 import { formatDuration } from "@/util/format"
@@ -626,54 +625,24 @@ export function Prompt(props: PromptProps) {
     } else if (inputText.startsWith("/tasks")) {
       // Handle /tasks commands locally without sending to server
       // kilocode_change start - /tasks command parsing
-      const trimmed = inputText.slice(1).trim() // Remove leading /
+      const trimmed = inputText.slice(1).trim()
       const parts = trimmed.split(/\s+/)
       const subcmd = parts[1]?.toLowerCase()
-      const arg = parts[2]
 
-      // For Phase 1, we primarily handle /tasks to open the task list
-      // Full subcommand parsing will be implemented in subsequent phases
-      if (trimmed === "tasks" || trimmed === "tasks help" || subcmd === undefined) {
-        // /tasks or /tasks help - show task list (placeholder for now)
-        // TODO: Open task list dialog in Phase 2
-        toast.show({
-          variant: "info",
-          message: "Task management: /tasks new creates, /tasks list shows all",
-          duration: 4000,
-        })
+      if (trimmed === "tasks" || trimmed === "tasks list" || subcmd === undefined) {
+        command.trigger("task.list")
       } else if (subcmd === "new") {
-        // /tasks new or /tasks new --advanced
+        command.trigger("task.new")
+      } else if (trimmed === "tasks help") {
         toast.show({
           variant: "info",
-          message: "Task wizard: /tasks new --advanced for full options",
-          duration: 3000,
-        })
-      } else if (subcmd === "show" && arg) {
-        // /tasks show <task_id>
-        toast.show({
-          variant: "info",
-          message: `Showing task: ${arg}`,
-          duration: 2000,
-        })
-      } else if (subcmd === "edit" && arg) {
-        // /tasks edit <task_id>
-        toast.show({
-          variant: "info",
-          message: `Editing task: ${arg}`,
-          duration: 2000,
-        })
-      } else if (subcmd === "list") {
-        // /tasks list - already handled by default case above
-        toast.show({
-          variant: "info",
-          message: "Task list - use /tasks to open",
-          duration: 2000,
+          message: "Use /tasks or /tasks list to open list, /tasks new to open wizard",
+          duration: 3500,
         })
       } else {
-        // Unknown /tasks subcommand - show usage hint
         toast.show({
           variant: "warning",
-          message: "Try: /tasks, /tasks new, /tasks list",
+          message: "Supported: /tasks, /tasks list, /tasks new",
           duration: 3000,
         })
       }

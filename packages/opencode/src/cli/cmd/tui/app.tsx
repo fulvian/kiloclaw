@@ -424,6 +424,15 @@ function App() {
         handleTaskNavigate("list")
       },
     },
+    {
+      title: "New task",
+      value: "task.new",
+      category: "Task",
+      hidden: true,
+      onSelect: () => {
+        handleTaskNavigate("new")
+      },
+    },
     // kilocode_change end
     ...(Flag.KILO_EXPERIMENTAL_WORKSPACES_TUI
       ? [
