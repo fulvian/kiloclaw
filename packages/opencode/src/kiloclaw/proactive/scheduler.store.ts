@@ -323,6 +323,7 @@ function initDb(): void {
   if (_dbInitialized) return
 
   try {
+    log.info("initializing proactive database", { path: PROACTIVE_DB_PATH })
     mkdirSync(dirname(PROACTIVE_DB_PATH), { recursive: true })
     _sqlite = new BunDatabase(PROACTIVE_DB_PATH, { create: true })
     _sqlite.run("PRAGMA journal_mode = WAL")
@@ -635,6 +636,8 @@ export const ProactiveTaskStore = {
   },
 
   list(tenantId: string, status?: TaskStatus): ProactiveTask[] {
+    if (!_dbInitialized) initDb()
+
     if (_sqlite) {
       try {
         const rows = _sqlite.prepare("SELECT * FROM proactive_tasks ORDER BY created_at DESC").all() as Record<
@@ -658,6 +661,7 @@ export const ProactiveTaskStore = {
   },
 
   getPending(limit?: number): ProactiveTask[] {
+    if (!_dbInitialized) initDb()
     const before = now()
 
     if (_sqlite) {
@@ -745,6 +749,8 @@ export const ProactiveTaskStore = {
   },
 
   getRun(id: string): ProactiveTaskRun | null {
+    if (!_dbInitialized) initDb()
+
     if (_sqlite) {
       try {
         const row = _sqlite.prepare("SELECT * FROM proactive_task_runs WHERE id = ?").get(id) as
@@ -761,6 +767,8 @@ export const ProactiveTaskStore = {
   },
 
   getRuns(taskId: string, limit?: number): ProactiveTaskRun[] {
+    if (!_dbInitialized) initDb()
+
     if (_sqlite) {
       try {
         let query = "SELECT * FROM proactive_task_runs WHERE task_id = ? ORDER BY created_at DESC"
@@ -825,6 +833,8 @@ export const ProactiveTaskStore = {
   },
 
   getDLQEntry(id: string): ProactiveDlqEntry | null {
+    if (!_dbInitialized) initDb()
+
     if (_sqlite) {
       try {
         const row = _sqlite.prepare("SELECT * FROM proactive_dlq WHERE id = ?").get(id) as
@@ -841,6 +851,7 @@ export const ProactiveTaskStore = {
   },
 
   getDLQ(taskId?: string, readyOnly?: boolean): ProactiveDlqEntry[] {
+    if (!_dbInitialized) initDb()
     const nowVal = now()
 
     if (_sqlite) {

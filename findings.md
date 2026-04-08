@@ -59,3 +59,28 @@
 - Branding fix alone (`KILO_BRAND_NAME=kiloclaw`) was insufficient to prevent legacy behavioral contamination.
 - Effective root-cause fix required explicit legacy discovery gate (`KILO_DISABLE_KILOCODE_LEGACY`) plus filtering in config and skill path resolution.
 - With isolated XDG runtime dirs and legacy gate enabled, `debug skill` no longer surfaces `.kilocode`-sourced skill locations in dev runtime output.
+
+## Stabilization Findings (2026-04-07, Recovery Finalization)
+
+- Recovery integration on `refactor/kilocode-elimination` is stable and keeps `bun run dev` in Kiloclaw mode.
+- Full Kiloclaw suite now passes after integration hardening: `797 pass, 3 skip, 0 fail` (`bun run --cwd packages/opencode test test/kiloclaw/`).
+- Wave 6 staging gate script completes with local verification green and active staging context checks passing.
+
+## Scheduled Tasks Persistence Fix (2026-04-08)
+
+### Bug: Tasks Lost Between CLI Sessions
+
+**Symptom**: Tasks created in the TUI wizard appear during the same session but disappear after restarting the CLI.
+
+**Root Cause**: Multiple read functions in `scheduler.store.ts` were missing `initDb()` call:
+
+- `list()`, `getPending()`, `getRun()`, `getRuns()`, `getDLQEntry()`, `getDLQ()`
+- These functions checked `if (_sqlite)` without first ensuring `initDb()` was called
+- If `list()` was called FIRST (before any write operation), `_sqlite` remained `null`
+- The database path was correct (XDG-compliant), but queries never reached it
+
+**Fix**: Added `if (!_dbInitialized) initDb()` to all read functions missing it.
+
+**Files Changed**: `packages/opencode/src/kiloclaw/proactive/scheduler.store.ts`
+
+**Commit**: Fixed in `scheduler.store.ts` - added missing `initDb()` calls to read functions
