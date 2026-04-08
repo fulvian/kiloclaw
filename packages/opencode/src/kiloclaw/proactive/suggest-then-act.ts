@@ -8,7 +8,7 @@ import z from "zod"
 import { fn } from "@/util/fn"
 import { Database as BunDatabase } from "bun:sqlite"
 import { mkdirSync } from "node:fs"
-import { dirname } from "node:path"
+import { dirname, join } from "node:path"
 
 // =============================================================================
 // Types
@@ -143,7 +143,20 @@ CREATE INDEX IF NOT EXISTS proactive_suggestions_expires_idx ON proactive_sugges
 // Database
 // =============================================================================
 
-const PROACTIVE_DB_PATH = process.env["KILOCLAW_PROACTIVE_DB_PATH"] ?? ".kiloclaw/proactive.db"
+/**
+ * Get the path for the proactive task database.
+ * Uses XDG_DATA_HOME/.kilocode/proactive.db to match the rest of the system.
+ */
+function getProactiveDbPath(): string {
+  if (process.env["KILOCLAW_PROACTIVE_DB_PATH"]) {
+    return process.env["KILOCLAW_PROACTIVE_DB_PATH"]!
+  }
+  const xdgDataHome =
+    process.env["XDG_DATA_HOME"] ?? join(process.env["HOME"] ?? "/home/fulvio", ".local", "share", "kiloclaw")
+  return join(xdgDataHome, ".kilocode", "proactive.db")
+}
+
+const PROACTIVE_DB_PATH = getProactiveDbPath()
 
 let _sqlite: BunDatabase | null = null
 let _dbInitialized = false

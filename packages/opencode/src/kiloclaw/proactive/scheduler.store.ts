@@ -6,7 +6,7 @@ import { Log } from "@/util/log"
 import z from "zod"
 import { Database as BunDatabase } from "bun:sqlite"
 import { mkdirSync } from "node:fs"
-import { dirname } from "node:path"
+import { dirname, join } from "node:path"
 
 // =============================================================================
 // Schemas
@@ -286,7 +286,20 @@ CREATE INDEX IF NOT EXISTS proactive_lease_expires_idx ON proactive_runtime_leas
 // Database
 // =============================================================================
 
-const PROACTIVE_DB_PATH = process.env["KILOCLAW_PROACTIVE_DB_PATH"] ?? ".kiloclaw/proactive.db"
+/**
+ * Get the path for the proactive task database.
+ * Uses XDG_DATA_HOME/.kilocode/proactive.db to match the rest of the system.
+ */
+function getProactiveDbPath(): string {
+  if (process.env["KILOCLAW_PROACTIVE_DB_PATH"]) {
+    return process.env["KILOCLAW_PROACTIVE_DB_PATH"]!
+  }
+  const xdgDataHome =
+    process.env["XDG_DATA_HOME"] ?? join(process.env["HOME"] ?? "/home/fulvio", ".local", "share", "kiloclaw")
+  return join(xdgDataHome, ".kilocode", "proactive.db")
+}
+
+const PROACTIVE_DB_PATH = getProactiveDbPath()
 
 let _sqlite: BunDatabase | null = null
 let _dbInitialized = false
@@ -316,6 +329,7 @@ function initDb(): void {
     _sqlite.run("PRAGMA foreign_keys = ON")
     _sqlite.exec(PROACTIVE_TABLES_SQL)
     ensureRunColumns()
+    ensureTaskColumns()
     _dbInitialized = true
     log.info("proactive database initialized", { path: PROACTIVE_DB_PATH })
   } catch (err) {
@@ -341,6 +355,24 @@ function ensureRunColumns(): void {
   for (const [name, kind] of cols) {
     try {
       _sqlite.run(`ALTER TABLE proactive_task_runs ADD COLUMN ${name} ${kind}`)
+    } catch {}
+  }
+}
+
+function ensureTaskColumns(): void {
+  if (!_sqlite) return
+  const cols = [
+    ["schedule_type", "TEXT NOT NULL DEFAULT 'recurring'"],
+    ["timezone", "TEXT"],
+    ["display_schedule", "TEXT"],
+    ["last_scheduled_for", "INTEGER"],
+    ["state", "TEXT NOT NULL DEFAULT 'active'"],
+    ["archived_at", "INTEGER"],
+    ["completed_at", "INTEGER"],
+  ] as const
+  for (const [name, kind] of cols) {
+    try {
+      _sqlite.run(`ALTER TABLE proactive_tasks ADD COLUMN ${name} ${kind}`)
     } catch {}
   }
 }
