@@ -251,6 +251,35 @@ export namespace ProceduralMemory {
     return Array.from(patterns.values())
   }
 
+  export async function remove(procedureId: ProcedureId): Promise<boolean> {
+    const current = procedures.get(procedureId)
+    if (!current) return false
+    procedures.delete(procedureId)
+    versions.delete(procedureId)
+
+    if (current.agencyId) {
+      const byAgency = proceduresByAgency.get(current.agencyId) ?? []
+      proceduresByAgency.set(
+        current.agencyId,
+        byAgency.filter((id) => id !== procedureId),
+      )
+    }
+
+    if (current.skillId) {
+      const bySkill = proceduresBySkill.get(current.skillId) ?? []
+      proceduresBySkill.set(
+        current.skillId,
+        bySkill.filter((id) => id !== procedureId),
+      )
+    }
+
+    return true
+  }
+
+  export async function getPatternCount(): Promise<number> {
+    return patterns.size
+  }
+
   /**
    * Clear all procedural memory (for testing)
    */
@@ -276,5 +305,7 @@ export const proceduralMemory: IProceduralMemory = {
   registerPattern: ProceduralMemory.registerPattern,
   findPattern: ProceduralMemory.findPattern,
   updatePatternStats: ProceduralMemory.updatePatternStats,
+  remove: ProceduralMemory.remove,
+  getPatternCount: ProceduralMemory.getPatternCount,
   clear: ProceduralMemory.clear,
 }

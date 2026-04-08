@@ -1,5 +1,4 @@
 import { Log } from "@/util/log"
-import { Flag } from "@/flag/flag"
 import type {
   RunArtifacts,
   MemoryEntry,
@@ -22,12 +21,10 @@ import {
 } from "./types.js"
 import { AgencyId, AgentId, CorrelationId } from "../types.js"
 import type { MemoryLifecycle as IMemoryLifecycle } from "./types.js"
-import { memoryBroker } from "./broker.js"
+import { memoryBroker, MemoryBroker } from "./broker.js"
 import { semanticMemory } from "./semantic.js"
 import { episodicMemory } from "./episodic.js"
-import { MemoryRetention } from "./memory.retention.js"
-import { MemoryDb } from "./memory.db.js"
-import { WorkingMemoryRepo, EpisodicMemoryRepo, SemanticMemoryRepo, ProceduralMemoryRepo } from "./memory.repository.js"
+import { proceduralMemory } from "./procedural.js"
 
 const log = Log.create({ service: "kiloclaw.memory.lifecycle" })
 
@@ -35,15 +32,6 @@ const log = Log.create({ service: "kiloclaw.memory.lifecycle" })
 let retentionTimer: ReturnType<typeof setInterval> | null = null
 
 export namespace MemoryLifecycle {
-  async function ensureRepo(): Promise<void> {
-    if (!Flag.KILO_EXPERIMENTAL_MEMORY_V2) return
-    try {
-      await WorkingMemoryRepo.count("default")
-    } catch {
-      await MemoryDb.init(":memory:")
-    }
-  }
-
   /**
    * Capture run artifacts and classify for storage
    */
@@ -92,7 +80,7 @@ export namespace MemoryLifecycle {
    * Classify artifacts for layer assignment
    */
   export function classify(artifacts: MemoryEntry[]): Classification[] {
-    return artifacts.map((artifact) => classifyArtifact(artifact))
+    return artifacts.map((artifact) => memoryBroker.classify(artifact.value))
   }
 
   /**
@@ -165,19 +153,6 @@ export namespace MemoryLifecycle {
    * Purge a single entry
    */
   export async function purge(entryId: MemoryId, reason: PurgeReason): Promise<void> {
-    if (Flag.KILO_EXPERIMENTAL_MEMORY_V2) {
-      const layer = inferLayerFromId(entryId)
-      await MemoryRetention.purgeEntries("default", [
-        {
-          layer,
-          id: entryId,
-          reason: "manual",
-        },
-      ])
-      log.info("entry purged (V2)", { entryId, reason, layer })
-      return
-    }
-
     await memoryBroker.purge(entryId, reason)
     log.info("entry purged", { entryId, reason })
   }
@@ -244,28 +219,16 @@ export namespace MemoryLifecycle {
   async function enforceRetention(): Promise<void> {
     log.debug("running retention enforcement")
 
-    if (Flag.KILO_EXPERIMENTAL_MEMORY_V2) {
-      // V2 uses MemoryRetention from the persistence layer
-      try {
-        const workingResult = await MemoryRetention.enforcePolicy("default", "working")
-        const episodicResult = await MemoryRetention.enforcePolicy("default", "episodic")
-        log.info("V2 retention enforcement completed", {
-          workingPurged: workingResult.purged,
-          episodicPurged: episodicResult.purged,
-        })
-      } catch (err) {
-        log.error("V2 retention enforcement failed", { err })
-      }
-      return
-    }
+    const workingPurged = memoryBroker.working().cleanup()
+    const episodicPolicy = MemoryBroker.getRetentionPolicy("episodic")
+    const episodicPurged = episodicPolicy.ttlMs
+      ? episodicMemory.purgeBefore(new Date(Date.now() - episodicPolicy.ttlMs))
+      : 0
 
-    // Legacy: clean up working memory expired entries
-    memoryBroker.working().cleanup()
-
-    // In production, would also:
-    // - Check episodic memory for expired episodes
-    // - Check semantic memory for outdated facts
-    // - Apply privacy/right-to-forgiveness policies
+    log.info("retention enforcement complete", {
+      workingPurged,
+      episodicPurged,
+    })
   }
 
   /**
@@ -277,32 +240,10 @@ export namespace MemoryLifecycle {
     semantic: { totalFacts: number }
     procedural: { totalProcedures: number; totalPatterns: number }
   }> {
-    if (Flag.KILO_EXPERIMENTAL_MEMORY_V2) {
-      await ensureRepo()
-      const working = await WorkingMemoryRepo.getMany("default", [])
-      const totalEpisodes = await EpisodicMemoryRepo.count("default")
-      const totalEvents = await EpisodicMemoryRepo.countEvents("default")
-      const totalFacts = await SemanticMemoryRepo.count("default")
-      const totalProcedures = await ProceduralMemoryRepo.count("default")
-
-      const legacyWorking = memoryBroker.working().stats()
-      const legacyEpisodic = await episodicMemory.getStats()
-      const legacyProcedures = await memoryBroker.procedural().list()
-      const mergedKeys = [...new Set([...Object.keys(working), ...legacyWorking.keys])]
-
-      return {
-        working: { size: mergedKeys.length, keys: mergedKeys },
-        episodic: {
-          totalEpisodes: Math.max(totalEpisodes, legacyEpisodic.totalEpisodes),
-          totalEvents: Math.max(totalEvents, legacyEpisodic.totalEvents),
-        },
-        semantic: { totalFacts },
-        procedural: { totalProcedures: Math.max(totalProcedures, legacyProcedures.length), totalPatterns: 0 },
-      }
-    }
-
     const episodicStats = await episodicMemory.getStats()
     const procedures = await memoryBroker.procedural().list()
+    const facts = await semanticMemory.query()
+    const patterns = await proceduralMemory.getPatternCount()
 
     return {
       working: memoryBroker.working().stats(),
@@ -311,59 +252,14 @@ export namespace MemoryLifecycle {
         totalEvents: episodicStats.totalEvents,
       },
       semantic: {
-        totalFacts: 0,
+        totalFacts: facts.length,
       },
       procedural: {
         totalProcedures: procedures.length,
-        totalPatterns: 0,
+        totalPatterns: patterns,
       },
     }
   }
-}
-
-function classifyArtifact(entry: MemoryEntry): Classification {
-  const key = entry.key.toLowerCase()
-  if (entry.layer === "working") {
-    return ClassificationSchema.parse({
-      layer: "working",
-      sensitivity: "high",
-      confidence: 0.9,
-      reasoning: "working_context",
-    })
-  }
-
-  if (entry.layer === "episodic") {
-    return ClassificationSchema.parse({
-      layer: "episodic",
-      sensitivity: "medium",
-      confidence: 0.85,
-      reasoning: "episodic_event",
-    })
-  }
-
-  if (key.includes("procedure") || key.includes("playbook") || key.includes("runbook")) {
-    return ClassificationSchema.parse({
-      layer: "procedural",
-      sensitivity: "medium",
-      confidence: 0.8,
-      reasoning: "procedural_pattern",
-    })
-  }
-
-  return ClassificationSchema.parse({
-    layer: "semantic",
-    sensitivity: "low",
-    confidence: 0.75,
-    reasoning: "semantic_fact",
-  })
-}
-
-function inferLayerFromId(id: string): string {
-  if (id.startsWith("wk_") || id.startsWith("mem_")) return "working"
-  if (id.startsWith("ep_") || id.startsWith("ev_")) return "episodic"
-  if (id.startsWith("fact_") || id.startsWith("vec_")) return "semantic"
-  if (id.startsWith("proc_") || id.startsWith("pv_")) return "procedural"
-  return "semantic"
 }
 
 // Export as MemoryLifecycle interface

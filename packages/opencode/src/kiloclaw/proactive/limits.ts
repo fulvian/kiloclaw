@@ -24,7 +24,15 @@ export interface ProactivityLimitsConfig {
   readonly maxLowRiskActionsPerDay: number
   readonly confirmationMode: ConfirmationMode
   readonly allowedTriggers: TriggerSignal[]
+  readonly lowRiskAllowlist: ProactionType[]
   readonly allowOverBudget: boolean
+}
+
+export interface ProactionDecision {
+  readonly allowed: boolean
+  readonly requiresApproval: boolean
+  readonly rationale: string
+  readonly evidence: Record<string, unknown>
 }
 
 // Policy validator
@@ -35,6 +43,7 @@ export const ProactivityLimitsSchema = z.object({
   maxLowRiskActionsPerDay: z.number().int().positive().default(10),
   confirmationMode: ConfirmationMode.default("suggest_then_act"),
   allowedTriggers: z.array(TriggerSignal).default(["schedule", "reminder", "anomaly", "threshold"]),
+  lowRiskAllowlist: z.array(ProactionType).default([]),
   allowOverBudget: z.boolean().default(false),
 })
 
@@ -46,6 +55,7 @@ export const DEFAULT_PROACTIVITY_LIMITS: ProactivityLimitsConfig = {
   maxLowRiskActionsPerDay: 10,
   confirmationMode: "suggest_then_act",
   allowedTriggers: ["schedule", "reminder", "anomaly", "threshold"],
+  lowRiskAllowlist: [],
   allowOverBudget: false,
 }
 
@@ -72,9 +82,63 @@ export class ProactivityLimitsManager {
     this.log.info("proactivity limits updated", { limits })
   }
 
+  private getDecision(
+    type: ProactionType,
+    risk?: "low" | "medium" | "high" | "critical",
+    irreversible?: boolean,
+  ): ProactionDecision {
+    if (type === "suggest" || type === "notify") {
+      return {
+        allowed: true,
+        requiresApproval: false,
+        rationale: "non-executing proaction is allowed",
+        evidence: {
+          type,
+          confirmationMode: this.limits.confirmationMode,
+        },
+      }
+    }
+
+    const allowlisted = this.limits.lowRiskAllowlist.includes(type)
+    const modeAllows = this.limits.confirmationMode !== "explicit_approval" || allowlisted
+    const highRisk = risk === "high" || risk === "critical" || irreversible === true
+    const allowed = modeAllows && !highRisk
+    const requiresApproval = this.limits.confirmationMode === "explicit_approval" || highRisk
+    const rationale = highRisk
+      ? "blocked: irreversible or high-risk path requires explicit approval"
+      : allowed
+        ? "allowed: low-risk action permitted by confirmation mode"
+        : "blocked: explicit approval mode without allowlist"
+
+    return {
+      allowed,
+      requiresApproval,
+      rationale,
+      evidence: {
+        type,
+        risk: risk ?? "low",
+        irreversible: irreversible === true,
+        confirmationMode: this.limits.confirmationMode,
+        allowlisted,
+      },
+    }
+  }
+
   // Check if a proaction type is allowed
-  isProactionAllowed(type: ProactionType): boolean {
-    return true // All proactions allowed by default
+  isProactionAllowed(
+    type: ProactionType,
+    options?: { risk?: "low" | "medium" | "high" | "critical"; irreversible?: boolean },
+  ): boolean {
+    const decision = this.getDecision(type, options?.risk, options?.irreversible)
+    this.log.debug("proaction decision", decision.evidence)
+    return decision.allowed
+  }
+
+  getDecisionEvidence(
+    type: ProactionType,
+    options?: { risk?: "low" | "medium" | "high" | "critical"; irreversible?: boolean },
+  ): ProactionDecision {
+    return this.getDecision(type, options?.risk, options?.irreversible)
   }
 
   // Check if a trigger is allowed
@@ -126,7 +190,9 @@ export class ProactivityLimitsManager {
   toPolicy(): ProactivityPolicy {
     return {
       allowedTriggers: this.limits.allowedTriggers,
-      allowedProactions: ["suggest", "notify", "act_low_risk"],
+      allowedProactions: ["suggest", "notify", "act_low_risk"].filter((x) =>
+        this.isProactionAllowed(x as ProactionType),
+      ) as ProactionType[],
       dailyBudget: this.limits.maxProactiveActionsPerDay,
       confirmationMode: this.limits.confirmationMode,
       maxTasksPerDay: this.limits.maxProactiveActionsPerDay,

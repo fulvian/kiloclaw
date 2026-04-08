@@ -7,6 +7,7 @@ import z from "zod"
 export interface ConfigInfo {
   logLevel: "DEBUG" | "INFO" | "WARN" | "ERROR"
   debug: boolean
+  policyEnforcementMode: "strict" | "compat"
   agencies: AgencyConfig[]
   plugins: string[]
   telemetry: TelemetryConfig
@@ -35,6 +36,7 @@ export interface ConfigLoader {
 const ConfigInfoSchema = z.object({
   logLevel: z.enum(["DEBUG", "INFO", "WARN", "ERROR"]).default("INFO"),
   debug: z.boolean().default(false),
+  policyEnforcementMode: z.enum(["strict", "compat"]).default("strict"),
   agencies: z
     .array(
       z.object({
@@ -77,10 +79,6 @@ function isBlocked(key: string): boolean {
   return BLOCKED_PREFIXES.some((prefix) => key.startsWith(prefix))
 }
 
-function hasLegacyEnv(): boolean {
-  return Object.keys(process.env).some((key) => BLOCKED_PREFIXES.some((prefix) => key.startsWith(prefix)))
-}
-
 // Convert KILOCLAW_* env vars to config object
 function envToConfig(): Partial<ConfigInfo> {
   const log = Log.create({ service: "kiloclaw.config" })
@@ -88,15 +86,18 @@ function envToConfig(): Partial<ConfigInfo> {
   const result: Partial<ConfigInfo> = {}
 
   for (const [key, value] of Object.entries(envVars)) {
-    // Strip prefix and normalize to canonical uppercase token
-    const configKey = key.substring(ACCEPTED_PREFIX.length).toUpperCase()
+    // Strip prefix
+    const stripped = key.substring(ACCEPTED_PREFIX.length)
 
-    switch (configKey) {
+    switch (stripped) {
       case "LOG_LEVEL":
         result.logLevel = value as ConfigInfo["logLevel"]
         break
       case "DEBUG":
         result.debug = value === "true"
+        break
+      case "POLICY_ENFORCEMENT_MODE":
+        result.policyEnforcementMode = value === "compat" ? "compat" : "strict"
         break
       case "TELEMETRY_ENABLED":
         if (!result.telemetry) result.telemetry = { enabled: true, endpoint: "", projectId: "" }
@@ -122,6 +123,7 @@ function envToConfig(): Partial<ConfigInfo> {
 const DEFAULT_CONFIG: ConfigInfo = {
   logLevel: "INFO",
   debug: false,
+  policyEnforcementMode: "strict",
   agencies: [],
   plugins: [],
   telemetry: {
@@ -140,10 +142,6 @@ export const Config = {
     }),
     (input) => {
       const log = Log.create({ service: "kiloclaw.config" })
-
-      if (process.env["KILOCLAW_STRICT_ENV"] === "true" && hasLegacyEnv()) {
-        throw new Error("KILOCLAW_STRICT_ENV=true blocks legacy env prefixes (ARIA_, KILO_, OPENCODE_)")
-      }
 
       // Validate no blocked prefixes are used
       for (const key of Object.keys(process.env)) {

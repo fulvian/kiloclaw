@@ -17,6 +17,11 @@ import { DialogMcp } from "@tui/component/dialog-mcp"
 import { DialogStatus } from "@tui/component/dialog-status"
 import { DialogThemeList } from "@tui/component/dialog-theme-list"
 import { DialogHelp } from "./ui/dialog-help"
+import { DialogTaskWizard } from "./ui/dialog-task-wizard"
+import { DialogTaskList } from "./ui/dialog-task-list"
+import { DialogTaskDetail } from "./ui/dialog-task-detail"
+import { DialogTaskRuns } from "./ui/dialog-task-runs"
+import { DialogTaskDLQ } from "./ui/dialog-task-dlq"
 import { CommandProvider, useCommandDialog } from "@tui/component/dialog-command"
 import { DialogAgent } from "@tui/component/dialog-agent"
 import { DialogSessionList } from "@tui/component/dialog-session-list"
@@ -36,6 +41,7 @@ import { Session as SessionApi } from "@/session"
 import { DialogSelect } from "./ui/dialog-select"
 import { Link } from "./ui/link"
 import { TuiEvent } from "./event"
+import { Bus } from "@/bus"
 import { KVProvider, useKV } from "./context/kv"
 import { Provider } from "@/provider/provider"
 import { ArgsProvider, useArgs, type Args } from "./context/args"
@@ -404,6 +410,24 @@ function App() {
         // kilocode_change end
       },
     },
+    // kilocode_change start - /tasks slash command for scheduled task management
+    {
+      title: "Manage tasks",
+      value: "task.list",
+      keybind: "task_list",
+      category: "Task",
+      suggested: false,
+      slash: {
+        name: "tasks",
+        aliases: ["task"],
+      },
+      onSelect: () => {
+        // Task list dialog will be opened via TaskNavigate event
+        // This is handled by prompt parsing when user types /tasks
+        Bus.publish(TuiEvent.TaskNavigate, { action: "list", advanced: false })
+      },
+    },
+    // kilocode_change end
     ...(Flag.KILO_EXPERIMENTAL_WORKSPACES_TUI
       ? [
           {
@@ -772,6 +796,137 @@ function App() {
       sessionID: evt.properties.sessionID,
     })
   })
+
+  // kilocode_change start - Task navigation event handler using Bus.subscribe
+  Bus.subscribe(TuiEvent.TaskNavigate, (evt) => {
+    // Feature gate check - silently ignore if feature is disabled
+    if (!Flag.KILOCLAW_SCHEDULED_TASKS_ENABLED) return
+
+    const { action, taskId } = evt.properties
+    switch (action) {
+      case "new":
+        // Wizard gate - allow if wizard enabled or if no specific wizard flag (backward compat)
+        if (!Flag.KILOCLAW_SCHEDULED_TASKS_WIZARD_ENABLED && Flag.KILOCLAW_SCHEDULED_TASKS_ENABLED) {
+          toast.show({ variant: "error", message: "Task wizard is disabled", duration: 2000 })
+          return
+        }
+        dialog.replace(() => (
+          <DialogTaskWizard
+            taskId={taskId}
+            onComplete={() => {
+              toast.show({
+                variant: "success",
+                message: taskId ? "Task updated successfully" : "Task created successfully",
+                duration: 3000,
+              })
+            }}
+          />
+        ))
+        break
+      case "list":
+        // Views gate
+        if (!Flag.KILOCLAW_SCHEDULED_TASKS_VIEWS_ENABLED && Flag.KILOCLAW_SCHEDULED_TASKS_ENABLED) {
+          toast.show({ variant: "error", message: "Task views are disabled", duration: 2000 })
+          return
+        }
+        dialog.replace(() => (
+          <DialogTaskList
+            onSelectTask={(id, act) => {
+              Bus.publish(TuiEvent.TaskNavigate, { action: act, taskId: id })
+            }}
+            onCreateNew={() => {
+              Bus.publish(TuiEvent.TaskNavigate, { action: "new" })
+            }}
+            onClose={() => dialog.clear()}
+          />
+        ))
+        break
+      case "show":
+      case "edit":
+        // Views gate
+        if (!Flag.KILOCLAW_SCHEDULED_TASKS_VIEWS_ENABLED && Flag.KILOCLAW_SCHEDULED_TASKS_ENABLED) {
+          toast.show({ variant: "error", message: "Task views are disabled", duration: 2000 })
+          return
+        }
+        if (!taskId) {
+          // No taskId - redirect to list
+          Bus.publish(TuiEvent.TaskNavigate, { action: "list" })
+          return
+        }
+        dialog.replace(() => (
+          <DialogTaskDetail
+            taskId={taskId}
+            onEdit={() => {
+              Bus.publish(TuiEvent.TaskNavigate, { action: "edit", taskId })
+            }}
+            onRuns={() => {
+              Bus.publish(TuiEvent.TaskNavigate, { action: "runs", taskId })
+            }}
+            onDLQ={() => {
+              Bus.publish(TuiEvent.TaskNavigate, { action: "dlq", taskId })
+            }}
+            onPause={() => {
+              const { ProactiveTaskStore } = require("@/kiloclaw/proactive/scheduler.store")
+              ProactiveTaskStore.update(taskId, { status: "paused" })
+              toast.show({ variant: "info", message: "Task paused", duration: 2000 })
+              // Refresh the detail view
+              Bus.publish(TuiEvent.TaskNavigate, { action: "show", taskId })
+            }}
+            onResume={() => {
+              const { ProactiveTaskStore } = require("@/kiloclaw/proactive/scheduler.store")
+              ProactiveTaskStore.update(taskId, { status: "active" })
+              toast.show({ variant: "info", message: "Task resumed", duration: 2000 })
+              Bus.publish(TuiEvent.TaskNavigate, { action: "show", taskId })
+            }}
+            onRunNow={() => {
+              toast.show({ variant: "info", message: "Task run triggered (Phase 4)", duration: 2000 })
+            }}
+            onDelete={() => {
+              const { ProactiveTaskStore } = require("@/kiloclaw/proactive/scheduler.store")
+              ProactiveTaskStore.remove(taskId)
+              toast.show({ variant: "info", message: "Task deleted", duration: 2000 })
+              dialog.clear()
+            }}
+            onClose={() => dialog.clear()}
+          />
+        ))
+        break
+      case "runs":
+        // Views gate
+        if (!Flag.KILOCLAW_SCHEDULED_TASKS_VIEWS_ENABLED && Flag.KILOCLAW_SCHEDULED_TASKS_ENABLED) {
+          toast.show({ variant: "error", message: "Task views are disabled", duration: 2000 })
+          return
+        }
+        if (!taskId) {
+          toast.show({ variant: "error", message: "Task ID required for runs view", duration: 2000 })
+          return
+        }
+        dialog.replace(() => <DialogTaskRuns taskId={taskId} onClose={() => dialog.clear()} />)
+        break
+      case "dlq":
+        // Views gate
+        if (!Flag.KILOCLAW_SCHEDULED_TASKS_VIEWS_ENABLED && Flag.KILOCLAW_SCHEDULED_TASKS_ENABLED) {
+          toast.show({ variant: "error", message: "Task views are disabled", duration: 2000 })
+          return
+        }
+        dialog.replace(() => (
+          <DialogTaskDLQ
+            taskId={taskId}
+            onReplayEntry={() => {
+              toast.show({ variant: "info", message: "Replay triggered (Phase 4)", duration: 2000 })
+            }}
+            onRemoveEntry={(entryId) => {
+              const { ProactiveTaskStore } = require("@/kiloclaw/proactive/scheduler.store")
+              ProactiveTaskStore.removeFromDLQ(entryId)
+              toast.show({ variant: "info", message: "DLQ entry removed", duration: 2000 })
+            }}
+            onClose={() => dialog.clear()}
+          />
+        ))
+        break
+    }
+  })
+  // kilocode_change end
 
   sdk.event.on(SessionApi.Event.Deleted.type, (evt) => {
     if (route.data.type === "session" && route.data.sessionID === evt.properties.info.id) {

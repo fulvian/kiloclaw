@@ -1,6 +1,27 @@
 # Task Plan — Kiloclaw Foundation Rebuild
 
-## Status: Phase 7 - Release (IN PROGRESS)
+## Status: Phase 5 - Delivery (Wave 6 Readiness) (IN PROGRESS)
+
+## Re-baseline Plan (2026-04-07)
+
+- [x] Produce updated implementation blueprint-aligned plan
+  - `docs/plans/KILOCLAW_PROACTIVE_SEMIAUTONOMOUS_PLAN_2026-04-07.md`
+- [x] Realign workflow tracking to actual maturity
+- [x] Wave 1.1: Refactor orchestrator to remove permissive allow-all defaults
+- [x] Wave 1.2: Introduce policy executor integration in runtime path
+- [x] Wave 1.3: Add decision log with correlation evidence for each action
+- [x] Wave 1.4: Add strict tests for high-risk deny-or-gate behavior
+- [x] Wave 1.5: Add compatibility feature flag (`strict|compat`) and docs
+- [x] Wave 2: Durable audit store + memory retention/purge hardening
+- [x] Wave 3: Proactivity durable runtime (task ledger, scheduler service, worker)
+- [x] Wave 4: Safe proactivity controls + evidence/rationale for decisions
+- [x] Wave 5: Isolation guard and namespace boundary tests
+- [x] Wave 6.1: Release readiness report and gate matrix
+- [x] Wave 6.2: Full kiloclaw regression verification (382/382)
+- [x] Wave 6.3a: Staging canary/rollback technical execution
+- [ ] Wave 6.3b: Leadership/security sign-off completion
+
+**Current Gate Target**: Wave 6 readiness and final HITL approval
 
 ## Phase 1 Foundation - COMPLETED ✅
 

@@ -192,6 +192,52 @@ export namespace EpisodicMemory {
     }
   }
 
+  export function removeEpisode(episodeId: EpisodeId): boolean {
+    const episode = episodes.get(episodeId)
+    if (!episode) return false
+    episodes.delete(episodeId)
+    const linked = episodeEvents.get(episodeId) ?? []
+    episodeEvents.delete(episodeId)
+    for (const eventId of linked) {
+      const event = events.get(eventId)
+      events.delete(eventId)
+      if (!event) continue
+
+      const byType = eventsByType.get(event.type) ?? []
+      eventsByType.set(
+        event.type,
+        byType.filter((id) => id !== eventId),
+      )
+
+      if (event.agencyId) {
+        const byAgency = eventsByAgency.get(event.agencyId) ?? []
+        eventsByAgency.set(
+          event.agencyId,
+          byAgency.filter((id) => id !== eventId),
+        )
+      }
+
+      if (event.agentId) {
+        const byAgent = eventsByAgent.get(event.agentId) ?? []
+        eventsByAgent.set(
+          event.agentId,
+          byAgent.filter((id) => id !== eventId),
+        )
+      }
+    }
+    return true
+  }
+
+  export function purgeBefore(cutoff: Date): number {
+    const expired = Array.from(episodes.values())
+      .filter((ep) => new Date(ep.completedAt).getTime() < cutoff.getTime())
+      .map((ep) => ep.id)
+    for (const id of expired) {
+      removeEpisode(id)
+    }
+    return expired.length
+  }
+
   /**
    * Link an event to an episode
    */
@@ -239,5 +285,7 @@ export const episodicMemory: IEpisodicMemory = {
   getEventsByType: EpisodicMemory.getEventsByType,
   getTimeline: EpisodicMemory.getTimeline,
   getStats: EpisodicMemory.getStats,
+  removeEpisode: EpisodicMemory.removeEpisode,
+  purgeBefore: EpisodicMemory.purgeBefore,
   clear: EpisodicMemory.clear,
 }

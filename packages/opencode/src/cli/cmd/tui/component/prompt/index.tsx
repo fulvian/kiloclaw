@@ -24,6 +24,7 @@ import { useExit } from "../../context/exit"
 import { Clipboard } from "../../util/clipboard"
 import type { FilePart } from "@kilocode/sdk/v2"
 import { TuiEvent } from "../../event"
+import { Bus } from "@/bus"
 import { iife } from "@/util/iife"
 import { Locale } from "@/util/locale"
 import { formatDuration } from "@/util/format"
@@ -622,6 +623,68 @@ export function Prompt(props: PromptProps) {
             ...x,
           })),
       })
+    } else if (inputText.startsWith("/tasks")) {
+      // Handle /tasks commands locally without sending to server
+      // kilocode_change start - /tasks command parsing
+      const trimmed = inputText.slice(1).trim() // Remove leading /
+      const parts = trimmed.split(/\s+/)
+      const subcmd = parts[1]?.toLowerCase()
+      const arg = parts[2]
+
+      // For Phase 1, we primarily handle /tasks to open the task list
+      // Full subcommand parsing will be implemented in subsequent phases
+      if (trimmed === "tasks" || trimmed === "tasks help" || subcmd === undefined) {
+        // /tasks or /tasks help - show task list (placeholder for now)
+        // TODO: Open task list dialog in Phase 2
+        toast.show({
+          variant: "info",
+          message: "Task management: /tasks new creates, /tasks list shows all",
+          duration: 4000,
+        })
+      } else if (subcmd === "new") {
+        // /tasks new or /tasks new --advanced
+        toast.show({
+          variant: "info",
+          message: "Task wizard: /tasks new --advanced for full options",
+          duration: 3000,
+        })
+      } else if (subcmd === "show" && arg) {
+        // /tasks show <task_id>
+        toast.show({
+          variant: "info",
+          message: `Showing task: ${arg}`,
+          duration: 2000,
+        })
+      } else if (subcmd === "edit" && arg) {
+        // /tasks edit <task_id>
+        toast.show({
+          variant: "info",
+          message: `Editing task: ${arg}`,
+          duration: 2000,
+        })
+      } else if (subcmd === "list") {
+        // /tasks list - already handled by default case above
+        toast.show({
+          variant: "info",
+          message: "Task list - use /tasks to open",
+          duration: 2000,
+        })
+      } else {
+        // Unknown /tasks subcommand - show usage hint
+        toast.show({
+          variant: "warning",
+          message: "Try: /tasks, /tasks new, /tasks list",
+          duration: 3000,
+        })
+      }
+      // Clear the prompt after handling
+      input.extmarks.clear()
+      setStore("prompt", { input: "", parts: [] })
+      setStore("extmarkToPartIndex", new Map())
+      props.onSubmit?.()
+      input.clear()
+      return
+      // kilocode_change end
     } else {
       sdk.client.session
         .prompt({

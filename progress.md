@@ -1052,3 +1052,185 @@ Modified `packages/opencode/src/tool/skill.ts`:
 **Files Modified:**
 
 - `packages/opencode/src/tool/skill.ts`
+
+---
+
+## 2026-04-07 - Safe Recovery + Proactive Plan Integration on Working Kiloclaw Branch
+
+### Recovery outcome
+
+- Root cause confirmed as branch drift (`docs/agency-guide-canonical` vs `refactor/kilocode-elimination`), not repository corruption.
+- Safe recovery executed with backup branch + stash snapshot, then integration applied on `refactor/kilocode-elimination`.
+
+### Integrated implementation scope
+
+- Recovered and integrated runtime/proactivity work including:
+  - durable scheduler runtime (`task-ledger`, `scheduler-service`, `worker`, sqlite store)
+  - policy enforcement strict/compat hooks in orchestrator
+  - isolation + audit modules
+  - knowledge evidence/provider plumbing
+  - Wave 6 release/staging plan documents and scripts
+
+### Verification completed
+
+- `bun run dev -- --help` -> Kiloclaw CLI starts correctly.
+- `bun run dev -- kiloclaw agency list` -> ✅ agencies visible
+- `bun run dev -- kiloclaw skill list` -> ✅ skills visible
+- `bun run dev -- kiloclaw provider list` -> ✅ providers visible
+- Targeted test suites for integrated plan:
+  - `test/kiloclaw/autolearning.test.ts` -> ✅ 45 pass
+  - `test/kiloclaw/proactivity-runtime.test.ts` -> ✅ 8 pass
+  - `test/kiloclaw/durable-recovery.test.ts` -> ✅ 5 pass
+  - `test/kiloclaw/policy-enforcement.test.ts` -> ✅ 2 pass
+  - `test/kiloclaw/runtime.test.ts` -> ✅ 58 pass
+  - `test/kiloclaw/isolation.test.ts` -> ✅ 2 pass
+  - `test/kiloclaw/hybrid-router.test.ts` -> ✅ 16 pass
+  - `test/kiloclaw/config-strict-env.test.ts` -> ✅ 2 pass
+
+### Notes on full `test/kiloclaw/` run
+
+- Full aggregate run still shows additional failures in legacy blueprint/recall slices unrelated to the integrated proactive runtime changes.
+- Current merge objective (recover + integrate + validate Kiloclaw proactive runtime and local CLI deployability) is met with green targeted suites and live CLI checks.
+
+### Final stabilization update (2026-04-07)
+
+- Remaining recall/policy and test-isolation regressions were fixed and validated.
+- Full Kiloclaw aggregate suite now green:
+  - `bun run --cwd packages/opencode test test/kiloclaw/`
+  - Result: `804 pass`, `3 skip`, `0 fail`.
+- Wave 6 staging preflight rerun passed end-to-end:
+  - `bash script/wave6-staging-gates.sh`
+  - active context `kind-kiloclaw-staging` confirmed; deployment/service checks and readiness preflight completed.
+
+### Phase 5 verification evidence refresh (2026-04-07)
+
+- Full suite evidence refreshed to `804 pass, 3 skip, 0 fail` via `bun run --cwd packages/opencode test test/kiloclaw/`.
+- Staging preflight evidence refreshed via `bash script/wave6-staging-gates.sh` with context/deployment/service/readiness checks passing.
+- Scheduled-task CLI lifecycle integration evidence recorded: `bun run --cwd packages/opencode test test/cli/task-command.test.ts` -> `2 pass, 0 fail`.
+
+### Scheduled tasks P0 follow-up (2026-04-07)
+
+- Implemented task CLI product surface:
+  - `kilo task create|list|show|pause|resume|run-now|delete|update|validate`
+  - compatibility alias under `kiloclaw task ...`
+- Added scheduling domain and validation modules:
+  - `packages/opencode/src/kiloclaw/proactive/schedule-parse.ts`
+  - `packages/opencode/src/kiloclaw/proactive/scheduled-task.ts`
+- Extended durable run persistence with execution metadata fields:
+  - `attempt`, `scheduled_for`, `started_at`, `finished_at`
+  - `error_code`, `error_message`, `correlation_id`, `idempotency_key`, `trace_id`
+  - added runtime-safe schema upgrade via `ALTER TABLE ... ADD COLUMN` guards.
+- Integrated runtime metadata propagation in scheduler engine:
+  - per-run correlation/idempotency/trace identifiers now recorded.
+- Added targeted tests:
+  - `test/kiloclaw/scheduled-task-schema.test.ts` -> ✅ pass
+  - `test/kiloclaw/scheduled-task-runtime.test.ts` -> ✅ pass
+- `bun run --cwd packages/opencode typecheck` now only fails on pre-existing unrelated issue:
+  - `test/kiloclaw/hybrid-retriever.test.ts` line 41 nullability mismatch.
+
+### Scheduled tasks Phase 4 verification update (2026-04-07)
+
+- Added runtime verification scenarios in `test/kiloclaw/scheduled-task-runtime.test.ts`:
+  - policy gate blocked run recorded as `policy_denied` with gate decision metadata.
+  - exhausted retries route failed run to DLQ and persist error metadata.
+- Re-ran focused suites:
+  - `bun run --cwd packages/opencode test test/kiloclaw/scheduled-task-runtime.test.ts` -> ✅ 3 pass
+  - `bun run --cwd packages/opencode test test/kiloclaw/scheduled-task-schema.test.ts test/kiloclaw/scheduled-task-runtime.test.ts` -> ✅ 7 pass
+
+### Phase 5 delivery handoff packet completion (2026-04-07)
+
+- Final sign-off packet created: `docs/release/WAVE6_SIGNOFF_PACKET_2026-04-07.md`.
+- Wave 6 readiness doc linked to sign-off packet and marked technical vs organizational gate split.
+- Closure report unresolved items updated to explicitly track pending external sign-off signatures.
+
+### Scheduled tasks Phase 4 CLI integration update (2026-04-07)
+
+- Added CLI lifecycle integration tests in `test/cli/task-command.test.ts`:
+  - create/list/show/pause/resume/run-now/update/delete lifecycle flow
+  - invalid cron validation path with non-zero exit
+- Hardened store behavior for integration reliability in `src/kiloclaw/proactive/scheduler.store.ts`:
+  - delete path no longer depends on sqlite `run(...).changes`
+  - list path uses DB read + in-process tenant/status filtering
+- Standardized task tenant scoping default in CLI flow:
+  - `src/cli/cmd/task.ts` now uses `KILOCLAW_TENANT_ID` fallback to `local`
+  - `src/kiloclaw/proactive/scheduled-task.ts` accepts explicit `tenantId` during create
+- Verification runs:
+  - `bun run --cwd packages/opencode test test/cli/task-command.test.ts` -> ✅ 2 pass
+  - `bun run --cwd packages/opencode test test/cli/task-command.test.ts test/kiloclaw/scheduled-task-schema.test.ts test/kiloclaw/scheduled-task-runtime.test.ts` -> ✅ 9 pass
+  - `bun run --cwd packages/opencode test test/kiloclaw/proactivity-runtime.test.ts test/kiloclaw/policy-enforcement.test.ts` -> ✅ 10 pass
+
+---
+
+## 2026-04-08 - Scheduled Tasks Interactive UX - COMPLETE
+
+### Summary
+
+Completed Phase 5 of Scheduled Tasks UX plan: Telemetry and Rollout Controls.
+
+### What was done
+
+**Phase 5 - Hardening & Telemetry (COMPLETE)**
+
+1. **Feature Gates in `app.tsx`:**
+   - `KILOCLAW_SCHEDULED_TASKS_ENABLED` - master kill switch
+   - `KILOCLAW_SCHEDULED_TASKS_WIZARD_ENABLED` - controls wizard access
+   - `KILOCLAW_SCHEDULED_TASKS_VIEWS_ENABLED` - controls list/detail/runs/dlq views
+
+2. **TUI Telemetry Wired:**
+   | Component | Events |
+   |-----------|--------|
+   | `dialog-task-list.tsx` | `list_view`, `detail_view`, `wizard_start` |
+   | `dialog-task-detail.tsx` | `detail_view`, `task_pause`, `task_resume`, `task_run_now`, `wizard_start` |
+   | `dialog-task-runs.tsx` | `runs_view` |
+   | `dialog-task-dlq.tsx` | `dlq_view`, `dlq_replay`, `dlq_remove` |
+   | `dialog-task-wizard.tsx` | `wizard_progress`, `wizard_step_timing` (already complete) |
+
+3. **CLI Telemetry Added (`task.ts`):**
+   - `task_create`, `task_update`, `task_delete`, `task_pause`, `task_resume`, `task_run_now`
+   - Wrapped with try/catch for Bus-not-available graceful degradation
+
+4. **CLI Tests Extended:**
+   - Added tests for `runs` and `dlq` commands
+   - Added tests for status filter
+   - Added tests for runs with `--failed` and `--limit` filters
+   - Added tests for feature flag behavior
+
+### Files Created/Modified
+
+| File                                                                    | Change                   |
+| ----------------------------------------------------------------------- | ------------------------ |
+| `packages/opencode/src/cli/cmd/task.ts`                                 | CLI commands + telemetry |
+| `packages/opencode/src/cli/cmd/tui/ui/dialog-task-*.tsx`                | 6 new TUI components     |
+| `packages/opencode/src/cli/cmd/tui/context/task-draft.tsx`              | Draft persistence        |
+| `packages/opencode/src/kiloclaw/proactive/scheduled-task.ts`            | Zod schemas              |
+| `packages/opencode/src/kiloclaw/telemetry/scheduled-tasks.telemetry.ts` | Telemetry events         |
+| `packages/opencode/src/cli/cmd/tui/app.tsx`                             | Feature gates            |
+| `packages/opencode/src/flag/flag.ts`                                    | Feature flags            |
+| `packages/opencode/test/cli/task-command.test.ts`                       | Extended tests           |
+
+### Verification
+
+| Check                                       | Result    |
+| ------------------------------------------- | --------- |
+| `bun run --cwd packages/opencode typecheck` | ✅ PASS   |
+| `bun test ./test/cli/task-command.test.ts`  | ✅ 6 pass |
+
+### Feature Flags
+
+| Flag                                      | Default         | Purpose                           |
+| ----------------------------------------- | --------------- | --------------------------------- |
+| `KILOCLAW_SCHEDULED_TASKS_ENABLED`        | `true`          | Master switch for scheduled tasks |
+| `KILOCLAW_SCHEDULED_TASKS_WIZARD_ENABLED` | follows enabled | Wizard UI                         |
+| `KILOCLAW_SCHEDULED_TASKS_VIEWS_ENABLED`  | follows enabled | Management views                  |
+| `KILOCLAW_SCHEDULED_TASKS_TELEMETRY`      | `false`         | Opt-in telemetry                  |
+| `KILOCLAW_SCHEDULED_TASKS_DRAFT_TTL_DAYS` | `7`             | Draft persistence TTL             |
+
+### 5-Phase Implementation: COMPLETE
+
+All phases from `KILOCLAW_SCHEDULED_TASKS_INTERACTIVE_UX_PLAN_2026-04-07.md` delivered:
+
+1. ✅ Phase 1: Slash entry + parser for `/tasks`
+2. ✅ Phase 2: Wizard primitives for task creation/editing
+3. ✅ Phase 3: Management and monitoring views
+4. ✅ Phase 4: Unified interactive/non-interactive command paths
+5. ✅ Phase 5: Telemetry and rollout controls

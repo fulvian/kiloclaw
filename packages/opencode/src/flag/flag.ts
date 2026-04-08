@@ -29,6 +29,7 @@ export namespace Flag {
   export const KILO_DISABLE_CLAUDE_CODE_PROMPT = KILO_DISABLE_CLAUDE_CODE || truthy("KILO_DISABLE_CLAUDE_CODE_PROMPT")
   export const KILO_DISABLE_CLAUDE_CODE_SKILLS = KILO_DISABLE_CLAUDE_CODE || truthy("KILO_DISABLE_CLAUDE_CODE_SKILLS")
   export const KILO_DISABLE_EXTERNAL_SKILLS = KILO_DISABLE_CLAUDE_CODE_SKILLS || truthy("KILO_DISABLE_EXTERNAL_SKILLS")
+  export const KILO_DISABLE_KILOCODE_LEGACY = truthy("KILO_DISABLE_KILOCODE_LEGACY")
   export declare const KILO_DISABLE_PROJECT_CONFIG: boolean
   export const KILO_FAKE_VCS = process.env["KILO_FAKE_VCS"]
   export declare const KILO_CLIENT: string
@@ -85,8 +86,8 @@ export namespace Flag {
 
   // Semantic Memory Trigger (Phase 1 - Deprecate Keyword-based Recall)
   // kilocode_change start
-  // Enabled by default - set KILOCLAW_SEMANTIC_TRIGGER_V1=false to disable
-  export const KILOCLAW_SEMANTIC_TRIGGER_V1 = !falsy("KILOCLAW_SEMANTIC_TRIGGER_V1")
+  // Disabled by default - set KILOCLAW_SEMANTIC_TRIGGER_V1=true to enable
+  export const KILOCLAW_SEMANTIC_TRIGGER_V1 = truthy("KILOCLAW_SEMANTIC_TRIGGER_V1")
   export const KILOCLAW_SEMANTIC_TRIGGER_BM25_FALLBACK = !falsy("KILOCLAW_SEMANTIC_TRIGGER_BM25_FALLBACK")
   export const KILOCLAW_SEMANTIC_THRESHOLD_RECALL = number("KILOCLAW_SEMANTIC_THRESHOLD_RECALL") ?? 0.42
   export const KILOCLAW_SEMANTIC_THRESHOLD_SHADOW = number("KILOCLAW_SEMANTIC_THRESHOLD_SHADOW") ?? 0.28
@@ -115,6 +116,31 @@ export namespace Flag {
   export const KILO_SEMANTIC_ROUTING_THRESHOLD = number("KILO_SEMANTIC_ROUTING_THRESHOLD") ?? 0.5
   export const KILO_SEMANTIC_ROUTING_FALLBACK_TO_KEYWORD = !falsy("KILO_SEMANTIC_ROUTING_FALLBACK_TO_KEYWORD")
   // kilocode_change end
+
+  // =============================================================================
+  // Scheduled Tasks UX (Phase 1-5)
+  // =============================================================================
+
+  // Enable/disable scheduled tasks slash command and TUI
+  // Enabled by default - set KILOCLAW_SCHEDULED_TASKS_ENABLED=false to disable
+  export const KILOCLAW_SCHEDULED_TASKS_ENABLED = !falsy("KILOCLAW_SCHEDULED_TASKS_ENABLED")
+
+  // Enable/disable interactive wizard (Phase 2)
+  // Default follows KILOCLAW_SCHEDULED_TASKS_ENABLED
+  export const KILOCLAW_SCHEDULED_TASKS_WIZARD_ENABLED =
+    truthy("KILOCLAW_SCHEDULED_TASKS_WIZARD_ENABLED") || KILOCLAW_SCHEDULED_TASKS_ENABLED
+
+  // Enable/disable management views (Phase 3 - list, detail, runs, DLQ)
+  // Default follows KILOCLAW_SCHEDULED_TASKS_ENABLED
+  export const KILOCLAW_SCHEDULED_TASKS_VIEWS_ENABLED =
+    truthy("KILOCLAW_SCHEDULED_TASKS_VIEWS_ENABLED") || KILOCLAW_SCHEDULED_TASKS_ENABLED
+
+  // Telemetry/opt-out for scheduled tasks UX
+  // Disabled by default (opt-in)
+  export const KILOCLAW_SCHEDULED_TASKS_TELEMETRY = truthy("KILOCLAW_SCHEDULED_TASKS_TELEMETRY")
+
+  // Draft TTL in days (default 7)
+  export const KILOCLAW_SCHEDULED_TASKS_DRAFT_TTL_DAYS = number("KILOCLAW_SCHEDULED_TASKS_DRAFT_TTL_DAYS") ?? 7
 }
 
 // Dynamic getter for KILO_DISABLE_PROJECT_CONFIG

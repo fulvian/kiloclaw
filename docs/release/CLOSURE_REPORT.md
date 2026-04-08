@@ -3,17 +3,17 @@
 > **Project Name:** Kiloclaw Foundation Rebuild  
 > **Project Type:** Architecture Refactoring + Feature Migration  
 > **Start Date:** 2026-04-02  
-> **Completion Date:** 2026-04-02  
-> **Duration:** 1 day (compressed timeline due to existing groundwork)  
-> **Status:** PHASE 7 IN PROGRESS - Ready for Release
+> **Completion Date:** TBD  
+> **Duration:** Ongoing (re-baselined on 2026-04-07)  
+> **Status:** WAVE 6 READINESS IN PROGRESS - Go-live pending staging sign-off
 
 ---
 
 ## 1. Executive Summary
 
-The Kiloclaw Foundation Rebuild has successfully completed all 6 implementation phases (Foundation, Core Runtime, Memory, Agency Migration, Proactivity/Safety, Verification) with 364 tests passing and all quality gates green. The project established a modern, verifiable, and secure AI assistant platform built on TypeScript with complete isolation from the upstream KiloCode project.
+The Kiloclaw Foundation Rebuild has completed implementation scope through Wave 5 and is executing Wave 6 release-readiness gates. Latest local verification shows `bun run --cwd packages/opencode test test/kiloclaw/` at 382 pass and 0 fail, while go-live remains blocked on staging sign-off.
 
-**Overall Assessment:** ✅ SUCCESS - Ready for Phase 7 Go-Live
+**Overall Assessment:** ⏳ IMPLEMENTATION COMPLETE (WAVE 1-5) - RELEASE READINESS IN PROGRESS
 
 ---
 
@@ -67,7 +67,7 @@ The Kiloclaw Foundation Rebuild has successfully completed all 6 implementation 
 | Config adapter tests | `test/kiloclaw/config-legacy-adapter.test.ts` | 38      | ✅ PASS      |
 | Wave1 skills tests   | `test/kiloclaw/skills/wave1.test.ts`          | 66      | ✅ PASS      |
 | Wave2 skills tests   | `test/kiloclaw/skills/wave2.test.ts`          | 43      | ✅ PASS      |
-| **Total Tests**      |                                               | **364** | ✅ 100% PASS |
+| **Total Tests**      |                                               | **382** | ✅ 100% PASS |
 
 ### 3.3 Documentation Artifacts
 
@@ -134,7 +134,9 @@ The Kiloclaw Foundation Rebuild has successfully completed all 6 implementation 
 | Verification       | Week 14-15 | Week 1               | -14 weeks |
 | Release            | Week 16    | TBD                  | TBD       |
 
-**Note:** The project was significantly accelerated due to:
+**Historical note:** The prior one-day compressed timeline is kept as historical context and is superseded by the 2026-04-07 re-baseline plan.
+
+Acceleration factors recorded in the original baseline:
 
 1. Existing KiloCode foundation providing solid base
 2. Clear requirements from ARIA predecessor
@@ -170,7 +172,7 @@ The Kiloclaw Foundation Rebuild has successfully completed all 6 implementation 
 | Area              | Observation                                                                                  |
 | ----------------- | -------------------------------------------------------------------------------------------- |
 | **Architecture**  | Clear separation of concerns with 4-layer memory enabled independent development and testing |
-| **Testing**       | Comprehensive test suite (364 tests) caught issues early and enabled confident refactoring   |
+| **Testing**       | Comprehensive test suite (382 tests) caught issues early and enabled confident refactoring   |
 | **Documentation** | ADRs provided clear decision rationale, reducing review overhead                             |
 | **Isolation**     | Strong isolation from KiloCode prevented scope creep and maintained focus                    |
 | **Safety**        | Policy-first approach reduced security concerns during development                           |
@@ -186,7 +188,7 @@ The Kiloclaw Foundation Rebuild has successfully completed all 6 implementation 
 
 ### 7.3 Recommendations for Future Projects
 
-1. **Maintain test-first discipline** - The high test coverage (364 tests) was critical to catching regressions
+1. **Maintain test-first discipline** - The high test coverage (382 tests) was critical to catching regressions
 2. **Document decision rationale** - ADRs saved significant review time
 3. **Isolate scope aggressively** - Clear boundaries prevented feature creep
 4. **Build observability early** - Metrics and logging should be in place from day 1
@@ -232,15 +234,15 @@ The Kiloclaw Foundation Rebuild has successfully completed all 6 implementation 
 
 ### Project Completion Status
 
-| Milestone          | Status      | Date       |
-| ------------------ | ----------- | ---------- |
-| Foundation         | ✅ COMPLETE | 2026-04-02 |
-| Core Runtime       | ✅ COMPLETE | 2026-04-02 |
-| Memory             | ✅ COMPLETE | 2026-04-02 |
-| Agency Migration   | ✅ COMPLETE | 2026-04-02 |
-| Proactivity/Safety | ✅ COMPLETE | 2026-04-02 |
-| Verification       | ✅ COMPLETE | 2026-04-02 |
-| Release            | ⏳ PENDING  | TBD        |
+| Milestone          | Status                  | Date       |
+| ------------------ | ----------------------- | ---------- |
+| Foundation         | ✅ COMPLETE             | 2026-04-02 |
+| Core Runtime       | ✅ COMPLETE             | 2026-04-02 |
+| Memory             | ✅ COMPLETE             | 2026-04-02 |
+| Agency Migration   | ✅ COMPLETE             | 2026-04-02 |
+| Proactivity/Safety | ✅ COMPLETE             | 2026-04-02 |
+| Verification       | ✅ COMPLETE             | 2026-04-02 |
+| Release            | ⏳ IN PROGRESS (Wave 6) | TBD        |
 
 ### Final Approval
 
@@ -288,6 +290,6 @@ The Kiloclaw Foundation Rebuild has successfully completed all 6 implementation 
 
 ---
 
-_Closure Report Version: 1.0.0_  
-_Generated: 2026-04-02_  
+_Closure Report Version: 1.1.0_  
+_Generated: 2026-04-07_  
 _Next Review: Post-Phase 7 Go-Live + 30 days_
