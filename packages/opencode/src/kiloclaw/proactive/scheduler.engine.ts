@@ -4,13 +4,14 @@
 
 import { Log } from "@/util/log"
 import z from "zod"
-import { ProactiveTaskStore, type ProactiveTask, type RunOutcome } from "./scheduler.store"
+import { ProactiveTaskStore, type ProactiveTask, type ProactiveDlqEntry, type RunOutcome } from "./scheduler.store"
 import { BudgetManager } from "./budget"
 import { ProactivityLimitsManager } from "./limits"
 import type { TriggerEvent } from "./trigger"
 import { createHash } from "node:crypto"
 import { nextRuns } from "./schedule-parse"
 import { Flag } from "@/flag/flag"
+import { emitTaskNotification } from "./notifications"
 
 // =============================================================================
 // Types
@@ -298,6 +299,8 @@ export const ProactiveSchedulerEngine = {
         nextRunAt: Date.now(),
       })
 
+      emitTaskNotification(task, { type: "dlq_replay", entry })
+
       ProactiveTaskStore.removeFromDLQ(entry.id)
 
       await this.executeTaskInternal(task)
@@ -355,6 +358,8 @@ export const ProactiveSchedulerEngine = {
           idempotencyKey,
           traceId,
         })
+        const run = ProactiveTaskStore.getRuns(task.id, 1)[0]
+        if (run) emitTaskNotification(task, { type: "run_policy_denied", run })
         this.tasksBlocked++
         this.tasksProcessed++
 
@@ -370,6 +375,8 @@ export const ProactiveSchedulerEngine = {
           idempotencyKey,
           traceId,
         })
+        const run = ProactiveTaskStore.getRuns(task.id, 1)[0]
+        if (run) emitTaskNotification(task, { type: "run_budget_exceeded", run })
         this.tasksBlocked++
         this.tasksProcessed++
 
@@ -390,6 +397,8 @@ export const ProactiveSchedulerEngine = {
         idempotencyKey,
         traceId,
       })
+      const run = ProactiveTaskStore.getRuns(task.id, 1)[0]
+      if (run) emitTaskNotification(task, { type: "run_success", run })
 
       const nextRunAt = this.calculateNextRun(task)
       ProactiveTaskStore.update(task.id, {
@@ -443,6 +452,7 @@ export const ProactiveSchedulerEngine = {
           dlqId: dlqEntry.id,
           maxRetries,
         })
+        emitTaskNotification(task, { type: "dlq_move", entry: dlqEntry })
       } else {
         const nextRunAt = Date.now() + this.calculateBackoff(retryCount)
 
@@ -476,6 +486,8 @@ export const ProactiveSchedulerEngine = {
           traceId,
         },
       )
+      const failedRun = ProactiveTaskStore.getRuns(task.id, 1)[0]
+      if (failedRun) emitTaskNotification(task, { type: "run_failed", run: failedRun, error: errorMsg })
       this.tasksFailed++
       this.tasksProcessed++
 

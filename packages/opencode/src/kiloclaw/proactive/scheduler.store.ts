@@ -336,6 +336,7 @@ function ensureRunColumns(): void {
     ["idempotency_key", "TEXT"],
     ["trace_id", "TEXT"],
     ["fence_token", "INTEGER"],
+    ["run_type", "TEXT NOT NULL DEFAULT 'scheduled'"],
   ] as const
   for (const [name, kind] of cols) {
     try {
