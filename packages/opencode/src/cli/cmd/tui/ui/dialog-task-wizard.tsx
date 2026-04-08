@@ -1,9 +1,8 @@
-import { TextAttributes, TextareaRenderable } from "@opentui/core"
-import { createSignal, createMemo, For, Show } from "solid-js"
+import { TextAttributes, TextareaRenderable, Renderable } from "@opentui/core"
+import { createSignal, createMemo, For, Show, batch } from "solid-js"
 import { useTheme } from "@tui/context/theme"
 import { useDialog } from "./dialog"
-import { useKeyboard } from "@opentui/solid"
-import { useKeybind } from "@tui/context/keybind"
+import { useKeyboard, useRenderer } from "@opentui/solid"
 import { useKV } from "../context/kv"
 import { useTaskWizardDraft, type TaskWizardDraft } from "../context/task-draft"
 import {
@@ -12,19 +11,41 @@ import {
   buildCreate,
   type ScheduledTaskCreateInput,
 } from "@/kiloclaw/proactive/scheduled-task"
-import { SchedulePreset, nextRuns, resolveSchedule, isValidTimezone } from "@/kiloclaw/proactive/schedule-parse"
+import {
+  nextRuns,
+  isValidTimezone,
+  validateCron,
+  scheduleToCron,
+  isValidTime,
+  parsePresetToCategory,
+  categoryToPreset,
+  type ScheduleCategory,
+} from "@/kiloclaw/proactive/schedule-parse"
 import {
   publishWizardProgress,
   publishWizardStepTiming,
   publishTaskAction,
 } from "@/kiloclaw/telemetry/scheduled-tasks.telemetry"
 
-const PRESETS: Array<{ value: string; label: string; description: string }> = [
-  { value: "hourly", label: "Hourly", description: "Every hour at :00" },
-  { value: "daily-09:00", label: "Daily at 9am", description: "Once a day at 09:00" },
-  { value: "weekdays-09:00", label: "Weekdays at 9am", description: "Monday to Friday at 09:00" },
-  { value: "weekly-mon-09:00", label: "Weekly Monday", description: "Every Monday at 09:00" },
-  { value: "monthly-1st-09:00", label: "Monthly on 1st", description: "First day of month at 09:00" },
+// =============================================================================
+// UI CONSTANTS
+// =============================================================================
+
+const SCHEDULE_CATEGORIES: Array<{ value: ScheduleCategory; label: string; description: string }> = [
+  { value: "daily", label: "Daily", description: "Once a day at a specific time" },
+  { value: "weekdays", label: "Weekdays", description: "Monday to Friday at a specific time" },
+  { value: "weekly", label: "Weekly", description: "One day per week at a specific time" },
+  { value: "monthly", label: "Monthly", description: "One day per month at a specific time" },
+]
+
+const WEEKDAYS = [
+  { value: 0, label: "Sun" },
+  { value: 1, label: "Mon" },
+  { value: 2, label: "Tue" },
+  { value: 3, label: "Wed" },
+  { value: 4, label: "Thu" },
+  { value: 5, label: "Fri" },
+  { value: 6, label: "Sat" },
 ]
 
 const TIMEZONES = [
@@ -42,6 +63,19 @@ const TIMEZONES = [
   "Asia/Singapore",
   "Australia/Sydney",
 ]
+
+// Legacy preset labels for backward compatibility
+const LEGACY_PRESET_LABELS: Record<string, string> = {
+  hourly: "Hourly (every hour at :00)",
+  "daily-09:00": "Daily at 9am",
+  "weekdays-09:00": "Weekdays at 9am",
+  "weekly-mon-09:00": "Weekly Monday at 9am",
+  "monthly-1st-09:00": "Monthly on 1st at 9am",
+}
+
+// =============================================================================
+// CONSTANTS
+// =============================================================================
 
 const RETRY_POLICIES = [
   { value: "fixed", label: "Fixed", description: "Same delay between retries" },
@@ -77,16 +111,21 @@ const STEP_LABELS: Record<WizardStep, string> = {
   review: "5. Review",
 }
 
+// =============================================================================
+// DIALOG TASK WIZARD
+// =============================================================================
+
 export function DialogTaskWizard(props: { taskId?: string; onComplete?: () => void }) {
   const dialog = useDialog()
   const { theme } = useTheme()
-  const keybind = useKeybind()
   const kv = useKV()
   const draftHelper = useTaskWizardDraft()
 
   const isEditing = () => !!props.taskId
 
+  // ---------------------------------------------------------------------------
   // Helper to parse store config into wizard data format
+  // ---------------------------------------------------------------------------
   function parseStoreConfigToWizardData(config: Record<string, unknown>): Partial<ScheduledTaskCreateInput> {
     const scheduleExpr = config.scheduleExpr as string | undefined
     const preset = config.preset as string | undefined
@@ -95,10 +134,8 @@ export function DialogTaskWizard(props: { taskId?: string; onComplete?: () => vo
       | undefined
     const quietHours = config.quietHours as { start?: string; end?: string } | undefined
 
-    // Extract preset from cron if not stored as preset
     let resolvedPreset = preset
     if (!resolvedPreset && scheduleExpr) {
-      // Try to match known presets
       if (scheduleExpr === "0 * * * *") resolvedPreset = "hourly"
       else if (scheduleExpr === "0 9 * * *") resolvedPreset = "daily-09:00"
       else if (scheduleExpr === "0 9 * * 1-5") resolvedPreset = "weekdays-09:00"
@@ -125,26 +162,23 @@ export function DialogTaskWizard(props: { taskId?: string; onComplete?: () => vo
     }
   }
 
+  // ---------------------------------------------------------------------------
   // Load existing draft or create new
+  // ---------------------------------------------------------------------------
   const existingDraft = isEditing() ? draftHelper.loadDraft("global", props.taskId) : draftHelper.loadDraft("global")
 
-  // If editing without draft, load from store
   function getInitialDraft(): TaskWizardDraft {
     if (existingDraft) return existingDraft
 
     const newDraft = draftHelper.createNewDraft(props.taskId)
 
     if (isEditing() && props.taskId) {
-      // Try to load task from store
       try {
         const { ProactiveTaskStore } = require("@/kiloclaw/proactive/scheduler.store")
         const existing = ProactiveTaskStore.get(props.taskId)
         if (existing) {
           const config = JSON.parse(existing.triggerConfig)
-          return {
-            ...newDraft,
-            data: parseStoreConfigToWizardData(config),
-          }
+          return { ...newDraft, data: parseStoreConfigToWizardData(config) }
         }
       } catch {
         // Store not available, use empty draft
@@ -156,56 +190,149 @@ export function DialogTaskWizard(props: { taskId?: string; onComplete?: () => vo
 
   const initialDraft = getInitialDraft()
 
+  // ---------------------------------------------------------------------------
+  // Core state
+  // ---------------------------------------------------------------------------
   const [step, setStep] = createSignal<WizardStep>(initialDraft.step)
   const [data, setData] = createSignal<Partial<ScheduledTaskCreateInput>>(initialDraft.data)
   const [advanced, setAdvanced] = createSignal(false)
-  const [error, setError] = createSignal<string | null>(null)
+  const [fieldErrors, setFieldErrors] = createSignal<Record<string, string>>({})
   const [isSaving, setIsSaving] = createSignal(false)
-
-  // Track step timing for telemetry
   const [stepStartTime, setStepStartTime] = createSignal<number>(Date.now())
 
-  // Emit wizard start telemetry
-  publishWizardProgress(initialDraft.step, "start", props.taskId)
+  // ---------------------------------------------------------------------------
+  // Schedule step state - NEW STRUCTURED APPROACH
+  // ---------------------------------------------------------------------------
+  function getInitialScheduleState() {
+    const d = initialDraft.data
+    const parsed = d.preset ? parsePresetToCategory(d.preset) : null
 
-  // Schedule step state
-  const [selectedPreset, setSelectedPreset] = createSignal<string>((data().preset as string) ?? "daily-09:00")
-  const [customCron, setCustomCron] = createSignal<string>((data().cron as string) ?? "")
-  const [timezone, setTimezone] = createSignal<string>((data().timezone as string) ?? "local")
-  const [useCustomCron, setUseCustomCron] = createSignal(!!data().cron)
+    if (parsed) {
+      return {
+        category: parsed.category,
+        time: parsed.time,
+        weekday: parsed.weekday ?? 1,
+        dayOfMonth: parsed.dayOfMonth ?? 1,
+      }
+    }
 
+    return {
+      category: "daily" as ScheduleCategory,
+      time: "09:00",
+      weekday: 1,
+      dayOfMonth: 1,
+    }
+  }
+
+  const [scheduleCategory, setScheduleCategory] = createSignal<ScheduleCategory>(getInitialScheduleState().category)
+  const [scheduleTime, setScheduleTime] = createSignal<string>(getInitialScheduleState().time)
+  const [scheduleWeekday, setScheduleWeekday] = createSignal<number>(getInitialScheduleState().weekday)
+  const [scheduleDayOfMonth, setScheduleDayOfMonth] = createSignal<number>(getInitialScheduleState().dayOfMonth)
+  const [timezone, setTimezone] = createSignal<string>((initialDraft.data.timezone as string) ?? "local")
+  const [useCustomCron, setUseCustomCron] = createSignal(false)
+  const [customCron, setCustomCron] = createSignal<string>((initialDraft.data.cron as string) ?? "")
+
+  // ---------------------------------------------------------------------------
   // Intent step state
-  const [name, setName] = createSignal<string>((data().name as string) ?? "")
-  const [prompt, setPrompt] = createSignal<string>((data().prompt as string) ?? "")
+  // ---------------------------------------------------------------------------
+  const [name, setName] = createSignal<string>((initialDraft.data.name as string) ?? "")
+  const [prompt, setPrompt] = createSignal<string>((initialDraft.data.prompt as string) ?? "")
 
+  // ---------------------------------------------------------------------------
   // Reliability step state
-  const [retryAttempts, setRetryAttempts] = createSignal<number>(data().retryMaxAttempts ?? 3)
-  const [retryBackoff, setRetryBackoff] = createSignal<string>(data().retryBackoff ?? "exponential")
-  const [retryBaseMs, setRetryBaseMs] = createSignal<number>(data().retryBaseMs ?? 30_000)
-  const [retryMaxMs, setRetryMaxMs] = createSignal<number>(data().retryMaxMs ?? 900_000)
-  const [concurrency, setConcurrency] = createSignal<string>(data().concurrency ?? "forbid")
-  const [missedRunPolicy, setMissedRunPolicy] = createSignal<string>(data().missedRunPolicy ?? "catchup_one")
-  const [startingDeadlineMs, setStartingDeadlineMs] = createSignal<number>(data().startingDeadlineMs ?? 600_000)
+  // ---------------------------------------------------------------------------
+  const [retryAttempts, setRetryAttempts] = createSignal<number>(initialDraft.data.retryMaxAttempts ?? 3)
+  const [retryBackoff, setRetryBackoff] = createSignal<string>(initialDraft.data.retryBackoff ?? "exponential")
+  const [retryBaseMs, setRetryBaseMs] = createSignal<number>(initialDraft.data.retryBaseMs ?? 30_000)
+  const [retryMaxMs, setRetryMaxMs] = createSignal<number>(initialDraft.data.retryMaxMs ?? 900_000)
+  const [concurrency, setConcurrency] = createSignal<string>(initialDraft.data.concurrency ?? "forbid")
+  const [missedRunPolicy, setMissedRunPolicy] = createSignal<string>(initialDraft.data.missedRunPolicy ?? "catchup_one")
+  const [startingDeadlineMs, setStartingDeadlineMs] = createSignal<number>(
+    initialDraft.data.startingDeadlineMs ?? 600_000,
+  )
 
+  // ---------------------------------------------------------------------------
   // Policy step state
-  const [requireApproval, setRequireApproval] = createSignal<string>(data().requireApproval ?? "auto")
+  // ---------------------------------------------------------------------------
+  const [requireApproval, setRequireApproval] = createSignal<string>(initialDraft.data.requireApproval ?? "auto")
   const [quietHoursStart, setQuietHoursStart] = createSignal<string>("")
   const [quietHoursEnd, setQuietHoursEnd] = createSignal<string>("")
 
-  // Computed next runs preview
+  // ---------------------------------------------------------------------------
+  // Computed values
+  // ---------------------------------------------------------------------------
+
+  const structuredSchedule = createMemo(() => ({
+    category: scheduleCategory(),
+    time: scheduleTime(),
+    weekday: scheduleWeekday(),
+    dayOfMonth: scheduleDayOfMonth(),
+  }))
+
+  const computedCron = createMemo(() => {
+    if (useCustomCron()) return customCron()
+    return scheduleToCron(structuredSchedule())
+  })
+
+  const computedPreset = createMemo(() => {
+    if (useCustomCron()) return undefined
+    return categoryToPreset(structuredSchedule())
+  })
+
   const nextRunsPreview = createMemo(() => {
     const tz = timezone() === "local" ? Intl.DateTimeFormat().resolvedOptions().timeZone : timezone()
-    const cron = useCustomCron() ? customCron() : resolveSchedule({ preset: selectedPreset() as any }).expr
-    const validation = validateSchedule({ cron, timezone: tz })
+    const validation = validateSchedule({ cron: computedCron(), timezone: tz })
     if (!validation.ok) return []
     return (validation.nextRuns ?? []).map((ts) => new Date(ts).toISOString())
   })
 
-  function updateData(updates: Partial<ScheduledTaskCreateInput>) {
-    setData((prev) => ({ ...prev, ...updates }))
-    saveDraft()
-  }
+  const currentStepErrors = createMemo(() => {
+    const errors = fieldErrors()
+    const s = step()
+    if (s === "schedule") {
+      const errs: Record<string, string> = {}
+      if (!useCustomCron() && !isValidTime(scheduleTime())) {
+        errs.time = "Invalid time format (HH:MM)"
+      }
+      const tz = timezone()
+      if (tz !== "local" && !isValidTimezone(tz)) {
+        errs.timezone = "Invalid timezone"
+      }
+      return errs
+    }
+    if (s === "intent") {
+      const errs: Record<string, string> = {}
+      if (!name().trim()) errs.name = "Name is required"
+      if (!prompt().trim()) errs.prompt = "Prompt is required"
+      return errs
+    }
+    return {}
+  })
 
+  const canAdvance = createMemo(() => Object.keys(currentStepErrors()).length === 0)
+
+  const stepHelperText = createMemo(() => {
+    switch (step()) {
+      case "schedule":
+        return useCustomCron() ? "Enter cron expression manually" : "Select category, time, then Next"
+      case "intent":
+        return "Name + prompt required. Ctrl+Enter advances."
+      case "reliability":
+        return "Configure retry and concurrency"
+      case "policy":
+        return "Set approval requirements"
+      case "review":
+        return "Review and click Save to create"
+      default:
+        return ""
+    }
+  })
+
+  const currentStepIndex = createMemo(() => STEPS.indexOf(step()) + 1)
+
+  // ---------------------------------------------------------------------------
+  // Data building
+  // ---------------------------------------------------------------------------
   function saveDraft() {
     const draft: TaskWizardDraft = {
       step: step(),
@@ -214,19 +341,15 @@ export function DialogTaskWizard(props: { taskId?: string; onComplete?: () => vo
       createdAt: initialDraft.createdAt,
       updatedAt: Date.now(),
     }
-    // Use taskId as draftId when editing, otherwise use global default
     draftHelper.saveDraft("global", draft, isEditing() ? props.taskId : undefined)
   }
 
   function buildCurrentData(): Partial<ScheduledTaskCreateInput> {
-    const scheduleData = useCustomCron()
-      ? { cron: customCron(), preset: undefined }
-      : { preset: selectedPreset(), cron: undefined }
-
     const quietHours = quietHoursStart() && quietHoursEnd() ? `${quietHoursStart()}-${quietHoursEnd()}` : undefined
 
     return {
-      ...scheduleData,
+      preset: computedPreset(),
+      cron: useCustomCron() ? customCron() : undefined,
       timezone: timezone() === "local" ? undefined : timezone(),
       name: name(),
       prompt: prompt(),
@@ -243,15 +366,23 @@ export function DialogTaskWizard(props: { taskId?: string; onComplete?: () => vo
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Step validation
+  // ---------------------------------------------------------------------------
   function validateStep(s: WizardStep): string | null {
     switch (s) {
       case "schedule": {
         if (useCustomCron()) {
-          const validation = validateSchedule({ cron: customCron() })
-          if (!validation.ok) return validation.error ?? "Invalid cron expression"
+          const result = validateCron(customCron())
+          if (!result.ok) return result.error ?? "Invalid cron expression"
         }
-        const tz = timezone() === "local" ? undefined : timezone()
-        if (tz && !isValidTimezone(tz)) return "Invalid timezone"
+        if (!useCustomCron() && !isValidTime(scheduleTime())) {
+          return "Invalid time format"
+        }
+        const tz = timezone()
+        if (tz !== "local" && !isValidTimezone(tz)) {
+          return "Invalid timezone"
+        }
         return null
       }
       case "intent": {
@@ -276,27 +407,30 @@ export function DialogTaskWizard(props: { taskId?: string; onComplete?: () => vo
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Navigation
+  // ---------------------------------------------------------------------------
   function nextStep() {
     const validationError = validateStep(step())
     if (validationError) {
-      setError(validationError)
+      setFieldErrors({ _form: validationError })
+      publishTaskAction("wizard_error", { error: validationError })
       return
     }
-    setError(null)
+
+    setFieldErrors({})
 
     const currentIndex = STEPS.indexOf(step())
-
-    // Track timing for current step
     const duration = Date.now() - stepStartTime()
     publishWizardStepTiming(step(), duration, props.taskId)
 
     if (currentIndex < STEPS.length - 1) {
-      // Publish step completion
       publishWizardProgress(step(), "complete", props.taskId)
       const nextStepVal = STEPS[currentIndex + 1]
-      setStep(nextStepVal)
-      setStepStartTime(Date.now())
-      // Publish next step start
+      batch(() => {
+        setStep(nextStepVal)
+        setStepStartTime(Date.now())
+      })
       publishWizardProgress(nextStepVal, "start", props.taskId)
       saveDraft()
     }
@@ -305,55 +439,60 @@ export function DialogTaskWizard(props: { taskId?: string; onComplete?: () => vo
   function prevStep() {
     const currentIndex = STEPS.indexOf(step())
     if (currentIndex > 0) {
-      // Track timing for current step
       const duration = Date.now() - stepStartTime()
       publishWizardStepTiming(step(), duration, props.taskId)
       const prevStepVal = STEPS[currentIndex - 1]
-      setStep(prevStepVal)
-      setStepStartTime(Date.now())
+      batch(() => {
+        setStep(prevStepVal)
+        setStepStartTime(Date.now())
+      })
+      setFieldErrors({})
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Save handler
+  // ---------------------------------------------------------------------------
   async function handleSave() {
     const validationError = validateStep(step())
     if (validationError) {
-      setError(validationError)
+      setFieldErrors({ _form: validationError })
+      publishTaskAction("wizard_error", { error: validationError })
       return
     }
 
     const currentData = buildCurrentData()
     const parsed = ScheduledTaskCreateSchema.safeParse(currentData)
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Validation failed")
-      publishTaskAction("wizard_error", { error: parsed.error.issues[0]?.message })
+      const msg = parsed.error.issues[0]?.message ?? "Validation failed"
+      setFieldErrors({ _form: msg })
+      publishTaskAction("wizard_error", { error: msg })
       return
     }
 
-    // Track final step timing
     const duration = Date.now() - stepStartTime()
     publishWizardStepTiming(step(), duration, props.taskId)
 
     setIsSaving(true)
     const startTime = Date.now()
     let savedTaskId: string | undefined = props.taskId
+
     try {
       const { ProactiveTaskStore } = await import("@/kiloclaw/proactive/scheduler.store")
       const { buildCreate, buildUpdate } = await import("@/kiloclaw/proactive/scheduled-task")
-
       const tenantId = process.env.KILOCLAW_TENANT_ID ?? "local"
 
       if (isEditing() && props.taskId) {
-        // Update existing task
         const existing = ProactiveTaskStore.get(props.taskId)
         if (!existing) {
-          setError("Task not found")
+          setFieldErrors({ _form: "Task not found" })
           return
         }
         const currentConfig = JSON.parse(existing.triggerConfig)
         const out = buildUpdate({
           currentConfig,
           currentCron: existing.scheduleCron ?? null,
-          patch: parsed.data as any, // buildUpdate accepts partial input
+          patch: parsed.data as any,
         })
         ProactiveTaskStore.update(props.taskId, {
           name: out.name,
@@ -366,7 +505,6 @@ export function DialogTaskWizard(props: { taskId?: string; onComplete?: () => vo
         draftHelper.deleteDraft("global", props.taskId)
         publishTaskAction("task_update", { taskId: savedTaskId, success: true, durationMs: Date.now() - startTime })
       } else {
-        // Create new task
         const out = buildCreate(parsed.data, tenantId)
         ProactiveTaskStore.create(out.task)
         ProactiveTaskStore.update(out.task.id, { status: parsed.data.enabled ? "active" : "paused" })
@@ -375,16 +513,14 @@ export function DialogTaskWizard(props: { taskId?: string; onComplete?: () => vo
         publishTaskAction("task_create", { taskId: savedTaskId, success: true, durationMs: Date.now() - startTime })
       }
 
-      // Publish wizard completion
       publishWizardProgress("review", "complete", savedTaskId)
       publishTaskAction("wizard_complete", { taskId: savedTaskId, success: true, durationMs: Date.now() - startTime })
 
-      // Show success and close
       dialog.clear()
       props.onComplete?.()
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "Failed to save task"
-      setError(errorMsg)
+      setFieldErrors({ _form: errorMsg })
       publishTaskAction("wizard_error", { taskId: savedTaskId, error: errorMsg })
     } finally {
       setIsSaving(false)
@@ -392,7 +528,6 @@ export function DialogTaskWizard(props: { taskId?: string; onComplete?: () => vo
   }
 
   function handleCancel() {
-    // Track timing for current step
     const duration = Date.now() - stepStartTime()
     publishWizardStepTiming(step(), duration, props.taskId)
     publishWizardProgress(step(), "cancel", props.taskId)
@@ -401,11 +536,21 @@ export function DialogTaskWizard(props: { taskId?: string; onComplete?: () => vo
     dialog.clear()
   }
 
+  // ---------------------------------------------------------------------------
   // Keyboard handling
+  // - Escape: always closes
+  // - Ctrl+Arrow: navigate steps
+  // - Plain Enter: advance on non-intent steps when valid
+  // - Ctrl+Enter: always advance
+  // ---------------------------------------------------------------------------
   useKeyboard((evt) => {
+    // Escape always closes
     if (evt.name === "escape") {
       handleCancel()
+      return
     }
+
+    // Ctrl+Arrow navigation
     if (evt.name === "arrow_left" && evt.ctrl) {
       prevStep()
       return
@@ -418,8 +563,23 @@ export function DialogTaskWizard(props: { taskId?: string; onComplete?: () => vo
       }
       return
     }
-    const allowPlainEnter = step() !== "intent"
-    if (evt.name === "return" && (evt.ctrl || allowPlainEnter)) {
+
+    // Plain Enter - only advance if not on intent step and validation passes
+    if (evt.name === "return" && !evt.ctrl) {
+      if (step() !== "intent" && canAdvance()) {
+        evt.preventDefault()
+        if (step() === "review") {
+          handleSave()
+        } else {
+          nextStep()
+        }
+      }
+      return
+    }
+
+    // Ctrl+Enter - always advances (required for intent step with textarea)
+    if (evt.name === "return" && evt.ctrl) {
+      evt.preventDefault()
       if (step() === "review") {
         handleSave()
       } else {
@@ -428,6 +588,12 @@ export function DialogTaskWizard(props: { taskId?: string; onComplete?: () => vo
     }
   })
 
+  // Emit wizard start telemetry
+  publishWizardProgress(initialDraft.step, "start", props.taskId)
+
+  // ---------------------------------------------------------------------------
+  // RENDER
+  // ---------------------------------------------------------------------------
   return (
     <box paddingLeft={2} paddingRight={2} gap={1} flexGrow={1} flexShrink={0} overflow="hidden">
       {/* Header */}
@@ -440,31 +606,29 @@ export function DialogTaskWizard(props: { taskId?: string; onComplete?: () => vo
         </text>
       </box>
 
-      {/* Step indicator */}
-      <box flexDirection="row" gap={1}>
-        <For each={STEPS}>
-          {(s) => (
-            <box
-              paddingLeft={1}
-              paddingRight={1}
-              backgroundColor={step() === s ? theme.primary : theme.backgroundElement}
-              onMouseUp={() => {
-                // Allow moving to previous steps only
-                if (STEPS.indexOf(s) <= STEPS.indexOf(step())) {
-                  setStep(s)
-                }
-              }}
-            >
-              <text fg={step() === s ? theme.background : theme.textMuted}>{STEP_LABELS[s]}</text>
-            </box>
-          )}
-        </For>
+      {/* Step indicator - IMPROVED: shows Step X of Y */}
+      <box flexDirection="column" gap={0}>
+        <box flexDirection="row" gap={1}>
+          <text fg={theme.textMuted}>
+            Step {currentStepIndex()} of {STEPS.length}:
+          </text>
+          <text fg={theme.primary} attributes={TextAttributes.BOLD}>
+            {STEP_LABELS[step()]}
+          </text>
+        </box>
+        <box flexDirection="row" gap={1} marginTop={0}>
+          <For each={STEPS}>
+            {(s) => (
+              <box width={2} height={1} backgroundColor={step() === s ? theme.primary : theme.backgroundElement} />
+            )}
+          </For>
+        </box>
       </box>
 
-      {/* Error display */}
-      <Show when={error()}>
+      {/* Form-level error display */}
+      <Show when={fieldErrors()._form}>
         <box padding={1} backgroundColor={theme.error}>
-          <text fg={theme.background}>{error()}</text>
+          <text fg={theme.background}>{fieldErrors()._form}</text>
         </box>
       </Show>
 
@@ -472,21 +636,26 @@ export function DialogTaskWizard(props: { taskId?: string; onComplete?: () => vo
       <scrollbox flexGrow={1} flexShrink={1}>
         <Show when={step() === "schedule"}>
           <ScheduleStep
-            selectedPreset={selectedPreset}
-            setSelectedPreset={setSelectedPreset}
+            category={scheduleCategory}
+            setCategory={setScheduleCategory}
+            time={scheduleTime}
+            setTime={setScheduleTime}
+            weekday={scheduleWeekday}
+            setWeekday={setScheduleWeekday}
+            dayOfMonth={scheduleDayOfMonth}
+            setDayOfMonth={setScheduleDayOfMonth}
+            timezone={timezone}
+            setTimezone={setTimezone}
             useCustomCron={useCustomCron}
             setUseCustomCron={setUseCustomCron}
             customCron={customCron}
             setCustomCron={setCustomCron}
-            timezone={timezone}
-            setTimezone={setTimezone}
-            advanced={advanced()}
-            setAdvanced={setAdvanced}
             nextRunsPreview={nextRunsPreview}
+            errors={fieldErrors()}
           />
         </Show>
         <Show when={step() === "intent"}>
-          <IntentStep name={name} setName={setName} prompt={prompt} setPrompt={setPrompt} />
+          <IntentStep name={name} setName={setName} prompt={prompt} setPrompt={setPrompt} errors={fieldErrors()} />
         </Show>
         <Show when={step() === "reliability"}>
           <ReliabilityStep
@@ -520,6 +689,8 @@ export function DialogTaskWizard(props: { taskId?: string; onComplete?: () => vo
         <Show when={step() === "review"}>
           <ReviewStep
             data={buildCurrentData}
+            computedCron={computedCron}
+            computedPreset={computedPreset}
             timezone={timezone}
             nextRunsPreview={nextRunsPreview}
             retryAttempts={retryAttempts}
@@ -529,6 +700,13 @@ export function DialogTaskWizard(props: { taskId?: string; onComplete?: () => vo
           />
         </Show>
       </scrollbox>
+
+      {/* Helper text */}
+      <box paddingTop={0}>
+        <text fg={theme.textMuted} attributes={TextAttributes.ITALIC}>
+          {stepHelperText()}
+        </text>
+      </box>
 
       {/* Footer with navigation */}
       <box flexDirection="row" justifyContent="space-between" alignItems="center" paddingTop={1}>
@@ -546,27 +724,26 @@ export function DialogTaskWizard(props: { taskId?: string; onComplete?: () => vo
           >
             <text fg={theme.textMuted}>{advanced() ? "Hide advanced" : "Show advanced"}</text>
           </box>
-          <text fg={theme.textMuted}>Ctrl+← back</text>
-          <text fg={theme.textMuted}>Ctrl+→ next</text>
         </box>
         <box flexDirection="row" gap={1}>
-          <Show when={step() !== "intent" && step() !== "review"}>
-            <text fg={theme.textMuted}>Enter next</text>
-          </Show>
-          <Show when={step() === "review"}>
-            <text fg={theme.textMuted}>Enter save</text>
-          </Show>
-          <Show when={step() === "intent"}>
-            <text fg={theme.textMuted}>Ctrl+Enter next</text>
-          </Show>
           <Show when={step() !== "review"}>
-            <box paddingLeft={3} paddingRight={3} backgroundColor={theme.primary} onMouseUp={nextStep}>
-              <text fg={theme.background}>Next →</text>
+            <box
+              paddingLeft={3}
+              paddingRight={3}
+              backgroundColor={canAdvance() ? theme.primary : theme.backgroundElement}
+              onMouseUp={() => canAdvance() && nextStep()}
+            >
+              <text fg={canAdvance() ? theme.background : theme.textMuted}>Next →</text>
             </box>
           </Show>
           <Show when={step() === "review"}>
-            <box paddingLeft={3} paddingRight={3} backgroundColor={theme.primary} onMouseUp={handleSave}>
-              <text fg={theme.background}>Save Task</text>
+            <box
+              paddingLeft={3}
+              paddingRight={3}
+              backgroundColor={isSaving() ? theme.backgroundElement : theme.primary}
+              onMouseUp={() => !isSaving() && handleSave()}
+            >
+              <text fg={isSaving() ? theme.textMuted : theme.background}>{isSaving() ? "Saving..." : "Save Task"}</text>
             </box>
           </Show>
         </box>
@@ -575,59 +752,142 @@ export function DialogTaskWizard(props: { taskId?: string; onComplete?: () => vo
   )
 }
 
-// Schedule Step Component
+// =============================================================================
+// SCHEDULE STEP - REDESIGNED with category + configurable time
+// =============================================================================
 function ScheduleStep(props: {
-  selectedPreset: () => string
-  setSelectedPreset: (v: string) => void
+  category: () => ScheduleCategory
+  setCategory: (v: ScheduleCategory) => void
+  time: () => string
+  setTime: (v: string) => void
+  weekday: () => number
+  setWeekday: (v: number) => void
+  dayOfMonth: () => number
+  setDayOfMonth: (v: number) => void
+  timezone: () => string
+  setTimezone: (v: string) => void
   useCustomCron: () => boolean
   setUseCustomCron: (v: boolean) => void
   customCron: () => string
   setCustomCron: (v: string) => void
-  timezone: () => string
-  setTimezone: (v: string) => void
-  advanced: boolean
-  setAdvanced: (v: boolean) => void
   nextRunsPreview: () => string[]
+  errors: Record<string, string>
 }) {
   const { theme } = useTheme()
 
   return (
-    <box flexDirection="column" gap={1}>
+    <box flexDirection="column" gap={2}>
       <text attributes={TextAttributes.BOLD} fg={theme.text}>
         Schedule
       </text>
 
-      <box flexDirection="row" gap={2}>
-        <box flexDirection="column" gap={0} flexGrow={1}>
-          <text fg={theme.textMuted}>Preset</text>
-          <For each={PRESETS}>
-            {(preset) => (
-              <box flexDirection="row" gap={1} onMouseUp={() => props.setSelectedPreset(preset.value)}>
-                <text fg={props.selectedPreset() === preset.value ? theme.primary : theme.textMuted}>
-                  {props.selectedPreset() === preset.value ? "●" : "○"}
-                </text>
-                <text fg={theme.text}>{preset.label}</text>
-                <text fg={theme.textMuted}>- {preset.description}</text>
-              </box>
-            )}
-          </For>
-        </box>
-
-        <box flexDirection="column" gap={1} flexGrow={1}>
-          <text fg={theme.textMuted}>Timezone</text>
-          <For each={TIMEZONES.slice(0, 8)}>
-            {(tz) => (
-              <box onMouseUp={() => props.setTimezone(tz)}>
-                <text fg={props.timezone() === tz ? theme.primary : theme.textMuted}>
-                  {tz === "local" ? "Local" : tz}
-                </text>
-              </box>
-            )}
-          </For>
-        </box>
+      {/* Category selector */}
+      <box flexDirection="column" gap={0}>
+        <text fg={theme.textMuted}>Category</text>
+        <For each={SCHEDULE_CATEGORIES}>
+          {(cat) => (
+            <box flexDirection="row" gap={1} onMouseUp={() => props.setCategory(cat.value)}>
+              <text fg={props.category() === cat.value ? theme.primary : theme.textMuted}>
+                {props.category() === cat.value ? "●" : "○"}
+              </text>
+              <text fg={theme.text}>{cat.label}</text>
+              <text fg={theme.textMuted}>- {cat.description}</text>
+            </box>
+          )}
+        </For>
       </box>
 
-      {/* Custom cron option */}
+      {/* Time editor */}
+      <Show when={!props.useCustomCron()}>
+        <box flexDirection="column" gap={0}>
+          <text fg={theme.textMuted}>Activation time (HH:MM)</text>
+          <input
+            value={props.time()}
+            onInput={(val) => props.setTime(val)}
+            placeholder="09:00"
+            width={10}
+            backgroundColor={theme.backgroundElement}
+            textColor={theme.text}
+          />
+          <Show when={props.errors.time}>
+            <text fg={theme.error} attributes={TextAttributes.BOLD}>
+              {props.errors.time}
+            </text>
+          </Show>
+        </box>
+
+        {/* Weekly: weekday selector */}
+        <Show when={props.category() === "weekly"}>
+          <box flexDirection="column" gap={0}>
+            <text fg={theme.textMuted}>Day of week</text>
+            <box flexDirection="row" gap={1}>
+              <For each={WEEKDAYS}>
+                {(day) => (
+                  <box
+                    paddingLeft={1}
+                    paddingRight={1}
+                    backgroundColor={props.weekday() === day.value ? theme.primary : theme.backgroundElement}
+                    onMouseUp={() => props.setWeekday(day.value)}
+                  >
+                    <text fg={props.weekday() === day.value ? theme.background : theme.text}>{day.label}</text>
+                  </box>
+                )}
+              </For>
+            </box>
+          </box>
+        </Show>
+
+        {/* Monthly: day of month selector */}
+        <Show when={props.category() === "monthly"}>
+          <box flexDirection="column" gap={0}>
+            <text fg={theme.textMuted}>Day of month (1-31)</text>
+            <input
+              value={String(props.dayOfMonth())}
+              onInput={(val) => {
+                const n = parseInt(val) || 1
+                props.setDayOfMonth(Math.min(31, Math.max(1, n)))
+              }}
+              width={5}
+              backgroundColor={theme.backgroundElement}
+              textColor={theme.text}
+            />
+          </box>
+        </Show>
+      </Show>
+
+      {/* Timezone selector */}
+      <box flexDirection="column" gap={0}>
+        <text fg={theme.textMuted}>Timezone</text>
+        <box flexDirection="row" gap={2}>
+          <box flexDirection="column" gap={0}>
+            <For each={TIMEZONES.slice(0, Math.ceil(TIMEZONES.length / 2))}>
+              {(tz) => (
+                <box onMouseUp={() => props.setTimezone(tz)}>
+                  <text fg={props.timezone() === tz ? theme.primary : theme.textMuted}>
+                    {tz === "local" ? "Local" : tz.split("/").pop()}
+                  </text>
+                </box>
+              )}
+            </For>
+          </box>
+          <box flexDirection="column" gap={0}>
+            <For each={TIMEZONES.slice(Math.ceil(TIMEZONES.length / 2))}>
+              {(tz) => (
+                <box onMouseUp={() => props.setTimezone(tz)}>
+                  <text fg={props.timezone() === tz ? theme.primary : theme.textMuted}>
+                    {tz === "local" ? "Local" : tz.split("/").pop()}
+                  </text>
+                </box>
+              )}
+            </For>
+          </box>
+        </box>
+        <Show when={props.errors.timezone}>
+          <text fg={theme.error}>{props.errors.timezone}</text>
+        </Show>
+      </box>
+
+      {/* Custom cron toggle */}
       <box flexDirection="row" gap={1} alignItems="center">
         <text
           fg={props.useCustomCron() ? theme.primary : theme.textMuted}
@@ -649,9 +909,11 @@ function ScheduleStep(props: {
       {/* Next runs preview */}
       <box flexDirection="column" gap={0}>
         <text attributes={TextAttributes.BOLD} fg={theme.textMuted}>
-          Next runs preview:
+          Next runs:
         </text>
-        <For each={props.nextRunsPreview()}>{(run) => <text fg={theme.text}>{run}</text>}</For>
+        <For each={props.nextRunsPreview().slice(0, 3)}>
+          {(run) => <text fg={theme.text}>{run.replace("T", " ").slice(0, 19)}</text>}
+        </For>
         <Show when={props.nextRunsPreview().length === 0}>
           <text fg={theme.error}>Invalid schedule</text>
         </Show>
@@ -660,50 +922,65 @@ function ScheduleStep(props: {
   )
 }
 
-// Intent Step Component
+// =============================================================================
+// INTENT STEP - with field-level validation
+// =============================================================================
 function IntentStep(props: {
   name: () => string
   setName: (v: string) => void
   prompt: () => string
   setPrompt: (v: string) => void
+  errors: Record<string, string>
 }) {
   const { theme } = useTheme()
   let textareaRef: TextareaRenderable | undefined
 
   return (
-    <box flexDirection="column" gap={1}>
+    <box flexDirection="column" gap={2}>
       <text attributes={TextAttributes.BOLD} fg={theme.text}>
         Intent
       </text>
 
-      <text fg={theme.textMuted}>Task name</text>
-      <input
-        value={props.name()}
-        onInput={(val) => props.setName(val)}
-        placeholder="e.g., Daily repo summary"
-        backgroundColor={theme.backgroundElement}
-        textColor={theme.text}
-      />
+      <box flexDirection="column" gap={0}>
+        <text fg={theme.textMuted}>Task name *</text>
+        <input
+          value={props.name()}
+          onInput={(val) => props.setName(val)}
+          placeholder="e.g., Daily repo summary"
+          backgroundColor={theme.backgroundElement}
+          textColor={theme.text}
+        />
+        <Show when={props.errors.name}>
+          <text fg={theme.error}>{props.errors.name}</text>
+        </Show>
+      </box>
 
-      <text fg={theme.textMuted}>Prompt payload</text>
-      <textarea
-        ref={(r) => {
-          textareaRef = r
-        }}
-        initialValue={props.prompt()}
-        onContentChange={() => {
-          if (textareaRef) props.setPrompt(textareaRef.plainText)
-        }}
-        placeholder="What should this task do?"
-        minHeight={4}
-        backgroundColor={theme.backgroundElement}
-        textColor={theme.text}
-      />
+      <box flexDirection="column" gap={0}>
+        <text fg={theme.textMuted}>Prompt payload *</text>
+        <textarea
+          ref={(r) => {
+            textareaRef = r
+          }}
+          initialValue={props.prompt()}
+          onContentChange={() => {
+            if (textareaRef) props.setPrompt(textareaRef.plainText)
+          }}
+          placeholder="What should this task do?"
+          minHeight={6}
+          backgroundColor={theme.backgroundElement}
+          textColor={theme.text}
+        />
+        <Show when={props.errors.prompt}>
+          <text fg={theme.error}>{props.errors.prompt}</text>
+        </Show>
+      </box>
     </box>
   )
 }
 
-// Reliability Step Component
+// =============================================================================
+// RELIABILITY STEP
+// =============================================================================
 function ReliabilityStep(props: {
   retryAttempts: () => number
   setRetryAttempts: (v: number) => void
@@ -724,7 +1001,7 @@ function ReliabilityStep(props: {
   const { theme } = useTheme()
 
   return (
-    <box flexDirection="column" gap={1}>
+    <box flexDirection="column" gap={2}>
       <text attributes={TextAttributes.BOLD} fg={theme.text}>
         Reliability
       </text>
@@ -813,7 +1090,9 @@ function ReliabilityStep(props: {
   )
 }
 
-// Policy Step Component
+// =============================================================================
+// POLICY STEP
+// =============================================================================
 function PolicyStep(props: {
   requireApproval: () => string
   setRequireApproval: (v: string) => void
@@ -825,51 +1104,59 @@ function PolicyStep(props: {
   const { theme } = useTheme()
 
   return (
-    <box flexDirection="column" gap={1}>
+    <box flexDirection="column" gap={2}>
       <text attributes={TextAttributes.BOLD} fg={theme.text}>
         Policy
       </text>
 
-      <text fg={theme.textMuted}>Approval mode</text>
-      <For each={APPROVAL_POLICIES}>
-        {(policy) => (
-          <box flexDirection="row" gap={1} onMouseUp={() => props.setRequireApproval(policy.value)}>
-            <text fg={props.requireApproval() === policy.value ? theme.primary : theme.textMuted}>
-              {props.requireApproval() === policy.value ? "●" : "○"}
-            </text>
-            <text fg={theme.text}>{policy.label}</text>
-            <text fg={theme.textMuted}>- {policy.description}</text>
-          </box>
-        )}
-      </For>
+      <box flexDirection="column" gap={0}>
+        <text fg={theme.textMuted}>Approval mode</text>
+        <For each={APPROVAL_POLICIES}>
+          {(policy) => (
+            <box flexDirection="row" gap={1} onMouseUp={() => props.setRequireApproval(policy.value)}>
+              <text fg={props.requireApproval() === policy.value ? theme.primary : theme.textMuted}>
+                {props.requireApproval() === policy.value ? "●" : "○"}
+              </text>
+              <text fg={theme.text}>{policy.label}</text>
+              <text fg={theme.textMuted}>- {policy.description}</text>
+            </box>
+          )}
+        </For>
+      </box>
 
-      <text fg={theme.textMuted}>Quiet hours (optional)</text>
-      <box flexDirection="row" gap={1} alignItems="center">
-        <input
-          value={props.quietHoursStart()}
-          onInput={(val) => props.setQuietHoursStart(val)}
-          placeholder="HH:MM"
-          width={10}
-          backgroundColor={theme.backgroundElement}
-          textColor={theme.text}
-        />
-        <text fg={theme.textMuted}>to</text>
-        <input
-          value={props.quietHoursEnd()}
-          onInput={(val) => props.setQuietHoursEnd(val)}
-          placeholder="HH:MM"
-          width={10}
-          backgroundColor={theme.backgroundElement}
-          textColor={theme.text}
-        />
+      <box flexDirection="column" gap={0}>
+        <text fg={theme.textMuted}>Quiet hours (optional)</text>
+        <box flexDirection="row" gap={1} alignItems="center">
+          <input
+            value={props.quietHoursStart()}
+            onInput={(val) => props.setQuietHoursStart(val)}
+            placeholder="HH:MM"
+            width={10}
+            backgroundColor={theme.backgroundElement}
+            textColor={theme.text}
+          />
+          <text fg={theme.textMuted}>to</text>
+          <input
+            value={props.quietHoursEnd()}
+            onInput={(val) => props.setQuietHoursEnd(val)}
+            placeholder="HH:MM"
+            width={10}
+            backgroundColor={theme.backgroundElement}
+            textColor={theme.text}
+          />
+        </box>
       </box>
     </box>
   )
 }
 
-// Review Step Component
+// =============================================================================
+// REVIEW STEP
+// =============================================================================
 function ReviewStep(props: {
   data: () => any
+  computedCron: () => string
+  computedPreset: () => string | undefined
   timezone: () => string
   nextRunsPreview: () => string[]
   retryAttempts: () => number
@@ -881,39 +1168,36 @@ function ReviewStep(props: {
   const d = () => props.data()
 
   const scheduleDescription = createMemo(() => {
-    const data = d()
-    if (data.cron) return `Custom cron: ${data.cron}`
-    const presetLabels: Record<string, string> = {
-      hourly: "Hourly",
-      "daily-09:00": "Daily at 9am",
-      "weekdays-09:00": "Weekdays at 9am",
-      "weekly-mon-09:00": "Weekly Monday at 9am",
-      "monthly-1st-09:00": "Monthly on 1st at 9am",
+    if (props.computedPreset()) {
+      return LEGACY_PRESET_LABELS[props.computedPreset()!] ?? props.computedPreset()
     }
-    return presetLabels[data.preset ?? "daily-09:00"] ?? data.preset
+    return `Custom: ${props.computedCron()}`
   })
 
   return (
-    <box flexDirection="column" gap={1}>
+    <box flexDirection="column" gap={2}>
       <text attributes={TextAttributes.BOLD} fg={theme.text}>
         Review
       </text>
 
-      <box flexDirection="column" gap={0} paddingTop={1}>
+      <box flexDirection="column" gap={0}>
         <text attributes={TextAttributes.BOLD} fg={theme.primary}>
           {d().name || "(unnamed)"}
         </text>
-        <text fg={theme.textMuted}></text>
       </box>
 
       <box flexDirection="column" gap={0}>
         <text attributes={TextAttributes.BOLD} fg={theme.textMuted}>
           Schedule
         </text>
-        <text fg={theme.text}>
-          {scheduleDescription()} - {props.timezone() === "local" ? "local timezone" : props.timezone()}
+        <text fg={theme.text}>{scheduleDescription()}</text>
+        <text fg={theme.textMuted}>
+          {props.timezone() === "local" ? "Local timezone" : props.timezone()}
+          {" | "}Cron: {props.computedCron()}
         </text>
-        <For each={props.nextRunsPreview().slice(0, 2)}>{(run) => <text fg={theme.textMuted}>Next: {run}</text>}</For>
+        <For each={props.nextRunsPreview().slice(0, 2)}>
+          {(run) => <text fg={theme.textMuted}>Next: {run.replace("T", " ").slice(0, 19)}</text>}
+        </For>
       </box>
 
       <box flexDirection="column" gap={0}>

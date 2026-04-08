@@ -13,6 +13,9 @@ export type SchedulePreset = z.infer<typeof SchedulePreset>
 export const ScheduleKind = z.enum(["preset", "cron"])
 export type ScheduleKind = z.infer<typeof ScheduleKind>
 
+export const ScheduleCategory = z.enum(["daily", "weekdays", "weekly", "monthly"])
+export type ScheduleCategory = z.infer<typeof ScheduleCategory>
+
 export const DEFAULT_PRESET: SchedulePreset = "daily-09:00"
 
 const PRESET_CRON: Record<SchedulePreset, string> = {
@@ -31,6 +34,106 @@ const WEEKDAY_MAP: Record<string, number> = {
   thu: 4,
   fri: 5,
   sat: 6,
+}
+
+// =============================================================================
+// SCHEDULE CATEGORY DTO - Structured schedule representation
+// =============================================================================
+
+export interface ScheduleDTO {
+  category: ScheduleCategory
+  time: string // HH:mm format
+  weekday?: number // 0-6 for weekly
+  dayOfMonth?: number // 1-31 for monthly
+}
+
+/**
+ * Maps a structured schedule DTO to a cron expression
+ */
+export function scheduleToCron(input: ScheduleDTO): string {
+  const [hours, minutes] = input.time.split(":").map(Number)
+  const timePart = `${minutes} ${hours}`
+
+  switch (input.category) {
+    case "daily":
+      return `${timePart} * * *`
+    case "weekdays":
+      return `${timePart} * * 1-5`
+    case "weekly": {
+      const dow = input.weekday ?? 1 // Default to Monday
+      return `${timePart} * * ${dow}`
+    }
+    case "monthly": {
+      const dom = input.dayOfMonth ?? 1 // Default to 1st
+      return `${timePart} ${dom} * *`
+    }
+    default:
+      return `${timePart} * * *`
+  }
+}
+
+/**
+ * Validates a time string in HH:mm format
+ */
+export function isValidTime(time: string): boolean {
+  if (!/^\d{2}:\d{2}$/.test(time)) return false
+  const [h, m] = time.split(":").map(Number)
+  return h >= 0 && h <= 23 && m >= 0 && m <= 59
+}
+
+/**
+ * Parses legacy preset IDs into structured schedule DTO
+ */
+export function parsePresetToCategory(preset: string): ScheduleDTO | null {
+  // hourly - special case
+  if (preset === "hourly") {
+    return { category: "daily", time: "00:00" }
+  }
+
+  // Parse patterns like "daily-09:00", "weekdays-09:00", "weekly-mon-09:00", "monthly-1st-09:00"
+  const dailyMatch = preset.match(/^daily-(\d{2}:\d{2})$/)
+  if (dailyMatch) {
+    return { category: "daily", time: dailyMatch[1]! }
+  }
+
+  const weekdaysMatch = preset.match(/^weekdays-(\d{2}:\d{2})$/)
+  if (weekdaysMatch) {
+    return { category: "weekdays", time: weekdaysMatch[1]! }
+  }
+
+  const weeklyMatch = preset.match(/^weekly-(mon|tue|wed|thu|fri|sat|sun)-(\d{2}:\d{2})$/)
+  if (weeklyMatch) {
+    const dayMap: Record<string, number> = { mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6, sun: 0 }
+    return { category: "weekly", time: weeklyMatch[2]!, weekday: dayMap[weeklyMatch[1]!] }
+  }
+
+  const monthlyMatch = preset.match(/^monthly-(\d+)(?:st|nd|rd|th)-(\d{2}:\d{2})$/)
+  if (monthlyMatch) {
+    return { category: "monthly", time: monthlyMatch[2]!, dayOfMonth: parseInt(monthlyMatch[1]!) }
+  }
+
+  return null
+}
+
+/**
+ * Builds a preset string from structured DTO for backward compatibility
+ */
+export function categoryToPreset(input: ScheduleDTO): string {
+  switch (input.category) {
+    case "daily":
+      return `daily-${input.time}`
+    case "weekdays":
+      return `weekdays-${input.time}`
+    case "weekly": {
+      const dayMap = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"]
+      return `weekly-${dayMap[input.weekday ?? 1]}-${input.time}`
+    }
+    case "monthly": {
+      const dom = input.dayOfMonth ?? 1
+      const suffix = dom === 1 ? "st" : dom === 2 ? "nd" : dom === 3 ? "rd" : "th"
+      return `monthly-${dom}${suffix}-${input.time}`
+    }
+  }
 }
 
 export function presetToCron(preset: SchedulePreset): string {
