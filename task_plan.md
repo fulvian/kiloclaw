@@ -121,6 +121,63 @@
 - [ ] Observability active on technical KPIs and safety
 - [ ] Support readiness completed with clear ownership
 
+## Scheduled Tasks Runtime Refoundation (2026-04-09) - COMPLETED ✅
+
+Implementation of `docs/plans/KILOCLAW_TASK_SCHEDULING_REFOUNDATION_PLAN_2026-04-09.md`
+
+### Phase 0: Stabilize Foundation (P0) - COMPLETED ✅
+
+- **RCA-01**: Daemon now requires executor registration before `start()` - fails fast if missing
+- **RCA-02**: Flag semantics documented with clear precedence between `Flag` and daemon loader
+- **RCA-03**: DB path unified to `.kiloccode/proactive.db` across store and install service
+- Added `executor_missing` outcome type in scheduler engine
+
+### Phase 1: Fix TUI User Control (P0) - COMPLETED ✅
+
+- **RCA-04**: Extended `/tasks` parser to support show/edit/runs/dlq/pause/resume/run/delete
+- **RCA-05**: Fixed edit navigation - now opens wizard instead of looping back to detail
+- **RCA-06**: TUI resume now recalculates `nextRunAt` matching CLI behavior
+- **RCA-07**: Added confirmation dialogs for delete and DLQ remove actions
+
+### Phase 2: Canonicalize State (P0) - COMPLETED ✅
+
+- **RCA-08**: Replaced silent `catch {}` with structured logging and error toasts in all dialogs
+- **RCA-09**: Added `running` state visibility in UI list and detail views
+- **RCA-10**: Fixed flaky sleep-based tests - now deterministic timing
+
+### Phase 3: Strengthen Runtime (P1) - COMPLETED ✅
+
+- Added misfire handling: `skip`, `catchup_one`, `catchup_all` policies (APScheduler-style)
+- Added `max_instances` enforcement per task to prevent concurrent execution
+- Added deterministic jitter for retry backoff (Celery-style)
+- Added `inFlightTasks` Map for tracking concurrent executions
+
+### Phase 4: Operationalize Release (P1) - COMPLETED ✅
+
+- Implemented `daemon status` command with human-readable and JSON output
+- Health dashboard shows: state, lease, scheduler, uptime, flags, telemetry
+- Telemetry includes: run success/fail/blocked rates, DLQ growth, tick lag
+
+### Verification Results
+
+```
+Typecheck: ✅ PASSED (0 errors)
+Tests:     ✅ 843 pass, 3 skip, 0 fail
+```
+
+### Files Modified
+
+| File                   | Changes                                                                              |
+| ---------------------- | ------------------------------------------------------------------------------------ |
+| `scheduler.engine.ts`  | executor_missing outcome, fail-fast, misfire handling, jitter backoff, max_instances |
+| `scheduler.store.ts`   | DB path alignment, structured logging                                                |
+| `daemon.ts`            | Executor registration required, daemon status command                                |
+| `flag.ts`              | Flag semantics documentation                                                         |
+| `app.tsx`              | Edit navigation fix, confirmations, resume with reschedule                           |
+| `prompt/index.tsx`     | Extended /tasks parser                                                               |
+| `dialog-*.tsx`         | Silent catch removal, error toasts, running state                                    |
+| `daemon-lease.test.ts` | Deterministic timing                                                                 |
+
 ## Scheduled Tasks Critical Fixes (2026-04-08) - COMPLETED ✅
 
 During Phase 7, critical bugs were discovered and fixed in the scheduled tasks system:
@@ -206,3 +263,4 @@ dba829e fix(scheduler): enable task execution engine and add Delete button
 - SAFETY_POLICY.md
 - PROACTIVITY_LIMITS.md
 - RISK_MATRIX.md
+- KILOCLAW_TASK_SCHEDULING_REFOUNDATION_PLAN_2026-04-09.md

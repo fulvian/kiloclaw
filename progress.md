@@ -1234,3 +1234,113 @@ All phases from `KILOCLAW_SCHEDULED_TASKS_INTERACTIVE_UX_PLAN_2026-04-07.md` del
 3. ✅ Phase 3: Management and monitoring views
 4. ✅ Phase 4: Unified interactive/non-interactive command paths
 5. ✅ Phase 5: Telemetry and rollout controls
+
+---
+
+## 2026-04-09 - Task Scheduling Refoundation - COMPLETED
+
+### Summary
+
+Implemented all 4 phases of `KILOCLAW_TASK_SCHEDULING_REFOUNDATION_PLAN_2026-04-09.md` for the scheduled tasks runtime.
+
+### Phase 0: Stabilize Foundation (P0)
+
+**RCA-01: task not executed even if runtime "up"**
+
+- Problem: `executionEnabled` default false and shadow mode active; no executor registered
+- Fix: `daemon.ts` now requires executor registration before `start()` succeeds; `scheduler.engine.ts` fails fast if no executor
+
+**RCA-02: contradictory flag defaults**
+
+- Problem: `Flag.KILOCLAW_DAEMON_RUNTIME_ENABLED` requires explicit "true"; internal loader uses softer check
+- Fix: Documented semantics and precedence in `flag.ts`
+
+**RCA-03: DB path inconsistency**
+
+- Problem: Store defaults to `.kiloclaw/proactive.db`; install service uses `.kilocode/proactive.db`
+- Fix: Unified to `.kiloccode/proactive.db` in `scheduler.store.ts`
+
+### Phase 1: Fix TUI User Control (P0)
+
+**RCA-04: /tasks parser not aligned with UI docs**
+
+- Extended parser to support: show, edit, runs, dlq, pause, resume, run, delete
+
+**RCA-05: edit not reachable**
+
+- Fixed edit navigation - now opens `DialogTaskWizard` instead of looping back
+
+**RCA-06: resume inconsistent between CLI and TUI**
+
+- TUI resume now recalculates `nextRunAt` using `nextRuns()` like CLI
+
+**RCA-07: destructive actions without confirmation**
+
+- Added `DialogAlert` confirmations for delete and DLQ remove
+
+### Phase 2: Canonicalize State (P0)
+
+**RCA-08: silent catch blocks hiding failures**
+
+- Replaced silent `catch {}` with structured logging and error toasts in all dialog components
+
+**RCA-09: incomplete running state visibility**
+
+- Added `running` state to UI list and detail views
+
+**RCA-10: test flakiness with sleep**
+
+- Fixed `daemon-lease.test.ts` - removed `Bun.sleep()` calls, now deterministic
+
+### Phase 3: Strengthen Runtime (P1)
+
+**Misfire handling (APScheduler-style)**
+
+- Implemented: `skip`, `catchup_one`, `catchup_all` policies
+- Added `startingDeadlineMs` for overdue task decisions
+
+**max_instances enforcement**
+
+- Added `maxInstances` to task config
+- Added `inFlightTasks` Map for tracking concurrent executions
+
+**Retry backoff with deterministic jitter (Celery-style)**
+
+- Exponential backoff: `baseBackoffMs * 2^(retryCount-1)`
+- Jitter based on taskId + retryCount hash for idempotency
+
+### Phase 4: Operationalize Release (P1)
+
+**`daemon status` command**
+
+- Human-readable output with state, lease, scheduler, uptime, flags, telemetry
+- JSON output with `--json` flag for machine consumption
+
+**Health telemetry**
+
+- Run success/fail/blocked rates
+- DLQ growth rate vs baseline
+- Average tick lag
+
+### Files Modified
+
+| File                            | Change                                                                                                  |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `scheduler.engine.ts`           | executor_missing outcome, fail-fast, misfire handling, jitter backoff, max_instances, inFlightTasks Map |
+| `scheduler.store.ts`            | DB path alignment, structured logging to migrations                                                     |
+| `daemon.ts`                     | Executor required before start, daemon status command                                                   |
+| `flag.ts`                       | Documented flag semantics and precedence                                                                |
+| `scheduled-task.ts`             | Added maxInstances field to schema                                                                      |
+| `app.tsx`                       | Edit→wizard, confirmations, resume with reschedule                                                      |
+| `prompt/index.tsx`              | Extended /tasks parser                                                                                  |
+| `dialog-task-*.tsx`             | Silent catch removal, error toasts, running state                                                       |
+| `schedule-dto.test.ts`          | Added maxInstances to test fixtures                                                                     |
+| `scheduled-task-schema.test.ts` | Added maxInstances to test fixtures                                                                     |
+| `daemon-lease.test.ts`          | Deterministic timing, removed sleep                                                                     |
+
+### Verification
+
+```
+Typecheck: ✅ PASSED (0 errors)
+Tests:     ✅ 843 pass, 3 skip, 0 fail
+```
