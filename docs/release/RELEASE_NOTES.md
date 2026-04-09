@@ -7,6 +7,20 @@
 
 ---
 
+## Corrective Update (2026-04-09)
+
+Task scheduling corrective work is now fully shipped for the runtime/TUI path.
+
+| Area                  | Update                                                                  | Status |
+| --------------------- | ----------------------------------------------------------------------- | ------ |
+| **TUI routing**       | Unified `/tasks` command parser and explicit dispatch in TUI            | ✅     |
+| **Runtime execution** | Daemon now uses a real executor adapter with no fake success path       | ✅     |
+| **Scheduling loop**   | Daemon-managed single loop mode removes duplicate runtime ticks         | ✅     |
+| **Run-now contract**  | `run-now` now returns typed reason codes for blocked/failed acceptance  | ✅     |
+| **Task selector UX**  | Selectors support short ref `tsk_...`, task name, and list index `#<n>` | ✅     |
+
+---
+
 ## Executive Summary
 
 Kiloclaw 7.4.0 introduces the **Semantic Memory Trigger** - replacing hardcoded keyword-based recall with pure embedding-based semantic similarity. This enables multilingual recall without language-specific keyword maintenance.

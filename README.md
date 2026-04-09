@@ -119,6 +119,25 @@ bun run typecheck
 bun test
 ```
 
+### Task Commands
+
+Use `kiloclaw task` in CLI or `/tasks` in TUI for the same task control flow.
+
+- Supported selectors: short task ref `tsk_...`, exact task name, or `#<index>` from task list
+- Quote `#<index>` in shell commands to avoid comment parsing
+
+```bash
+# CLI: run task now with different selectors
+kiloclaw task run-now tsk_01hzy8jv7w
+kiloclaw task run-now "Daily summary"
+kiloclaw task run-now "#2"
+
+# TUI slash commands
+/tasks show tsk_01hzy8jv7w
+/tasks run #2
+/tasks pause "Daily summary"
+```
+
 ## License
 
 MIT - See [LICENSE](LICENSE)
