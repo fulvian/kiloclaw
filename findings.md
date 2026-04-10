@@ -84,3 +84,38 @@
 **Files Changed**: `packages/opencode/src/kiloclaw/proactive/scheduler.store.ts`
 
 **Commit**: Fixed in `scheduler.store.ts` - added missing `initDb()` calls to read functions
+
+## MCP OAuth Auto-Refresh Implementation (2026-04-10, Wave 7)
+
+### Summary
+
+Implemented complete OAuth MCP auto-refresh system for Google Workspace MCP integration with single-login-per-user, cross-root/worktree credential sharing, and automatic token refresh.
+
+### New Files Created
+
+- `packages/opencode/src/mcp/auth-url.ts` - URL canonicalization (localhost normalization, trailing slash handling, default port removal, query string preservation)
+- `packages/opencode/src/mcp/auth-store.ts` - Canonical+runtime auth store with merge policy, lock file, atomic writes
+- `packages/opencode/src/mcp/refresh-manager.ts` - Proactive refresh scheduler with skew (120s), jitter, exponential backoff
+- `packages/opencode/src/mcp/auth-coordinator.ts` - Startup/in-session/401 orchestration with event publishing
+
+### Tests Created
+
+- `packages/opencode/test/mcp/auth-url.test.ts` - 20 tests (URL canonicalization)
+- `packages/opencode/test/mcp/auth-store.test.ts` - 8 tests (auth store)
+- `packages/opencode/test/mcp/refresh-manager.test.ts` - 12 tests (refresh scheduler)
+- `packages/opencode/test/mcp/oauth-provider-refresh-token-preservation.test.ts` - 4 tests (refresh token preservation)
+
+### Key Fixes
+
+- **oauth-provider.ts**: `saveTokens()` now preserves existing refresh token when not returned in OAuth response (prevents token loss on refresh)
+- **auth-url.ts**: Fixed trailing slash handling for root URLs, query string preservation, URL origin extraction
+- **mcp/index.ts**: Added 401 retry wrapper in `convertMcpTool()`, proper `EnsureResult` type export
+- **thread.ts**: Calls `MCP.ensureAtSessionStart()` before chat renders for automatic auth verification
+
+### Typecheck Status
+
+✅ All TypeScript errors resolved - `bun run --cwd packages/opencode typecheck` passes
+
+### Test Status
+
+- 34 MCP tests pass, 5 pre-existing failures (oauth-browser.test.ts, headers.test.ts - unrelated to this implementation)

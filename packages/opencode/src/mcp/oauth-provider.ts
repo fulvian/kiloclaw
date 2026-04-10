@@ -108,17 +108,28 @@ export class McpOAuthProvider implements OAuthClientProvider {
   }
 
   async saveTokens(tokens: OAuthTokens): Promise<void> {
+    // Preserve existing refresh token if new one not provided.
+    // This is normal behavior for Google OAuth - refresh tokens are only
+    // returned on the first authorization, not on subsequent refreshes.
+    const existingEntry = await McpAuth.getForUrl(this.mcpName, this.serverUrl)
+    const existingRefreshToken = existingEntry?.tokens?.refreshToken
+    const refreshToken = tokens.refresh_token ?? existingRefreshToken
+
     await McpAuth.updateTokens(
       this.mcpName,
       {
         accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token,
+        refreshToken,
         expiresAt: tokens.expires_in ? Date.now() / 1000 + tokens.expires_in : undefined,
         scope: tokens.scope,
       },
       this.serverUrl,
     )
-    log.info("saved oauth tokens", { mcpName: this.mcpName })
+    log.info("saved oauth tokens", {
+      mcpName: this.mcpName,
+      hasRefreshToken: !!refreshToken,
+      expiresIn: tokens.expires_in,
+    })
   }
 
   async redirectToAuthorization(authorizationUrl: URL): Promise<void> {

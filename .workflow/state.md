@@ -1,10 +1,20 @@
 # Project State
 
-## Current Phase: Phase 5 - Delivery (Wave 6 Technical Ready, External Sign-Off Pending)
+## Current Phase: Phase 5 - Delivery (Task Scheduling Corrective TDD 2026-04-09)
 
 ## Started: 2026-04-02T12:21:02+02:00
 
-## Last Updated: 2026-04-07T19:23:56+02:00
+## Last Updated: 2026-04-10T10:28:18+02:00
+
+## Corrective Track: Task Scheduling (2026-04-09)
+
+| Area                                   | Status      | Evidence                                                    |
+| -------------------------------------- | ----------- | ----------------------------------------------------------- |
+| TUI routing `/tasks` parser+dispatch   | ✅ VERIFIED | `test/cli/tui-task-command-router.test.ts`                  |
+| Control plane unificato (CLI/TUI)      | ✅ VERIFIED | `scheduler-control.service.test.ts`, `task-command.test.ts` |
+| Runtime no fake success / reason codes | ✅ VERIFIED | `scheduled-task-runtime.test.ts`                            |
+| Single loop daemon-managed             | ✅ VERIFIED | `daemon-lease.test.ts`, typecheck                           |
+| Stato canonico `state/status` compat   | ✅ VERIFIED | store updates + runtime tests                               |
 
 ## PRD: docs/plans/KILOCLAW_DYNAMIC_MEMORY_RECALL_PLAN_2026-04-06.md (NEW)
 
@@ -566,3 +576,98 @@ Weighted:    0.42375 + 0.18 boost = 0.60375 → recall ✅
 ### Documentation
 
 - `docs/plans/KILOCLAW_DYNAMIC_MEMORY_RECALL_PLAN_2026-04-06.md`
+
+---
+
+## Google Workspace Agency - PHASE F3 COMPLETED ✅
+
+**Started**: 2026-04-09
+**Phase**: F3 (Architecture & Manifest) - COMPLETED
+**Plan**: `docs/agencies/plans/KILOCLAW_GOOGLE_WORKSPACE_AGENCY_IMPLEMENTATION_PLAN_V1_2026-04-09.md`
+**Task Plan**: `docs/agencies/plans/GOOGLE_WORKSPACE_AGENCY_TASK_PLAN_2026-04-09.md`
+
+### Implementation Summary
+
+| Component         | File                                      | Status              |
+| ----------------- | ----------------------------------------- | ------------------- |
+| Agency Manifest   | `agency/manifests/gworkspace-manifest.ts` | ✅ Complete         |
+| OAuth Integration | `agency/auth/gworkspace-oauth.ts`         | ✅ Complete         |
+| Native Adapter    | `agency/adapters/gworkspace-adapter.ts`   | ✅ Complete         |
+| Tool Broker       | `agency/broker/gworkspace-broker.ts`      | ✅ Complete         |
+| Skills            | `agency/skills/gworkspace.ts`             | ✅ Complete (stubs) |
+| Policy Matrix     | `manifests/gworkspace-manifest.ts`        | ✅ Complete         |
+
+### Architecture Decision
+
+- **Approach**: Hybrid (native-first + MCP fallback)
+- **Score**: 3.95 (vs Native 4.35, MCP 2.75)
+- **Rationale**: Best security/coverage balance
+
+### Policy Matrix
+
+| Service  | Operation                   | Policy       |
+| -------- | --------------------------- | ------------ |
+| Gmail    | messages.get                | SAFE         |
+| Gmail    | drafts.create               | NOTIFY       |
+| Gmail    | messages.send               | CONFIRM      |
+| Gmail    | bulk_send >50               | DENY         |
+| Calendar | events.list                 | SAFE         |
+| Calendar | events.insert               | CONFIRM      |
+| Calendar | events.update >20 attendees | CONFIRM+HITL |
+| Drive    | files.list/get              | SAFE         |
+| Drive    | share same domain           | CONFIRM      |
+| Drive    | share public                | DENY         |
+
+### Research Findings
+
+- Google Workspace MCP servers: `taylorwilsdon/google_workspace_mcp`, `aaronsb/google-workspace-mcp`
+- OAuth 2.1 alignment: PKCE mandatory, refresh token rotation
+- Rate limiting: exponential backoff (500ms base, 32s max, 5 retries)
+- Sync handling: 410 Gone → full resync
+
+### Gate Status
+
+| Gate | Name                 | Status         |
+| ---- | -------------------- | -------------- |
+| G1   | Discovery Brief      | ✅ Complete    |
+| G2   | Tool Decision Record | ✅ Complete    |
+| G3   | Agency Manifest      | ✅ Complete    |
+| G4   | Build                | 🔄 In Progress |
+| G5   | Verification         | ⏳ Pending     |
+| G6   | Rollout              | ⏳ Pending     |
+
+### Next Steps
+
+1. **F4 (Build)**: Implement Gmail/Calendar adapters + OAuth flow
+2. **F4 (Build)**: Implement Drive/Docs/Sheets adapters
+3. **F5**: Add test suite for agency
+4. **F6**: Shadow/Canary rollout
+
+### Files Created
+
+```
+packages/opencode/src/kiloclaw/agency/
+├── manifests/gworkspace-manifest.ts   # Agency manifest + policy matrix
+├── skills/gworkspace.ts             # Gmail/Calendar/Drive/Docs/Sheets skills
+├── adapters/gworkspace-adapter.ts   # Native Google API adapter
+├── broker/gworkspace-broker.ts        # Native/MCP routing broker
+└── auth/gworkspace-oauth.ts          # OAuth 2.1 with PKCE
+
+docs/agencies/plans/
+└── GOOGLE_WORKSPACE_AGENCY_TASK_PLAN_2026-04-09.md  # Task tracking
+```
+
+packages/opencode/src/kiloclaw/agency/
+├── agents/gworkspace/ # Domain agents
+├── skills/gworkspace/ # Capability bundles
+├── adapters/ # Native Google API adapters
+├── broker/ # Tool routing + fallback
+├── policy/gworkspace/ # Policy engine
+├── auth/gworkspace/ # OAuth integration
+└── audit/gworkspace/ # Audit trail
+
+packages/opencode/test/gworkspace/ # Test suite
+
+```
+
+```

@@ -322,6 +322,15 @@ export const TuiThreadCommand = cmd({
       // spawn or async work so the OS cannot kill the process group.
       win32DisableProcessedInput()
       await loadDefaultSessionEnv()
+
+      // kilocode_change start - Initialize auth coordinator at startup
+      // This ensures auth is checked/refreshed before chat renders
+      const { MCP } = await import("@/mcp")
+      MCP.ensureAtSessionStart().catch((err) => {
+        Log.Default.warn("MCP ensureAtSessionStart failed", { error: err instanceof Error ? err.message : String(err) })
+      })
+      // kilocode_change end
+
       await seedMcpAuthFromUserData()
 
       if (args.fork && !args.continue && !args.session) {
