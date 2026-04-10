@@ -108,6 +108,37 @@ const agencyDefinitions: AgencyDefinition[] = [
     providers: ["openweathermap"],
     metadata: { wave: 2, description: "Weather information and forecasts" },
   },
+  {
+    id: "agency-gworkspace",
+    name: "Google Workspace Agency",
+    domain: "gworkspace",
+    policies: {
+      allowedCapabilities: [
+        "gmail.search",
+        "gmail.read",
+        "gmail.draft",
+        "gmail.send",
+        "calendar.list",
+        "calendar.read",
+        "calendar.create",
+        "calendar.update",
+        "drive.search",
+        "drive.list",
+        "drive.read",
+        "drive.share",
+        "docs.read",
+        "docs.update",
+        "sheets.read",
+        "sheets.update",
+      ],
+      deniedCapabilities: ["gmail.bulk_send", "drive.share_public", "*.permanent_delete"],
+      maxRetries: 5,
+      requiresApproval: true,
+      dataClassification: "confidential",
+    },
+    providers: ["googleapis_native", "google_workspace_mcp"],
+    metadata: { wave: 3, description: "Gmail, Calendar, Drive, Docs, and Sheets operations" },
+  },
 ]
 
 // Pre-defined skill chains for knowledge agency

@@ -5,7 +5,8 @@
       "agency-knowledge": "1.0.0",
       "agency-development": "1.0.0",
       "agency-nutrition": "1.0.0",
-      "agency-weather": "1.0.0"
+      "agency-weather": "1.0.0",
+      "agency-gworkspace": "1.0.0"
     },
     "skills": {
       "web-research": "1.0.0",

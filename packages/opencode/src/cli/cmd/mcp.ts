@@ -15,6 +15,95 @@ import { Global } from "../../global"
 import { modify, applyEdits } from "jsonc-parser"
 import { Filesystem } from "../../util/filesystem"
 import { Bus } from "../../bus"
+import { Process } from "@/util/process"
+
+function setDefaultEnv(name: string, value: string) {
+  if (process.env[name] !== undefined) return
+  process.env[name] = value
+}
+
+function parseEnvLine(line: string): [string, string] | null {
+  const text = line.trim()
+  if (!text || text.startsWith("#")) return null
+  const idx = text.indexOf("=")
+  if (idx <= 0) return null
+  const key = text.slice(0, idx).trim()
+  if (!key) return null
+  const raw = text.slice(idx + 1).trim()
+  const value =
+    (raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'")) ? raw.slice(1, -1) : raw
+  return [key, value]
+}
+
+async function loadDefaultSessionEnv(): Promise<void> {
+  const home = process.env.HOME
+  if (!home) return
+  const envFile = path.join(home, ".kilocode", ".env")
+  const text = await Filesystem.readText(envFile).catch(() => "")
+  if (!text) return
+  for (const line of text.split(/\r?\n/)) {
+    const parsed = parseEnvLine(line)
+    if (!parsed) continue
+    setDefaultEnv(parsed[0], parsed[1])
+  }
+}
+
+async function canReach(url: string): Promise<boolean> {
+  try {
+    const res = await fetch(url, { method: "GET" })
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
+function healthUrl(mcpUrl: string): string {
+  const u = new URL(mcpUrl)
+  return `${u.protocol}//${u.host}/health`
+}
+
+async function waitHealthy(url: string, timeoutMs = 30_000): Promise<boolean> {
+  const start = Date.now()
+  while (Date.now() - start < timeoutMs) {
+    if (await canReach(url)) return true
+    await Bun.sleep(250)
+  }
+  return false
+}
+
+async function ensureGoogleWorkspaceMcpRunning(name: string, config: McpRemote): Promise<void> {
+  if (name !== "google-workspace") return
+  const url = config.url
+  if (!url.includes("localhost")) return
+  const h = healthUrl(url)
+  if (await canReach(h)) return
+
+  await loadDefaultSessionEnv()
+
+  const hasOAuth = !!process.env.GOOGLE_OAUTH_CLIENT_ID && !!process.env.GOOGLE_OAUTH_CLIENT_SECRET
+  if (!hasOAuth) return
+
+  const port = new URL(url).port || "8000"
+  const base = process.env.WORKSPACE_MCP_BASE_URI ?? "http://localhost"
+  setDefaultEnv("WORKSPACE_MCP_PORT", port)
+  setDefaultEnv("WORKSPACE_MCP_BASE_URI", base)
+  setDefaultEnv("GOOGLE_OAUTH_REDIRECT_URI", `${base}:${port}/oauth2callback`)
+  setDefaultEnv("MCP_ENABLE_OAUTH21", "true")
+  setDefaultEnv("OAUTHLIB_INSECURE_TRANSPORT", "1")
+
+  Process.spawn(
+    ["uvx", "--from", "workspace-mcp", "workspace-mcp", "--transport", "streamable-http", "--tool-tier", "core"],
+    {
+      stdin: "ignore",
+      stdout: "ignore",
+      stderr: "ignore",
+      env: process.env,
+    },
+  )
+
+  const ok = await waitHealthy(h)
+  if (ok) return
+}
 
 function getAuthStatusIcon(status: MCP.AuthStatus): string {
   switch (status) {
@@ -211,6 +300,8 @@ export const McpAuthCommand = cmd({
           prompts.outro("Done")
           return
         }
+
+        await ensureGoogleWorkspaceMcpRunning(serverName, serverConfig)
 
         // Check if already authenticated
         const authStatus = await MCP.getAuthStatus(serverName)

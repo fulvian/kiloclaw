@@ -408,6 +408,20 @@ export namespace MCP {
         } catch (error) {
           lastError = error instanceof Error ? error : new Error(String(error))
 
+          if (
+            lastError.message.includes("No OAuth state saved") ||
+            lastError.message.includes("No code verifier saved")
+          ) {
+            status = { status: "needs_auth" as const }
+            Bus.publish(TuiEvent.ToastShow, {
+              title: "MCP Authentication Required",
+              message: `Server "${key}" requires authentication. Run: kilo mcp auth ${key}`,
+              variant: "warning",
+              duration: 8000,
+            }).catch((e) => log.debug("failed to show toast", { error: e }))
+            break
+          }
+
           // Handle OAuth-specific errors
           if (error instanceof UnauthorizedError) {
             log.info("mcp server requires authentication", { key, transport: name })
