@@ -519,6 +519,82 @@ Se il routing fallisce, il sistema cade in "custom" che mappa a web-search. Per 
 - Il typeBoost deve essere >= 0.2 per il dominio
 - Se il confidence e < 0.3, investigate - il routing sta fallendo silenziosamente
 
+### I. Agency Context Block in System Prompt (CRITICO - NON OBBLIO)
+
+Dopo il routing, il sistema inietta un blocco contesto nel system prompt. Questo blocco CONTIENE ISTRUZIONI CRITICHE che dicono al modello quale skill/tool usare.
+
+**IL BLOCCO CONTESTO DEVE ESSERE AGGIUNTO PER OGNI NUOVA AGENZIA in `prompt.ts`**
+
+Localizzazione: `packages/opencode/src/session/prompt.ts` linea ~877
+
+Pattern attuale (SOLO per agency-knowledge):
+
+```typescript
+if (Flag.KILO_ROUTING_AGENCY_CONTEXT_ENABLED && agencyContext) {
+  if (agencyContext.agencyId === "agency-knowledge") {
+    // BLOCCO KNOWLEDGE
+  } else if (agencyContext.agencyId === "agency-nba") {
+    // BLOCCO NBA (AGGIUNTO RECENTEMENTE)
+  }
+  // AGGIUNGERE NUOVO BLOCCO PER OGNI NUOVA AGENZIA QUI
+}
+```
+
+**Ogni blocco agenzia deve contenere:**
+
+1. **Header commento**: `<!-- Agency Context: [Nome] -->`
+2. **Routing info**: confidence, reason, source
+3. **Layer info** (se disponibile): L1 capabilities, L2 agent, L3 tools
+4. **CRITICAL TOOL INSTRUCTIONS**: Quali tool USARE e quali NON USARE
+   - Questo e' il punto cruciale - dice al modello di usare l'agenzia corretta
+5. **Skill instructions**: Quale skill caricare per l'agenzia
+6. **Domain-specific guardrails**: Warning specifici per il dominio
+
+**Esempio blocco NBA (da usare come template):**
+
+```typescript
+} else if (agencyContext.agencyId === "agency-nba") {
+  agencyBlock = [
+    "",
+    "<!-- Agency Context: NBA Betting Agency -->",
+    "This conversation has been routed to the NBA Betting Agency.",
+    `Routing confidence: ${Math.round(agencyContext.confidence * 100)}%`,
+    // ... routing info ...
+    "",
+    "CRITICAL TOOL INSTRUCTIONS:",
+    "- For NBA analysis, use the 'nba-analysis' skill which provides game data, odds, and betting recommendations",
+    "- DO NOT use generic web search for NBA queries",
+    "- DO NOT make up NBA statistics or odds - use the NBA Agency data providers",
+    "- All betting recommendations require human approval (HITL) before execution",
+    "",
+    "NBA Agency provides: NBA game analysis, betting odds, injury reports, value betting detection, and guarded recommendations.",
+    "Available tools: nba-analysis skill (REQUIRED for NBA queries), webfetch (for supplementary data only).",
+    "IMPORTANT: Never suggest actual bets without clear odds comparison and value assessment.",
+    "",
+  ].join("\n")
+}
+```
+
+**G4 Requirement aggiornato:**
+
+- [ ] Agency Context Block creato in `prompt.ts`
+- [ ] Istruzioni tool corrette (quali usare, quali NON usare)
+- [ ] Skill instructions per caricare l'agenzia
+- [ ] Domain-specific guardrails
+
+**Test del blocco contesto (obbligatorio):**
+
+Verificare che il system prompt contenga il blocco contesto corretto:
+
+1. Inietta query del dominio
+2. Verifica log per `agency routed` con `agencyId: "agency-[dominio]"`
+3. Verifica che il system prompt contenga il blocco contesto corretto
+4. Verifica che le istruzioni tool siano corrette
+
+**Sintomo se il blocco contesto manca:**
+
+Il modello usa web search invece dell'agenzia specializzata, anche se il routing dice `agency-nba` o altra agenzia. Questo perche' il system prompt non ha le istruzioni corrette.
+
 ---
 
 ## Esegui governance finale
