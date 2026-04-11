@@ -207,6 +207,7 @@ describe("scheduled task schema", () => {
       retryBaseMs: 30_000,
       retryMaxMs: 900_000,
       retryJitter: 0.2,
+      maxInstances: 1,
       concurrency: "forbid",
       startingDeadlineMs: 600_000,
       missedRunPolicy: "catchup_one",

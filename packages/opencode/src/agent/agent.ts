@@ -543,6 +543,33 @@ export namespace Agent {
   export async function get(agent: string) {
     // kilocode_change start -  Treat "build" as "code" for backward compatibility
     const effectiveAgent = agent === "build" ? "code" : agent
+
+    // gworkspace-ops must resolve from flexible registry to preserve MCP tool permissions.
+    if (effectiveAgent === "gworkspace-ops") {
+      getCatalog()
+      const forcedFlexible = FlexibleAgentRegistry.getAgent(effectiveAgent)
+      if (forcedFlexible) {
+        return {
+          name: forcedFlexible.id,
+          displayName: forcedFlexible.name,
+          description: forcedFlexible.description ?? `Flexible agent: ${forcedFlexible.id}`,
+          mode: (forcedFlexible.mode ?? "subagent") as "primary" | "subagent" | "all",
+          native: false,
+          hidden: false,
+          deprecated: false,
+          permission: forcedFlexible.permission ?? [],
+          topP: undefined,
+          temperature: undefined,
+          color: undefined,
+          model: undefined,
+          variant: undefined,
+          prompt: forcedFlexible.prompt,
+          options: {},
+          steps: undefined,
+        }
+      }
+    }
+
     const nativeAgent = await state().then((x) => x[effectiveAgent])
     if (nativeAgent) return nativeAgent
 

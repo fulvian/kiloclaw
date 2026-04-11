@@ -168,7 +168,10 @@ function readHealthUrl(mcpUrl: string): string {
 
 async function canReach(url: string): Promise<boolean> {
   try {
-    const res = await fetch(url, { method: "GET" })
+    const res = await fetch(url, {
+      method: "GET",
+      signal: AbortSignal.timeout(1500),
+    })
     return res.ok
   } catch {
     return false
@@ -253,17 +256,18 @@ async function startIntegratedGoogleWorkspaceMcp(): Promise<IntegratedGwsMcpRunt
     Log.Default.debug("google workspace MCP stdout", { text: chunk.toString().trim() })
   })
 
-  const healthy = await waitHealthy(healthUrl)
-  if (!healthy) {
+  void waitHealthy(healthUrl).then((healthy) => {
+    if (healthy) {
+      Log.Default.info("google workspace MCP autostarted", { healthUrl, pid: proc.pid })
+      return
+    }
     Log.Default.warn("google workspace MCP health check timed out; process left running", {
       healthUrl,
       cmd: cmd.join(" "),
       pid: proc.pid,
     })
-    return { started: true, spawned: true, proc }
-  }
+  })
 
-  Log.Default.info("google workspace MCP autostarted", { healthUrl, pid: proc.pid })
   return { started: true, spawned: true, proc }
 }
 

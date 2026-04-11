@@ -143,6 +143,10 @@ export namespace Flag {
   export const KILOCLAW_SCHEDULED_TASKS_DRAFT_TTL_DAYS = number("KILOCLAW_SCHEDULED_TASKS_DRAFT_TTL_DAYS") ?? 7
 
   // Daemon runtime - disabled by default, enable with KILOCLAW_DAEMON_RUNTIME_ENABLED=true
+  // Semantics: KILOCLAW_DAEMON_RUNTIME_ENABLED env var must be "true" (or "1") to enable.
+  // This is a secure default - daemon will not run unless explicitly opted in.
+  // The daemon loader (daemon.ts) uses a softer check (env !== "false") for internal
+  // testing flexibility, but the public Flag interface requires explicit opt-in.
   export const KILOCLAW_DAEMON_RUNTIME_ENABLED = truthy("KILOCLAW_DAEMON_RUNTIME_ENABLED")
 
   // =============================================================================

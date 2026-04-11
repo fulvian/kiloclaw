@@ -1108,6 +1108,153 @@ Modified `packages/opencode/src/tool/skill.ts`:
 - Staging preflight evidence refreshed via `bash script/wave6-staging-gates.sh` with context/deployment/service/readiness checks passing.
 - Scheduled-task CLI lifecycle integration evidence recorded: `bun run --cwd packages/opencode test test/cli/task-command.test.ts` -> `2 pass, 0 fail`.
 
+---
+
+## 2026-04-11 - Agency 2 NBA Foundation (M1/M2 Baseline)
+
+### Scope delivered
+
+- Added normalized NBA v1 schemas for `Game`, `Odds`, `Signal`, `Recommendation`.
+- Added NBA policy manifest with SAFE/NOTIFY/CONFIRM/DENY and deny-by-default behavior.
+- Registered `agency-nba` in bootstrap and manifest index.
+- Added targeted tests for schema + policy behavior.
+
+### Files created
+
+- `packages/opencode/src/kiloclaw/agency/nba/schema.ts`
+- `packages/opencode/src/kiloclaw/agency/manifests/nba-manifest.ts`
+- `packages/opencode/test/kiloclaw/nba-schema.test.ts`
+- `packages/opencode/test/kiloclaw/nba-manifest.test.ts`
+
+### Files updated
+
+- `packages/opencode/src/kiloclaw/agency/bootstrap.ts`
+- `packages/opencode/src/kiloclaw/agency/manifests/index.json`
+- `packages/opencode/src/kiloclaw/agency/manifests/index.ts`
+- `packages/opencode/src/kiloclaw/agency/index.ts`
+- `.workflow/state.md`
+
+### Verification evidence
+
+- `bun run --cwd packages/opencode test test/kiloclaw/nba-manifest.test.ts test/kiloclaw/nba-schema.test.ts` -> ✅ 8 pass, 0 fail
+- `bun run --cwd packages/opencode typecheck` -> ✅ pass
+
+---
+
+## 2026-04-11 - Agency 2 NBA Phase 4 + Successivi (Runtime + Budgeting)
+
+### Scope delivered
+
+- Implemented NBA runtime safety gate with policy decision outcomes (`allow|deny|require_hitl`).
+- Added stale recommendation gate integration and confidence clamp application in emission path.
+- Added Agency2 telemetry events (`request_started/completed`, `policy_decision`, `signal_emitted`).
+- Implemented dynamic tool payload budgeting baseline (normal/deep caps, policy prefilter, deterministic ranking, drop reasons).
+
+### Files created
+
+- `packages/opencode/src/kiloclaw/agency/nba/runtime.ts`
+- `packages/opencode/src/kiloclaw/agency/nba/budgeting.ts`
+- `packages/opencode/test/kiloclaw/nba-runtime.test.ts`
+- `packages/opencode/test/kiloclaw/nba-budgeting.test.ts`
+
+### Files updated
+
+- `packages/opencode/src/kiloclaw/agency/index.ts`
+- `.workflow/state.md`
+
+### Verification evidence
+
+- `bun run --cwd packages/opencode test test/kiloclaw/nba-manifest.test.ts test/kiloclaw/nba-schema.test.ts test/kiloclaw/nba-runtime.test.ts test/kiloclaw/nba-budgeting.test.ts` -> ✅ 17 pass, 0 fail
+- `bun run --cwd packages/opencode typecheck` -> ✅ pass
+
+---
+
+## 2026-04-11 - Agency 2 NBA Phase 6 (Delivery Readiness M3)
+
+### Scope delivered
+
+- Added provider resiliency module for source freshness TTLs, provider error classification, bounded exponential backoff with jitter.
+- Added simple circuit breaker runtime for provider protection.
+- Added quota-aware market planning helper with `full/degraded/safe` modes.
+- Added provider-call telemetry contract (`agency2.provider_call`).
+
+### Files created
+
+- `packages/opencode/src/kiloclaw/agency/nba/resilience.ts`
+- `packages/opencode/test/kiloclaw/nba-resilience.test.ts`
+
+### Files updated
+
+- `packages/opencode/src/kiloclaw/agency/index.ts`
+- `.workflow/state.md`
+
+### Verification evidence
+
+- `bun run --cwd packages/opencode test test/kiloclaw/nba-manifest.test.ts test/kiloclaw/nba-schema.test.ts test/kiloclaw/nba-runtime.test.ts test/kiloclaw/nba-budgeting.test.ts test/kiloclaw/nba-resilience.test.ts` -> ✅ 25 pass, 0 fail
+- `bun run --cwd packages/opencode typecheck` -> ✅ pass
+
+---
+
+## 2026-04-11 - Agency 2 NBA M4 (Calibration, Gates, Chaos)
+
+### Scope delivered
+
+- Added calibration/backtest primitives: Brier, log-loss, reliability buckets, calibration method selector (`sigmoid` vs `isotonic`), precision at edge threshold.
+- Added Go/No-Go KPI evaluator with per-metric pass/fail and rollback trigger computation.
+- Added chaos scenario evaluator enforcing stale odds block, degraded/safe mode under outage/quota exhaustion, and injury-feed guardrails.
+
+### Files created
+
+- `packages/opencode/src/kiloclaw/agency/nba/calibration.ts`
+- `packages/opencode/src/kiloclaw/agency/nba/gates.ts`
+- `packages/opencode/src/kiloclaw/agency/nba/chaos.ts`
+- `packages/opencode/test/kiloclaw/nba-calibration.test.ts`
+- `packages/opencode/test/kiloclaw/nba-gates.test.ts`
+- `packages/opencode/test/kiloclaw/nba-chaos.test.ts`
+
+### Files updated
+
+- `packages/opencode/src/kiloclaw/agency/index.ts`
+- `.workflow/state.md`
+
+### Verification evidence
+
+- `bun run --cwd packages/opencode test test/kiloclaw/nba-manifest.test.ts test/kiloclaw/nba-schema.test.ts test/kiloclaw/nba-runtime.test.ts test/kiloclaw/nba-budgeting.test.ts test/kiloclaw/nba-resilience.test.ts test/kiloclaw/nba-calibration.test.ts test/kiloclaw/nba-gates.test.ts test/kiloclaw/nba-chaos.test.ts` -> ✅ 37 pass, 0 fail
+- `bun run --cwd packages/opencode typecheck` -> ✅ pass
+
+---
+
+## 2026-04-11 - API Key Migration + Rotation (Agency2/NBA)
+
+### Scope delivered
+
+- Extracted local keys from Me4BrAIn sources and migrated into Kilo managed env block with rotation variables.
+- Added NBA provider key-rotation support in key manager (BallDontLie, Odds API, Polymarket + aliases).
+- Added tests for key alias loading and migration compatibility.
+
+### Operational migration applied (local machine)
+
+- Updated `/home/fulvio/.config/kilo/.env` with managed block `# BEGIN KILOCLAW AGENCY2 KEY ROTATION`.
+- Created backup before rewrite (`.env.backup_before_agency2_migration_*`).
+- Enforced `chmod 600` on `/home/fulvio/.config/kilo/.env`.
+- Migrated provider pools present: Tavily, Firecrawl, Brave, Perplexity, BallDontLie, Odds.
+
+### Code files updated
+
+- `packages/opencode/src/kiloclaw/agency/key-pool.ts`
+- `packages/opencode/src/cli/cmd/kiloclaw.ts`
+- `packages/opencode/test/kiloclaw/key-pool.test.ts`
+- `.workflow/state.md`
+
+### Verification evidence
+
+- `bun run --cwd packages/opencode test test/kiloclaw/key-pool.test.ts test/kiloclaw/nba-manifest.test.ts test/kiloclaw/nba-schema.test.ts test/kiloclaw/nba-runtime.test.ts test/kiloclaw/nba-budgeting.test.ts test/kiloclaw/nba-resilience.test.ts test/kiloclaw/nba-calibration.test.ts test/kiloclaw/nba-gates.test.ts test/kiloclaw/nba-chaos.test.ts` -> ✅ 39 pass, 0 fail
+- `bun run --cwd packages/opencode typecheck` -> ✅ pass
+
+### Blocker
+
+- Remote extraction from `100.99.43.29` blocked by Tailscale interactive SSH auth requirement.
+
 ### Scheduled tasks P0 follow-up (2026-04-07)
 
 - Implemented task CLI product surface:
@@ -1344,3 +1491,142 @@ Implemented all 4 phases of `KILOCLAW_TASK_SCHEDULING_REFOUNDATION_PLAN_2026-04-
 Typecheck: ✅ PASSED (0 errors)
 Tests:     ✅ 843 pass, 3 skip, 0 fail
 ```
+
+---
+
+## 2026-04-11 - Agency 2 NBA Key Migration & Rotation
+
+### Scope completed
+
+- Implemented key migration automation: `script/migrate-agency2-keys.ts`
+- Added `key-migration.ts` with pure helpers: `parseKeyLines`, `normalizeBuckets`, `renderManagedBlock`, `replaceManagedBlock`, `listVariableNames`
+- Added NBA provider pools to key manager: BALLDONTLIE, ODDS, POLYMARKET + aliases
+- Added PERPLEXITY provider to `loadAllFromEnv()`
+- Applied managed env block to `~/.config/kilo/.env` with timestamped backup
+- Added tests: `key-pool.test.ts` (PERPLEXITY loading), `key-migration-script.test.ts` (7 tests)
+
+### Files created/modified
+
+- `script/migrate-agency2-keys.ts` (new)
+- `packages/opencode/src/kiloclaw/agency/key-migration.ts` (new)
+- `packages/opencode/src/kiloclaw/agency/key-pool.ts` (PERPLEXITY + NBA pools + alias support)
+- `packages/opencode/src/cli/cmd/kiloclaw.ts` (BALLDONTLIE/ODDS hint)
+- `packages/opencode/test/kiloclaw/key-pool.test.ts` (updated)
+- `packages/opencode/test/kiloclaw/key-migration-script.test.ts` (new)
+
+### Verification
+
+```
+bun test test/kiloclaw/key-pool.test.ts test/kiloclaw/key-migration-script.test.ts test/kiloclaw/nba-*.test.ts
+→ 44 pass, 0 fail, 150 expect() calls across 10 files
+
+bun run --cwd packages/opencode typecheck
+→ tsgo --noEmit (pass)
+```
+
+### Blocker
+
+- Tailscale SSH interactive auth required for remote extraction from `100.99.43.29`
+- Resolution: approve at https://login.tailscale.com/a/l10d9959233e7a1 then re-run with `--remote`
+
+---
+
+## 2026-04-11 - Agency 2 NBA Adapter Layer + Orchestrator (M5)
+
+### Scope delivered
+
+- Created adapter layer with 8 provider adapters: BallDontLie, Odds API, Odds-Bet365, ParlayAPI, ESPN, nba_api, Polymarket
+- Created orchestrator with fallback chains, freshness tracking, and injury confidence penalty
+- Integrated injury confidence penalty into runtime via `computeAdjustedConfidence()`
+- Added comprehensive tests for orchestrator and runtime injury integration
+
+### Files created
+
+- `packages/opencode/src/kiloclaw/agency/nba/adapters/index.ts`
+- `packages/opencode/src/kiloclaw/agency/nba/adapters/base.ts`
+- `packages/opencode/src/kiloclaw/agency/nba/adapters/balldontlie.ts`
+- `packages/opencode/src/kiloclaw/agency/nba/adapters/odds-api.ts`
+- `packages/opencode/src/kiloclaw/agency/nba/adapters/odds-bet365.ts`
+- `packages/opencode/src/kiloclaw/agency/nba/adapters/parlay-api.ts`
+- `packages/opencode/src/kiloclaw/agency/nba/adapters/espn.ts`
+- `packages/opencode/src/kiloclaw/agency/nba/adapters/nba-api.ts`
+- `packages/opencode/src/kiloclaw/agency/nba/adapters/polymarket.ts`
+- `packages/opencode/src/kiloclaw/agency/nba/orchestrator.ts`
+- `packages/opencode/test/kiloclaw/nba-orchestrator.test.ts`
+- `packages/opencode/test/kiloclaw/nba-runtime-injury.test.ts`
+
+### Files updated
+
+- `packages/opencode/src/kiloclaw/agency/nba/runtime.ts` - Added injury confidence integration
+- `packages/opencode/src/kiloclaw/agency/nba/resilience.ts` - Added `NbaCircuitBreaker.Instance` interface
+- `packages/opencode/src/kiloclaw/agency/index.ts` - Fixed export typo
+- `packages/opencode/test/kiloclaw/nba-resilience.test.ts` - Updated TTL test values
+
+### Adapter Priority Chains
+
+| Capability | Primary     | Fallback Chain                                  |
+| ---------- | ----------- | ----------------------------------------------- |
+| Games      | BallDontLie | ESPN → nba_api                                  |
+| Odds       | Bet365      | Odds API → ParlayAPI → BallDontLie → Polymarket |
+| Injuries   | BallDontLie | ESPN                                            |
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     NbaOrchestrator                          │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │              Adapter Fallback Chains                  │   │
+│  │  games: balldontlie → espn → nba_api                  │   │
+│  │  odds:   odds_bet365 → odds_api → parlay → ...        │   │
+│  │  injuries: balldontlie → espn                          │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                           │                                  │
+│                           ▼                                  │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │         computeInjuryConfidencePenalty()               │   │
+│  │  - 0 penalty for fresh injuries (<1h)               │   │
+│  │  - Gradual penalty as data ages                      │   │
+│  │  - Max 50% penalty for stale data                   │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                           │                                  │
+│                           ▼                                  │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │              NbaRuntime                              │   │
+│  │  computeAdjustedConfidence(base, injuries)           │   │
+│  │  → Emits signals/recommendations with penalty       │   │
+│  └─────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Verification evidence
+
+```
+bun run --cwd packages/opencode test test/kiloclaw/nba
+→ 51 pass, 0 fail, 152 expect() calls across 10 files
+
+bun run --cwd packages/opencode typecheck
+→ tsgo --noEmit (pass)
+```
+
+---
+
+## 2026-04-11 - Google Workspace Agency Implementation
+
+### Scope delivered
+
+- Created Google Workspace Agency implementation based on `KILOCLAW_GOOGLE_WORKSPACE_AGENCY_IMPLEMENTATION_PLAN_V1_2026-04-09.md`
+- Implemented Google OAuth2 with automatic token refresh
+- Implemented Gmail, Calendar, Drive adapters
+- Added agency manifest and bootstrap registration
+
+### Files created (from plans/docs verification)
+
+- `docs/agencies/plans/KILOCLAW_GOOGLE_WORKSPACE_AGENCY_IMPLEMENTATION_PLAN_V1_2026-04-09.md`
+- `docs/agencies/plans/KILOCLAW_GOOGLE_WORKSPACE_MCP_OAUTH_AUTOREFRESH_PLAN_2026-04-10.md`
+
+### Next Actions
+
+1. Commit all Google Workspace Agency implementation files
+2. Verify typecheck and tests pass
+3. Create PR for review

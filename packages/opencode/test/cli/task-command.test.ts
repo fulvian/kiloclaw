@@ -33,41 +33,43 @@ describe("task command lifecycle", () => {
     expect(created.code).toBe(0)
     const createJson = parseJson(created.stdout)
     const id = String(createJson.task.id)
+    const ref = String(createJson.task.ref)
     expect(id.startsWith("task_")).toBe(true)
+    expect(ref.startsWith("tsk_")).toBe(true)
 
     const listed = await runCli(["task", "list", "--json"], env)
     expect(listed.code).toBe(0)
     const listJson = parseJson(listed.stdout)
     expect(Array.isArray(listJson.tasks)).toBe(true)
 
-    const shown = await runCli(["task", "show", id, "--json"], env)
+    const shown = await runCli(["task", "show", ref, "--json"], env)
     expect(shown.code).toBe(0)
     const showJson = parseJson(shown.stdout)
     expect(String(showJson.task.id)).toBe(id)
     expect(String(showJson.task.schedule)).toBe("0 9 * * *")
     expect(String(showJson.task.timezone)).toBe("UTC")
 
-    const paused = await runCli(["task", "pause", id], env)
+    const paused = await runCli(["task", "pause", ref], env)
     expect(paused.code).toBe(0)
 
-    const resumed = await runCli(["task", "resume", id], env)
+    const resumed = await runCli(["task", "resume", ref], env)
     expect(resumed.code).toBe(0)
 
-    const ran = await runCli(["task", "run-now", id, "--json"], env)
+    const ran = await runCli(["task", "run-now", ref, "--json"], env)
     expect(ran.code).toBe(0)
     const runJson = parseJson(ran.stdout)
     expect(typeof runJson.accepted).toBe("boolean")
     expect(typeof runJson.runId === "string" || runJson.runId === null).toBe(true)
 
-    const updated = await runCli(["task", "update", id, "--cron", "15 9 * * 1-5", "--timezone", "UTC"], env)
+    const updated = await runCli(["task", "update", ref, "--cron", "15 9 * * 1-5", "--timezone", "UTC"], env)
     expect(updated.code).toBe(0)
 
-    const shownAfterUpdate = await runCli(["task", "show", id, "--json"], env)
+    const shownAfterUpdate = await runCli(["task", "show", ref, "--json"], env)
     expect(shownAfterUpdate.code).toBe(0)
     const showAfterUpdateJson = parseJson(shownAfterUpdate.stdout)
     expect(String(showAfterUpdateJson.task.schedule)).toBe("15 9 * * 1-5")
 
-    const deleted = await runCli(["task", "delete", id], env)
+    const deleted = await runCli(["task", "delete", ref], env)
     expect(deleted.code).toBe(0)
 
     const shownAfterDelete = await runCli(["task", "show", id, "--json"], env)
@@ -205,6 +207,42 @@ describe("task command lifecycle", () => {
 
     // Clean up
     await runCli(["task", "delete", id], env)
+  }, 120_000)
+
+  it("resolves selectors by name and list index", async () => {
+    await using tmp = await tmpdir()
+    const env = {
+      ...process.env,
+      KILOCLAW_PROACTIVE_DB_PATH: join(tmp.path, "proactive.db"),
+      XDG_DATA_HOME: join(tmp.path, "xdg-data"),
+      KILOCLAW_PROACTIVE_ENABLED: "true",
+      KILO_DISABLE_KILOCODE_LEGACY: "true",
+      KILOCLAW_TENANT_ID: "test-tenant",
+    }
+
+    const first = await runCli(
+      ["task", "create", "--name", "selector by name", "--prompt", "a", "--cron", "0 9 * * *", "--json"],
+      env,
+    )
+    expect(first.code).toBe(0)
+    const firstJson = parseJson(first.stdout)
+    const firstId = String(firstJson.task.id)
+
+    const second = await runCli(
+      ["task", "create", "--name", "selector second", "--prompt", "b", "--cron", "0 10 * * *", "--json"],
+      env,
+    )
+    expect(second.code).toBe(0)
+
+    const byName = await runCli(["task", "show", "selector by name", "--json"], env)
+    expect(byName.code).toBe(0)
+    const byNameJson = parseJson(byName.stdout)
+    expect(String(byNameJson.task.id)).toBe(firstId)
+
+    const byIndex = await runCli(["task", "show", "#1", "--json"], env)
+    expect(byIndex.code).toBe(0)
+    const byIndexJson = parseJson(byIndex.stdout)
+    expect(String(byIndexJson.task.name)).toBe("selector second")
   }, 120_000)
 
   it("handles runs with filters", async () => {

@@ -42,6 +42,20 @@ describe("HybridRouter", () => {
   })
 
   describe("route with keyword fallback", () => {
+    it("routes Google Workspace intents to gworkspace agency", async () => {
+      const intent: Intent = {
+        id: "test-gws-1",
+        type: "query",
+        description: "Cerca nelle cartelle di Google Drive i documenti UdP Sicilia",
+        risk: "low",
+      }
+
+      const result = await router.route(intent)
+      expect(result).toBeDefined()
+      expect(String(result.agencyId)).toBe("agency-gworkspace")
+      expect(result.matchedDomain).toBe("gworkspace")
+    })
+
     it("routes a chat intent to knowledge agency", async () => {
       const intent: Intent = {
         id: "test-1",

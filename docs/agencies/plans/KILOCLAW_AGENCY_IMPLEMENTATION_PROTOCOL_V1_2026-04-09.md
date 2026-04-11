@@ -1,0 +1,359 @@
+# KILOCLAW_AGENCY_IMPLEMENTATION_PROTOCOL_V1_2026-04-09
+
+Protocollo operativo per agenzie con gate e controlli.
+
+---
+
+## Applica le fasi
+
+Usa queste fasi in ordine, senza saltare gate. Ogni gate richiede evidenze tracciabili.
+
+1. **Fase 1 - Discovery con utente**
+   - Obiettivo: chiarire bisogni reali, vincoli, rischi, confini operativi
+   - Deliverable: `Discovery Brief` approvato
+   - Gate `G1`: requisiti non ambigui, KPI misurabili, limiti rischio e legali firmati
+
+2. **Fase 2 - Research su tools/skills online**
+   - Obiettivo: confrontare alternative native vs MCP e motivare la scelta
+   - Deliverable: `Tool Decision Record` completo
+   - Gate `G2`: decisione tool con score e rationale verificabile
+
+3. **Fase 3 - Design architetturale**
+   - Obiettivo: definire mapping Intent -> Agency -> Agent -> Skill -> Tool e policy runtime
+   - Deliverable: `Agency Manifest Draft` + diagramma flusso + policy
+   - Gate `G3`: deny-by-default attivo, allowlist esplicita, fallback provider definito
+
+4. **Fase 4 - Implementazione**
+   - Obiettivo: realizzare componenti minime necessarie secondo design approvato
+   - Deliverable: codice, config, manifest, migrazioni, note operative
+   - Gate `G4`: build/test locali verdi, nessun scope creep non autorizzato
+
+5. **Fase 5 - Verifica**
+   - Obiettivo: validare funzionalita, regressioni, telemetria, sicurezza operativa
+   - Deliverable: report test + evidenze telemetry contract
+   - Gate `G5`: checklist minima completa e criteri accettazione soddisfatti
+
+6. **Fase 6 - Rollout**
+   - Obiettivo: rilascio controllato con monitoraggio e rollback pronto
+   - Deliverable: piano rollout, changelog, runbook, owner on-call
+   - Gate `G6`: go-live autorizzato + metriche post-release in soglia
+
+---
+
+## Conduci discovery
+
+La Discovery e una discussione strutturata tra coding agent e utente, con output concreti e verificabili. Niente sviluppo prima di `G1`.
+
+**Template domande pratiche**
+- Problema reale: quale risultato operativo deve cambiare da domani
+- Utenti target: chi usa la soluzione, con quale frequenza, in quale contesto
+- Input/output: quali dati entrano, quali dati escono, in quale formato
+- Flusso attuale: cosa succede oggi, dove sono errori, ritardi, costi
+- Vincoli tecnici: stack, ambienti, limiti performance, dipendenze obbligate
+- Vincoli operativi: SLA, finestre deploy, ownership, escalation
+- Sicurezza: dati sensibili, segreti, retention, audit trail richiesto
+- Legale/compliance: licenze, GDPR, geofence, policy interne
+- Rischio: cosa non deve mai accadere, severita, impatto massimo accettabile
+- Successo: KPI iniziali, target, orizzonte temporale, soglia go/no-go
+
+**Output attesi non ambigui**
+- Scope in/out in punti numerati
+- User intent principali con esempi reali
+- Casi limite critici
+- KPI con formula, baseline, target, finestra di misura
+- RACI minimo (owner, reviewer, approvatore)
+- Registro rischi con severita/probabilita e mitigazioni
+- Confini legali espliciti e azioni vietate
+
+**KPI minimi Discovery**
+- `% requisiti con criterio di accettazione`: target 100%
+- `% KPI con baseline e target`: target 100%
+- `tempo medio chiarimento requisito critico`: target definito per team
+- `% rischi high con mitigazione`: target 100%
+
+**Limiti rischio e confini legali**
+- Definisci soglie hard per perdita dati, azioni irreversibili, costo massimo per run
+- Definisci blocchi legali hard: dati personali, mercati regolati, automazioni vietate
+- Se i confini non sono chiari, stato obbligatorio: `NO-GO`
+
+---
+
+## Confronta gli strumenti
+
+Usa un metodo unico per scegliere tra tool nativi e MCP. Registra tutto nel `Tool Decision Record`.
+
+**Metodo di confronto (scorecard)**
+- Valuta ogni opzione su scala 1-5 per:
+  - performance (latency, throughput, error rate)
+  - token/context cost (prompt size, schema size, retries)
+  - affidabilita (stabilita API, timeout, fallback behavior)
+  - sicurezza (permessi, isolamento, secret handling, auditability)
+  - maintenance (upgrade effort, docs quality, ownership, lock-in)
+- Applica pesi per dominio (esempio: sicurezza 30%, affidabilita 25%, performance 20%, cost 15%, maintenance 10%)
+- Calcola score totale e seleziona opzione con miglior tradeoff, non solo punteggio massimo
+
+**Regole decisionali**
+- Preferisci native tool se equivalenti e con minore context footprint
+- Usa MCP quando aggiunge capacita necessarie non coperte nativamente
+- Richiedi fallback per tool con affidabilita non provata o SLA assente
+- Blocca tool senza modello permessi chiaro o audit trail
+
+---
+
+## Disegna la catena
+
+Il design deve mappare in modo esplicito l intera catena operativa. Nessuna capacita implicita.
+
+**Mapping obbligatorio**
+- `Intent`: cosa vuole ottenere l utente
+- `Agency`: orchestrazione di alto livello
+- `Agent`: unita esecutiva per sotto-obiettivo
+- `Skill`: comportamento specializzato riusabile
+- `Tool`: capacita concreta invocabile
+
+**Policy obbligatorie**
+- Hard deny-by-default su tutte le capability
+- Capability allowlist per agent e per fase
+- Metadata provider/fallback:
+  - provider primario
+  - provider fallback
+  - trigger di switch
+  - limite retry/backoff
+- Separazione azioni read-only vs write
+- Guardrail su azioni esterne e su workspace
+
+**Check context footprint esplicito**
+- Numero tool esposti per agent: target minimo necessario
+- Dimensione schema input/output per tool: riduci campi non usati
+- Strategia lazy-loading:
+  - carica skill/tool solo quando richiesti dal task
+  - evita pre-caricamento globale
+  - rilascia context non necessario dopo uso
+- Budget context per step e per run con soglie hard
+
+---
+
+## Implementa con gate
+
+Implementa solo cio che e approvato in `G3`. Ogni deviazione richiede update del manifest e nuovo review.
+
+**Regole operative**
+- Traccia ogni change a requisito Discovery
+- Mantieni configurazioni versionate e replicabili
+- Aggiungi telemetry minima per ogni decisione critica
+- Blocca feature extra non richieste dal perimetro approvato
+
+---
+
+## Verifica in modo minimo
+
+Usa questa checklist minima prima di `G5`. Tutti i test devono essere ripetibili.
+
+**Checklist test**
+- Unit test: logica core, policy gates, fallback routing
+- Integration test: catena Intent -> Tool con dipendenze reali o sandbox fedeli
+- Regression test: casi storici critici e bug fix principali
+- Telemetry contract test: eventi obbligatori, campi richiesti, cardinalita stabile
+
+**Criteri di accettazione**
+- 100% test critici verdi
+- Nessun bug severita alta aperto
+- Error budget e latency nei limiti definiti in Discovery
+- Telemetry valida e consumabile da monitoraggio
+- Evidenze archiviate in report versione specifica
+
+---
+
+## Applica hitl per alto rischio
+
+Per domini ad alto rischio, il sistema passa in HITL obbligatorio. Esempi: betting, trading, azioni esterne su workspace.
+
+**Trigger HITL hard**
+- Invio ordini o puntate
+- Scrittura/modifica/cancellazione file fuori perimetro consentito
+- Operazioni finanziarie o legali regolamentate
+- Azioni irreversibili o con impatto economico diretto
+
+**Protocollo HITL**
+- Step 1: genera piano azione con impatto stimato
+- Step 2: mostra diff/anteprima e rischi
+- Step 3: richiedi approvazione umana esplicita con ID approvatore
+- Step 4: esegui con logging completo e correlation id
+- Step 5: genera post-action report e possibilita rollback dove applicabile
+
+**Regola**
+- Se approvazione manca, scade o e incoerente: `DENY` automatico
+
+---
+
+## Aggiorna la guida ufficiale
+
+Aggiorna la guida ufficiale quando cambia il comportamento operativo o il contratto di implementazione. Usa PR docs formale.
+
+**Quando aggiornare**
+- Nuova fase, gate o criterio di accettazione
+- Nuova policy sicurezza o HITL
+- Nuovo standard mapping o context footprint
+- Cambio checklist test o telemetry contract
+- Introduzione/rimozione tool class o fallback policy
+
+**Processo PR docs**
+1. Apri branch docs dedicato
+2. Aggiorna guida canonica e riferimenti correlati
+3. Aggiungi sezione `Change rationale` con impatto e backward compatibility
+4. Collega evidenze: issue, decision record, report test
+5. Richiedi review tecnica + review compliance (se applicabile)
+6. Merge solo con check docs lint e link check verdi
+
+---
+
+## Usa i template
+
+### Discovery Brief
+
+```md
+# Discovery Brief
+
+## Contesto
+- Problema operativo:
+- Utenti coinvolti:
+- Processo attuale:
+
+## Obiettivi
+- Obiettivo 1:
+- Obiettivo 2:
+
+## Scope
+- In scope:
+- Out of scope:
+
+## KPI
+- KPI:
+  - Formula:
+  - Baseline:
+  - Target:
+  - Finestra misura:
+
+## Vincoli
+- Tecnici:
+- Operativi:
+- Sicurezza:
+- Legali:
+
+## Rischi
+- Rischio:
+  - Severita:
+  - Probabilita:
+  - Mitigazione:
+  - Limite hard:
+
+## Decisione gate
+- Stato G1: GO | NO-GO
+- Owner:
+- Data:
+```
+
+### Tool Decision Record
+
+```md
+# Tool Decision Record
+
+## Caso d uso
+- Intent:
+- Requisiti minimi:
+
+## Opzioni
+- Opzione A (Native):
+- Opzione B (MCP):
+- Opzione C (Ibrida):
+
+## Scorecard (1-5)
+| Criterio | Peso | A | B | C |
+|---|---:|---:|---:|---:|
+| Performance | 0.20 |  |  |  |
+| Token/context cost | 0.15 |  |  |  |
+| Affidabilita | 0.25 |  |  |  |
+| Sicurezza | 0.30 |  |  |  |
+| Maintenance | 0.10 |  |  |  |
+
+## Decisione
+- Scelta:
+- Rationale:
+- Fallback:
+- Trigger switch:
+- Stato G2: GO | NO-GO
+```
+
+### Agency Manifest Draft
+
+```md
+# Agency Manifest Draft
+
+## Mapping
+- Intent:
+- Agency:
+- Agent:
+- Skill:
+- Tool:
+
+## Policy
+- Deny-by-default: true
+- Capability allowlist:
+  - agent:
+    - capability:
+- Read/Write boundaries:
+- Workspace boundaries:
+
+## Provider metadata
+- Primary provider:
+- Fallback provider:
+- Retry policy:
+- Timeout policy:
+
+## Context footprint
+- Tool esposti:
+- Dimensione schema totale:
+- Lazy-loading strategy:
+- Budget context per step:
+- Stato G3: GO | NO-GO
+```
+
+### Go/No-Go Review
+
+```md
+# Go No-Go Review
+
+## Stato gate
+- G1:
+- G2:
+- G3:
+- G4:
+- G5:
+- G6:
+
+## Evidenze
+- Build:
+- Unit:
+- Integration:
+- Regression:
+- Telemetry contract:
+- Security checks:
+
+## Rischio residuo
+- Livello:
+- Motivazione:
+- Mitigazioni attive:
+
+## Decisione finale
+- Esito: GO | NO-GO
+- Condizioni:
+- Owner:
+- Approvatore:
+- Data:
+```
+
+---
+
+## Esegui governance finale
+
+Questo protocollo e vincolante per ogni nuova agency e per refactor che cambiano behavior. Se un gate fallisce, il flusso torna alla fase precedente con aggiornamento degli artefatti.

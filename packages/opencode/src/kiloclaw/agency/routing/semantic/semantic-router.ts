@@ -406,7 +406,10 @@ export class SemanticRouter {
    * Get default skill for a domain
    */
   private getDefaultSkillForDomain(agencyId: string): string {
-    const domain = agencyId.replace("agency-", "") as Domain
+    const domain = agencyId.replace("agency-", "")
+    if (domain === "gworkspace") {
+      return "drive.search"
+    }
     const defaults: Record<Domain, string> = {
       development: "code-generation",
       knowledge: "web-search",
@@ -414,7 +417,7 @@ export class SemanticRouter {
       weather: "weather-forecast",
       custom: "web-search",
     }
-    return defaults[domain] || "web-search"
+    return defaults[domain as Domain] || "web-search"
   }
 
   /**

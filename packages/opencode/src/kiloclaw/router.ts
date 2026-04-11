@@ -111,6 +111,20 @@ const DOMAIN_KEYWORDS: Record<string, string[]> = {
     "sole",
     "clima",
   ],
+  gworkspace: [
+    "google workspace",
+    "google drive",
+    "gmail",
+    "gdrive",
+    "google calendar",
+    "calendar",
+    "google docs",
+    "google sheets",
+    "cartella",
+    "cartelle",
+    "documenti",
+    "fogli",
+  ],
   custom: [],
 }
 
@@ -157,7 +171,13 @@ export const Router = {
               : domain === "nutrition" &&
                   (type.includes("nutrition") || type.includes("diet") || type.includes("recipe"))
                 ? 0.2
-                : 0
+                : domain === "gworkspace" &&
+                    (type.includes("gmail") ||
+                      type.includes("drive") ||
+                      type.includes("calendar") ||
+                      type.includes("workspace"))
+                  ? 0.25
+                  : 0
       return Math.min(1, base + typeBoost)
     }
 
@@ -177,22 +197,22 @@ export const Router = {
         log.info("routing intent", { intentId: intent.id, type: intent.type })
 
         // Calculate scores for each domain
-        const scores: DomainScore[] = (["development", "knowledge", "nutrition", "weather", "custom"] as string[]).map(
-          (domain) => {
-            const keywordScoreValue = keywordScore(intent, domain)
-            const reasons: string[] = []
+        const scores: DomainScore[] = (
+          ["development", "knowledge", "nutrition", "weather", "gworkspace", "custom"] as string[]
+        ).map((domain) => {
+          const keywordScoreValue = keywordScore(intent, domain)
+          const reasons: string[] = []
 
-            if (keywordScoreValue > 0) {
-              reasons.push(`matched ${Math.round(keywordScoreValue * 100)}% domain keywords`)
-            }
+          if (keywordScoreValue > 0) {
+            reasons.push(`matched ${Math.round(keywordScoreValue * 100)}% domain keywords`)
+          }
 
-            return {
-              domain,
-              score: riskAdjustedScore(keywordScoreValue, intent),
-              reasons,
-            }
-          },
-        )
+          return {
+            domain,
+            score: riskAdjustedScore(keywordScoreValue, intent),
+            reasons,
+          }
+        })
 
         // Sort by score descending
         scores.sort((a, b) => b.score - a.score)

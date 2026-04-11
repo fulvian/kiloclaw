@@ -302,6 +302,9 @@ const ProviderKeysCommand = cmd({
       console.log("  export TAVILY_API_KEY_1=tvly_xxxxx")
       console.log("  export TAVILY_API_KEY_2=tvly_yyyyy")
       console.log("  export FIRECRAWL_API_KEYS=fc_xxxx,fc_yyyy")
+      console.log("  export BALLDONTLIE_API_KEYS=bdl_xxxx,bdl_yyyy")
+      console.log("  export ODDS_API_KEYS=odds_xxxx,odds_yyyy")
+      console.log("  export PARLAY_API_KEYS=parlay_xxxx,parlay_yyyy")
       return
     }
 

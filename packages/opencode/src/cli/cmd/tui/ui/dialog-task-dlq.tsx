@@ -5,6 +5,10 @@ import { useDialog } from "./dialog"
 import { useKeyboard } from "@opentui/solid"
 import type { ProactiveDlqEntry } from "@/kiloclaw/proactive/scheduler.store"
 import { publishViewNavigation, publishTaskAction } from "@/kiloclaw/telemetry/scheduled-tasks.telemetry"
+import { Log } from "@/util/log"
+import { useToast } from "./toast"
+
+const log = Log.create({ service: "kilocclaw.tui.dialog-task-dlq" })
 
 export function DialogTaskDLQ(props: {
   taskId?: string
@@ -14,6 +18,7 @@ export function DialogTaskDLQ(props: {
 }) {
   const dialog = useDialog()
   const { theme } = useTheme()
+  const toast = useToast()
 
   const [selectedIndex, setSelectedIndex] = createSignal(0)
   const [readyOnly, setReadyOnly] = createSignal(true)
@@ -23,7 +28,9 @@ export function DialogTaskDLQ(props: {
     try {
       const { ProactiveTaskStore } = require("@/kiloclaw/proactive/scheduler.store")
       return ProactiveTaskStore.getDLQ(props.taskId, readyOnly())
-    } catch {
+    } catch (err) {
+      log.error("failed to load DLQ entries", { taskId: props.taskId, err })
+      toast.show({ variant: "error", message: "Failed to load DLQ entries", duration: 3000 })
       return [] as ProactiveDlqEntry[]
     }
   })
@@ -45,7 +52,8 @@ export function DialogTaskDLQ(props: {
       const { ProactiveTaskStore } = require("@/kiloclaw/proactive/scheduler.store")
       const task = ProactiveTaskStore.get(taskId)
       return task?.name ?? taskId
-    } catch {
+    } catch (err) {
+      log.warn("failed to get task name", { taskId, err })
       return taskId
     }
   }

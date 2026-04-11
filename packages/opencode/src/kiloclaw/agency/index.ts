@@ -66,6 +66,105 @@ export {
   type AgencyPoliciesManifest,
 } from "./manifests"
 
+// NBA schema
+export {
+  CONFIDENCE_CAP,
+  SourceSchema,
+  OddsSourceSchema,
+  MarketSchema,
+  GameStatusSchema,
+  FreshnessStateSchema,
+  RecommendationActionSchema,
+  RecommendationPolicySchema,
+  GameSchema,
+  OddsSchema,
+  SignalSchema,
+  RecommendationSchema,
+  capConfidence,
+  hasVigRemovalPreconditions,
+  StaleRecommendationInputSchema,
+  shouldBlockStaleRecommendation,
+  type Game,
+  type Odds,
+  type Signal,
+  type Recommendation,
+} from "./nba/schema"
+export {
+  NbaRuntime,
+  Agency2RequestStarted,
+  Agency2RequestCompleted,
+  Agency2PolicyDecision,
+  Agency2SignalEmitted,
+  NbaDecisionOutcomeSchema,
+  NbaPolicyDecisionSchema,
+  NbaRequestStartedSchema,
+  NbaRequestCompletedSchema,
+  NbaSignalEventSchema,
+  NbaDecisionInputSchema,
+  type NbaPolicyDecision,
+  type NbaRequestStarted,
+  type NbaRequestCompleted,
+  type NbaSignalEvent,
+} from "./nba/runtime"
+export {
+  NbaBudgeting,
+  NbaToolMetadataSchema,
+  NbaBudgetingInputSchema,
+  NbaBudgetMetricsSchema,
+  NbaBudgetingResultSchema,
+  type NbaToolMetadata,
+  type NbaBudgetingInput,
+  type NbaBudgetingResult,
+} from "./nba/budgeting"
+export {
+  ODDS_API_MAX_AGE_SECONDS,
+  PARLAY_MAX_AGE_SECONDS,
+  POLYMARKET_MAX_AGE_SECONDS,
+  ESPN_SCOREBOARD_LIVE_MAX_AGE_SECONDS,
+  ESPN_INJURIES_MAX_AGE_SECONDS,
+  BALLDONTLIE_GAMES_MAX_AGE_SECONDS,
+  BALLDONTLIE_STATS_MAX_AGE_SECONDS,
+  NBA_API_ADVANCED_MAX_AGE_SECONDS,
+  NbaFreshnessSourceSchema,
+  NbaFreshnessAssessmentSchema,
+  ProviderErrorCategorySchema,
+  BackoffInputSchema,
+  NbaCircuitBreaker,
+  NbaCircuitBreakerConfigSchema,
+  NbaCircuitBreakerSnapshotSchema,
+  MarketPlanInputSchema,
+  MarketPlanResultSchema,
+  ProviderCallOutcomeSchema,
+  NbaProviderCallSchema,
+  Agency2ProviderCall,
+  assessFreshness,
+  classifyProviderError,
+  computeBackoffMs,
+  selectMarketPlan,
+} from "./nba/resilience"
+export {
+  CALIBRATION_ISOTONIC_MIN_SAMPLE,
+  CalibrationPointSchema,
+  ReliabilityBucketSchema,
+  EdgeOutcomeSchema,
+  computeBrier,
+  computeLogLoss,
+  buildReliabilityBuckets,
+  chooseCalibrationMethod,
+  computePrecisionAtEdgeThreshold,
+  type CalibrationPoint,
+  type ReliabilityBucket,
+  type EdgeOutcome,
+} from "./nba/calibration"
+export {
+  NBA_ROLLOUT_TARGETS,
+  NbaRolloutTargetSchema,
+  NbaGateInputSchema,
+  NbaGateReportSchema,
+  evaluateNbaRolloutGate,
+} from "./nba/gates"
+export { NbaChaosInputSchema, NbaChaosReportSchema, evaluateNbaChaosScenario } from "./nba/chaos"
+
 // =============================================================================
 // DEPRECATED EXPORTS - Use new Flexible* types and registries instead
 // Migration: See packages/opencode/src/kiloclaw/agency/registry/

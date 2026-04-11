@@ -24,3 +24,6 @@ export {
 
 // Loader (use ManifestLoader.isEnabled, ManifestLoader.isLoaded, etc.)
 export { ManifestLoader, type ManifestType } from "./loader"
+
+// Domain policy manifests
+export { NbaAgency, type PolicyLevel as NbaPolicyLevel } from "./nba-manifest"

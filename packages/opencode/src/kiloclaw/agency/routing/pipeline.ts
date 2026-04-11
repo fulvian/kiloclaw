@@ -489,6 +489,14 @@ function doExtractCapabilities(intent: Intent): string[] {
     planning: ["plan", "planning", "roadmap"],
     nutrition: ["nutrition", "food", "diet", "meal", "calorie"],
     weather: ["weather", "temperature", "forecast", "rain"],
+    "drive.search": ["google drive", "drive", "search drive", "trova file", "cerca file", "ricerca file"],
+    "drive.list": ["list drive", "elenca file", "cartella", "cartelle", "folder", "folders"],
+    "drive.read": ["open file", "read file", "apri file", "leggi file", "documento", "documenti"],
+    "gmail.search": ["gmail", "search email", "cerca email", "posta"],
+    "gmail.read": ["read email", "leggi email", "messaggio"],
+    "calendar.list": ["calendar", "calendario", "eventi", "events"],
+    "docs.read": ["google docs", "docs", "documento google"],
+    "sheets.read": ["google sheets", "sheets", "foglio", "fogli"],
   }
 
   for (const [capability, keywords] of Object.entries(capabilityMap)) {

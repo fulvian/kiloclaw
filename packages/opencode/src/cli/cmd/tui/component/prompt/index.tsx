@@ -36,6 +36,7 @@ import { useKV } from "../../context/kv"
 import { useTextareaKeybindings } from "../textarea-keybindings"
 import { DialogSkill } from "../dialog-skill"
 import { shouldSummarize as shouldPasteSummary } from "@/kilocaw-legacy/paste-summary"
+import { dispatchTaskCommand, parseTasksCommand } from "../../task-command-router"
 
 export type PromptProps = {
   sessionID?: string
@@ -622,29 +623,16 @@ export function Prompt(props: PromptProps) {
             ...x,
           })),
       })
-    } else if (inputText.startsWith("/tasks")) {
-      // Handle /tasks commands locally without sending to server
-      // kilocode_change start - /tasks command parsing
-      const trimmed = inputText.slice(1).trim()
-      const parts = trimmed.split(/\s+/)
-      const subcmd = parts[1]?.toLowerCase()
-
-      if (trimmed === "tasks" || trimmed === "tasks list" || subcmd === undefined) {
-        command.trigger("task.list")
-      } else if (subcmd === "new") {
-        command.trigger("task.new")
-      } else if (trimmed === "tasks help") {
-        toast.show({
-          variant: "info",
-          message: "Use /tasks or /tasks list to open list, /tasks new to open wizard",
-          duration: 3500,
-        })
-      } else {
+    } else if (/^\/tasks\b/i.test(inputText.trim())) {
+      const parsed = parseTasksCommand(inputText)
+      if (!parsed.ok) {
         toast.show({
           variant: "warning",
-          message: "Supported: /tasks, /tasks list, /tasks new",
+          message: `${parsed.error}. Supported: /tasks, /tasks list, /tasks new, /tasks help, /tasks <show|edit|runs|pause|resume|run|delete> <selector>, /tasks dlq`,
           duration: 3000,
         })
+      } else {
+        dispatchTaskCommand(parsed.intent)
       }
       // Clear the prompt after handling
       input.extmarks.clear()
@@ -653,7 +641,6 @@ export function Prompt(props: PromptProps) {
       props.onSubmit?.()
       input.clear()
       return
-      // kilocode_change end
     } else {
       sdk.client.session
         .prompt({

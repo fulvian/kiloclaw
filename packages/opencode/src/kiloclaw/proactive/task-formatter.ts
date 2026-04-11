@@ -15,6 +15,7 @@ export function formatTaskListRow(task: ProactiveTask, runs?: ProactiveTaskRun[]
   const nextRun = task.nextRunAt ? formatRelativeTime(task.nextRunAt) : "-"
   return {
     id: task.id,
+    ref: task.ref,
     name: task.name,
     schedule: task.scheduleCron ?? "-",
     nextRun,
@@ -33,6 +34,7 @@ export function formatTaskDetail(task: ProactiveTask, runs: ProactiveTaskRun[], 
 
   return {
     id: task.id,
+    ref: task.ref,
     name: task.name,
     status: task.status,
     schedule: task.scheduleCron,
@@ -138,6 +140,7 @@ export function formatDuration(ms: number | undefined): string {
 
 export interface TaskListRow {
   id: string
+  ref: string
   name: string
   schedule: string
   nextRun: string
@@ -147,6 +150,7 @@ export interface TaskListRow {
 
 export interface TaskDetail {
   id: string
+  ref: string
   name: string
   status: string
   schedule: string | null | undefined

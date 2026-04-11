@@ -5,6 +5,10 @@ import { useDialog } from "./dialog"
 import { useKeyboard } from "@opentui/solid"
 import type { ProactiveTaskRun, RunOutcome } from "@/kiloclaw/proactive/scheduler.store"
 import { publishViewNavigation } from "@/kiloclaw/telemetry/scheduled-tasks.telemetry"
+import { Log } from "@/util/log"
+import { useToast } from "./toast"
+
+const log = Log.create({ service: "kilocclaw.tui.dialog-task-runs" })
 
 const OUTCOME_CONFIG: Record<RunOutcome, { label: string; color: string; bg?: string }> = {
   success: { label: "Success", color: "green" },
@@ -12,11 +16,13 @@ const OUTCOME_CONFIG: Record<RunOutcome, { label: string; color: string; bg?: st
   blocked: { label: "Blocked", color: "yellow" },
   budget_exceeded: { label: "Budget Exceeded", color: "yellow" },
   policy_denied: { label: "Policy Denied", color: "red" },
+  executor_missing: { label: "Executor Missing", color: "red" },
 }
 
 export function DialogTaskRuns(props: { taskId: string; taskName?: string; onClose?: () => void }) {
   const dialog = useDialog()
   const { theme } = useTheme()
+  const toast = useToast()
 
   const [filter, setFilter] = createSignal<RunOutcome | "all">("all")
   const [selectedIndex, setSelectedIndex] = createSignal(0)
@@ -28,7 +34,9 @@ export function DialogTaskRuns(props: { taskId: string; taskName?: string; onClo
       const { ProactiveTaskStore } =
         require("@/kiloclaw/proactive/scheduler.store") as typeof import("@/kiloclaw/proactive/scheduler.store")
       return ProactiveTaskStore.getRuns(props.taskId, limit())
-    } catch {
+    } catch (err) {
+      log.error("failed to load runs", { taskId: props.taskId, err })
+      toast.show({ variant: "error", message: "Failed to load task runs", duration: 3000 })
       return [] as ProactiveTaskRun[]
     }
   })

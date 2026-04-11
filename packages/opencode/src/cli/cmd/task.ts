@@ -1,8 +1,8 @@
 import type { Argv } from "yargs"
 import { bootstrap } from "../bootstrap"
 import { cmd } from "./cmd"
-import { ProactiveSchedulerEngine } from "../../kiloclaw/proactive/scheduler.engine"
 import { ProactiveTaskStore, type ProactiveTask } from "../../kiloclaw/proactive/scheduler.store"
+import { SchedulerControlService } from "../../kiloclaw/proactive/scheduler-control.service"
 import {
   ScheduledTaskCreateSchema,
   ScheduledTaskUpdateSchema,
@@ -25,7 +25,6 @@ import {
   type RunRow,
   type DlqRow,
 } from "../../kiloclaw/proactive/task-formatter"
-import { nextRuns } from "../../kiloclaw/proactive/schedule-parse"
 import { Flag } from "@/flag/flag"
 import { Bus } from "@/bus"
 import { TaskActionEvent } from "@/kiloclaw/telemetry/scheduled-tasks.telemetry"
@@ -125,25 +124,27 @@ export const TaskCreateCommand = cmd({
       }
 
       const out = buildCreate(parsed.data, tenantId())
+      const stored = args.dryRun ? null : ProactiveTaskStore.create(out.task)
       if (!args.dryRun) {
-        const stored = ProactiveTaskStore.create(out.task)
-        ProactiveTaskStore.update(stored.id, { status: parsed.data.enabled ? "active" : "paused" })
-        publishCliTaskAction("task_create", stored.id)
-      } else {
-        publishCliTaskAction("task_create", undefined, true)
+        ProactiveTaskStore.update(stored!.id, { status: parsed.data.enabled ? "active" : "paused" })
+        publishCliTaskAction("task_create", stored!.id)
       }
+      if (args.dryRun) publishCliTaskAction("task_create", undefined, true)
+
+      const view = stored ? { ...out.view, ref: stored.ref, id: stored.id } : out.view
 
       if (wantsJson(args)) {
-        console.log(JSON.stringify({ task: out.view, dryRun: args.dryRun === true }, null, 2))
+        console.log(JSON.stringify({ task: view, dryRun: args.dryRun === true }, null, 2))
         return
       }
 
       const action = args.dryRun ? "validated" : "created"
-      console.log(`task ${action}: ${(out.view.id as string) ?? "n/a"}`)
-      console.log(`name: ${out.view.name as string}`)
-      console.log(`schedule: ${out.view.schedule as string}`)
-      console.log(`timezone: ${out.view.timezone as string}`)
-      const next = (out.view.nextRuns as number[] | undefined) ?? []
+      console.log(`task ${action}: ${(view.id as string) ?? "n/a"}`)
+      if (stored?.ref) console.log(`ref: ${stored.ref}`)
+      console.log(`name: ${view.name as string}`)
+      console.log(`schedule: ${view.schedule as string}`)
+      console.log(`timezone: ${view.timezone as string}`)
+      const next = (view.nextRuns as number[] | undefined) ?? []
       if (next[0]) console.log(`next run: ${new Date(next[0]).toISOString()}`)
     })
   },
@@ -177,12 +178,12 @@ export const TaskListCommand = cmd({
         return
       }
 
-      console.log("ID                NAME                     SCHEDULE          NEXT RUN        STATUS    LAST")
+      console.log("REF             NAME                     SCHEDULE          NEXT RUN        STATUS    LAST")
       for (const row of rows) {
         const name = row.name.length > 24 ? row.name.slice(0, 21) + "..." : row.name.padEnd(24)
         const schedule = row.schedule.length > 14 ? row.schedule.slice(0, 11) + "..." : row.schedule.padEnd(14)
         console.log(
-          `${row.id.slice(0, 18).padEnd(18)} ${name} ${schedule} ${row.nextRun.padEnd(13)} ${row.status.padEnd(8)} ${row.lastOutcome}`,
+          `${row.ref.padEnd(15)} ${name} ${schedule} ${row.nextRun.padEnd(13)} ${row.status.padEnd(8)} ${row.lastOutcome}`,
         )
       }
     })
@@ -190,17 +191,15 @@ export const TaskListCommand = cmd({
 })
 
 export const TaskShowCommand = cmd({
-  command: "show <id>",
+  command: "show <task>",
   describe: "show task details and recent runs",
   builder: (yargs: Argv) =>
-    yargs.positional("id", { type: "string", demandOption: true }).option("json", { type: "boolean", default: false }),
+    yargs
+      .positional("task", { type: "string", demandOption: true, describe: "task selector: ref, id, name, or #index" })
+      .option("json", { type: "boolean", default: false }),
   handler: async (args) => {
     await bootstrap(process.cwd(), async () => {
-      const task = ProactiveTaskStore.get(args.id as string)
-      if (!task) {
-        console.error(`task not found: ${args.id as string}`)
-        process.exit(1)
-      }
+      const task = resolveTaskOrExit(args.task as string)
 
       const runs = ProactiveTaskStore.getRuns(task.id, 10)
       const dlqEntries = ProactiveTaskStore.getDLQ(task.id)
@@ -212,6 +211,7 @@ export const TaskShowCommand = cmd({
       }
 
       console.log(`id: ${detail.id}`)
+      console.log(`ref: ${detail.ref}`)
       console.log(`name: ${detail.name}`)
       console.log(`status: ${detail.status}`)
       console.log(`schedule: ${detail.schedule ?? "none"}`)
@@ -231,67 +231,82 @@ export const TaskShowCommand = cmd({
 })
 
 export const TaskPauseCommand = cmd({
-  command: "pause <id>",
+  command: "pause <task>",
   describe: "pause task execution",
-  builder: (yargs: Argv) => yargs.positional("id", { type: "string", demandOption: true }),
-  handler: async (args) => mutateStatus(args.id as string, "paused"),
+  builder: (yargs: Argv) =>
+    yargs.positional("task", {
+      type: "string",
+      demandOption: true,
+      describe: "task selector: ref, id, name, or #index",
+    }),
+  handler: async (args) => mutateStatus(args.task as string, "paused"),
 })
 
 export const TaskResumeCommand = cmd({
-  command: "resume <id>",
+  command: "resume <task>",
   describe: "resume task execution",
-  builder: (yargs: Argv) => yargs.positional("id", { type: "string", demandOption: true }),
-  handler: async (args) => mutateStatus(args.id as string, "active"),
+  builder: (yargs: Argv) =>
+    yargs.positional("task", {
+      type: "string",
+      demandOption: true,
+      describe: "task selector: ref, id, name, or #index",
+    }),
+  handler: async (args) => mutateStatus(args.task as string, "active"),
 })
 
 export const TaskDeleteCommand = cmd({
-  command: "delete <id>",
+  command: "delete <task>",
   describe: "delete a task",
-  builder: (yargs: Argv) => yargs.positional("id", { type: "string", demandOption: true }),
+  builder: (yargs: Argv) =>
+    yargs.positional("task", {
+      type: "string",
+      demandOption: true,
+      describe: "task selector: ref, id, name, or #index",
+    }),
   handler: async (args) => {
     await bootstrap(process.cwd(), async () => {
-      const ok = ProactiveTaskStore.remove(args.id as string)
+      const task = resolveTaskOrExit(args.task as string)
+      const ok = SchedulerControlService.deleteTask(task.id)
       if (!ok) {
-        console.error(`task not found: ${args.id as string}`)
+        console.error(`task not found: ${args.task as string}`)
         process.exit(1)
       }
-      publishCliTaskAction("task_delete", args.id as string)
-      console.log(`deleted: ${args.id as string}`)
+      publishCliTaskAction("task_delete", task.id)
+      console.log(`deleted: ${task.ref}`)
     })
   },
 })
 
 export const TaskRunNowCommand = cmd({
-  command: "run-now <id>",
+  command: "run-now <task>",
   describe: "trigger immediate task run",
   builder: (yargs: Argv) =>
-    yargs.positional("id", { type: "string", demandOption: true }).option("json", { type: "boolean", default: false }),
+    yargs
+      .positional("task", { type: "string", demandOption: true, describe: "task selector: ref, id, name, or #index" })
+      .option("json", { type: "boolean", default: false }),
   handler: async (args) => {
     await bootstrap(process.cwd(), async () => {
-      const task = ProactiveTaskStore.get(args.id as string)
-      if (!task) {
-        console.error(`task not found: ${args.id as string}`)
-        process.exit(1)
-      }
+      const task = resolveTaskOrExit(args.task as string)
 
-      ProactiveSchedulerEngine.init({})
-      ProactiveSchedulerEngine.start()
-      const accepted = await ProactiveSchedulerEngine.executeTask({ taskId: task.id })
+      const out = await SchedulerControlService.runNow(task.id, "manual")
       const run = ProactiveTaskStore.getRuns(task.id, 1)[0] ?? null
+      const accepted = out.accepted
       publishCliTaskAction("task_run_now", task.id, accepted)
-      const out = {
+      const payload = {
         runId: run?.id ?? null,
         accepted,
+        reasonCode: out.reasonCode,
         gateDecision: run?.gateDecisions ?? null,
         executionMode: "run-now",
       }
 
       if (args.json) {
-        console.log(JSON.stringify(out, null, 2))
+        console.log(JSON.stringify(payload, null, 2))
         return
       }
 
       console.log(`accepted: ${accepted}`)
+      if (!accepted) console.log(`reason: ${out.reasonCode}`)
       if (run?.id) console.log(`run: ${run.id}`)
       if (run?.outcome) console.log(`outcome: ${run.outcome}`)
     })
@@ -299,11 +314,11 @@ export const TaskRunNowCommand = cmd({
 })
 
 export const TaskUpdateCommand = cmd({
-  command: "update <id>",
+  command: "update <task>",
   describe: "update schedule or runtime options",
   builder: (yargs: Argv) =>
     baseOptions(yargs)
-      .positional("id", { type: "string", demandOption: true })
+      .positional("task", { type: "string", demandOption: true, describe: "task selector: ref, id, name, or #index" })
       .check((args) => {
         if (args.interactive && !isInteractive()) {
           console.warn("Warning: --interactive requires TTY, running in non-interactive mode")
@@ -318,11 +333,7 @@ export const TaskUpdateCommand = cmd({
         console.log("Running in non-interactive mode...")
       }
 
-      const current = ProactiveTaskStore.get(args.id as string)
-      if (!current) {
-        console.error(`task not found: ${args.id as string}`)
-        process.exit(1)
-      }
+      const current = resolveTaskOrExit(args.task as string)
 
       const parsed = ScheduledTaskUpdateSchema.safeParse({
         name: args.name,
@@ -368,11 +379,11 @@ export const TaskUpdateCommand = cmd({
       }
 
       if (!updated) {
-        console.error(`task not found: ${args.id as string}`)
+        console.error(`task not found: ${args.task as string}`)
         process.exit(1)
       }
 
-      console.log(`updated: ${updated.id}`)
+      console.log(`updated: ${updated.ref}`)
     })
   },
 })
@@ -414,21 +425,17 @@ export const TaskValidateCommand = cmd({
 })
 
 export const TaskRunsCommand = cmd({
-  command: "runs <id>",
+  command: "runs <task>",
   describe: "list recent runs for a task",
   builder: (yargs: Argv) =>
     yargs
-      .positional("id", { type: "string", demandOption: true })
+      .positional("task", { type: "string", demandOption: true, describe: "task selector: ref, id, name, or #index" })
       .option("json", { type: "boolean", default: false })
       .option("failed", { type: "boolean", default: false, describe: "Show only failed runs" })
       .option("limit", { type: "number", default: 20, describe: "Maximum number of runs to show" }),
   handler: async (args) => {
     await bootstrap(process.cwd(), async () => {
-      const task = ProactiveTaskStore.get(args.id as string)
-      if (!task) {
-        console.error(`task not found: ${args.id as string}`)
-        process.exit(1)
-      }
+      const task = resolveTaskOrExit(args.task as string)
 
       const runs = ProactiveTaskStore.getRuns(task.id, args.limit ?? 20)
       const filteredRuns = args.failed ? runs.filter((r) => r.outcome === "failed") : runs
@@ -444,7 +451,7 @@ export const TaskRunsCommand = cmd({
         return
       }
 
-      console.log(`Task: ${task.name} (${task.id})`)
+      console.log(`Task: ${task.name} (${task.ref})`)
       console.log("")
       for (const row of rows) {
         console.log(`${formatTimestamp(row.startedAt)}  [${row.outcome}]  ${formatDuration(row.durationMs)}`)
@@ -461,15 +468,16 @@ export const TaskDLQCommand = cmd({
   describe: "show dead letter queue entries",
   builder: (yargs: Argv) =>
     yargs
-      .option("task", { type: "string", describe: "Filter by task ID" })
+      .option("task", { type: "string", describe: "Filter by task selector (ref, id, name, #index)" })
       .option("ready", { type: "boolean", default: false, describe: "Show only entries ready for retry" })
       .option("json", { type: "boolean", default: false }),
   handler: async (args) => {
     await bootstrap(process.cwd(), async () => {
-      const entries = ProactiveTaskStore.getDLQ(args.task as string | undefined, args.ready ?? false)
+      const task = args.task ? resolveTaskOrExit(args.task) : null
+      const entries = ProactiveTaskStore.getDLQ(task?.id, args.ready ?? false)
       const rows: DlqRow[] = entries.map((entry) => {
-        const task = args.task ? ProactiveTaskStore.get(args.task) : null
-        return formatDlqRow(entry, task?.name)
+        const current = task ?? ProactiveTaskStore.get(entry.taskId)
+        return formatDlqRow(entry, current?.name)
       })
 
       if (wantsJson(args)) {
@@ -517,32 +525,41 @@ export const TaskCommand = cmd({
   handler: async () => {},
 })
 
-async function mutateStatus(id: string, status: "active" | "paused"): Promise<void> {
+async function mutateStatus(selector: string, status: "active" | "paused"): Promise<void> {
   await bootstrap(process.cwd(), async () => {
-    const task = ProactiveTaskStore.get(id)
-    if (!task) {
-      console.error(`task not found: ${id}`)
-      process.exit(1)
-    }
+    const task = resolveTaskOrExit(selector)
 
     const cfg = parseConfig(task.triggerConfig)
-    const next = task.scheduleCron
-      ? (nextRuns({
-          cron: task.scheduleCron,
-          timezone: typeof cfg.timezone === "string" ? cfg.timezone : Intl.DateTimeFormat().resolvedOptions().timeZone,
-          count: 1,
-        })[0] ?? null)
-      : null
-
-    ProactiveTaskStore.update(id, {
-      status,
-      nextRunAt: status === "active" ? next : null,
-      triggerConfig: JSON.stringify({ ...cfg, enabled: status === "active" }),
+    const updatedCfg = JSON.stringify({ ...cfg, enabled: status === "active" })
+    SchedulerControlService.updateTask(task.id, {
+      triggerConfig: updatedCfg,
+      ...(status === "active"
+        ? { status: "active", state: "active" as const }
+        : { status: "paused", state: "paused" as const, nextRunAt: null }),
     })
+    if (status === "active") {
+      SchedulerControlService.resumeTask(task.id)
+    }
 
-    publishCliTaskAction(status === "active" ? "task_resume" : "task_pause", id)
-    console.log(`${status}: ${id}`)
+    publishCliTaskAction(status === "active" ? "task_resume" : "task_pause", task.id)
+    console.log(`${status}: ${task.ref}`)
   })
+}
+
+function resolveTaskOrExit(selector: string): ProactiveTask {
+  const out = SchedulerControlService.resolveTask(selector, tenantId())
+  if (out.ok) return out.task
+
+  if (out.code === "ambiguous") {
+    const options = out.matches.slice(0, 5).map((task) => `${task.ref}:${task.name}`)
+    console.error(`task selector is ambiguous: ${selector}`)
+    console.error(`matches: ${options.join(", ")}`)
+    process.exit(1)
+  }
+
+  console.error(`task not found: ${selector}`)
+  process.exit(1)
+  throw new Error("unreachable")
 }
 
 function tenantId(): string {

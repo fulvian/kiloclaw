@@ -534,6 +534,42 @@ describe("CapabilityRouter", () => {
       expect(result.skill).toBe("web-skill")
     })
 
+    test("given agency allowedCapabilities when route then restricts generic cross-agency skills", () => {
+      const agency = createAgency({
+        id: "agency-gworkspace",
+        domain: "gworkspace",
+        policies: {
+          allowedCapabilities: ["drive.search", "drive.list", "drive.read"],
+          deniedCapabilities: [],
+          maxRetries: 3,
+          requiresApproval: false,
+          dataClassification: "internal",
+        },
+      })
+      AgencyRegistry.registerAgency(agency)
+
+      const webSkill = createSkill({
+        id: "web-search",
+        capabilities: ["search", "web"],
+      })
+      const driveSkill = createSkill({
+        id: "gworkspace-drive-search",
+        capabilities: ["drive.search", "drive.list"],
+      })
+      SkillRegistry.registerSkill(webSkill)
+      SkillRegistry.registerSkill(driveSkill)
+
+      const intent = {
+        intent: "query",
+        parameters: { capabilities: ["search", "drive.search"] },
+        context: { urgency: "medium" as const },
+      }
+
+      const result = CapabilityRouter.routeTask(intent, "agency-gworkspace")
+      expect(result.type).toBe("skill")
+      expect(result.skill).toBe("gworkspace-drive-search")
+    })
+
     test("given no matching anything when route then throws NoMatchingCapabilityError", () => {
       const intent = {
         intent: "completely-unknown-task",

@@ -8,7 +8,7 @@ import { win32DisableProcessedInput, win32FlushInputBuffer, win32InstallCtrlCGua
 import { Installation } from "@/installation"
 import { Flag } from "@/flag/flag"
 import { ProactiveTaskStore } from "@/kiloclaw/proactive/scheduler.store"
-import { ProactiveSchedulerEngine } from "@/kiloclaw/proactive/scheduler.engine"
+import { SchedulerControlService } from "@/kiloclaw/proactive/scheduler-control.service"
 import { DialogProvider, useDialog } from "@tui/ui/dialog"
 import { DialogProvider as DialogProviderList } from "@tui/component/dialog-provider"
 import { SDKProvider, useSDK } from "@tui/context/sdk"
@@ -54,6 +54,8 @@ import { initializeTUIDependencies } from "@kilocode/kilo-gateway/tui" // kiloco
 import { TuiConfigProvider } from "./context/tui-config"
 import { TuiConfig } from "@/config/tui"
 import { requestSessionFeedback } from "./routes/session/feedback-bar" // kilocode_change
+import { setTaskCommandHandlers } from "./task-command-router"
+import { DialogTaskHelp } from "./ui/dialog-task-help"
 
 async function getTerminalBackgroundColor(): Promise<"dark" | "light"> {
   // can't set raw mode if not a TTY
@@ -435,6 +437,15 @@ function App() {
         handleTaskNavigate("new")
       },
     },
+    {
+      title: "Task help",
+      value: "task.help",
+      category: "Task",
+      hidden: true,
+      onSelect: () => {
+        dialog.replace(() => <DialogTaskHelp />)
+      },
+    },
     // kilocode_change end
     ...(Flag.KILO_EXPERIMENTAL_WORKSPACES_TUI
       ? [
@@ -806,7 +817,10 @@ function App() {
   })
 
   // kilocode_change start - Task navigation handler (direct call, no Bus subscription)
-  const handleTaskNavigate = (action: "new" | "list" | "show" | "edit" | "runs" | "dlq", taskId?: string) => {
+  const handleTaskNavigate = (
+    action: "new" | "list" | "show" | "edit" | "wizard" | "runs" | "dlq" | "pause" | "resume" | "run" | "delete",
+    taskId?: string,
+  ) => {
     if (!Flag.KILOCLAW_SCHEDULED_TASKS_ENABLED) return
 
     if (action === "new") {
@@ -846,7 +860,7 @@ function App() {
       return
     }
 
-    if (action === "show" || action === "edit") {
+    if (action === "show") {
       if (!Flag.KILOCLAW_SCHEDULED_TASKS_VIEWS_ENABLED && Flag.KILOCLAW_SCHEDULED_TASKS_ENABLED) {
         queueMicrotask(() => toast.show({ variant: "error", message: "Task views are disabled", duration: 2000 }))
         return
@@ -858,57 +872,72 @@ function App() {
       dialog.replace(() => (
         <DialogTaskDetail
           taskId={taskId}
-          onEdit={() => handleTaskNavigate("edit", taskId)}
+          onEdit={() => handleTaskNavigate("wizard", taskId)}
           onRuns={() => handleTaskNavigate("runs", taskId)}
           onDLQ={() => handleTaskNavigate("dlq", taskId)}
           onPause={() => {
-            const { ProactiveTaskStore } = require("@/kiloclaw/proactive/scheduler.store")
-            ProactiveTaskStore.update(taskId, { status: "paused" })
+            SchedulerControlService.pauseTask(taskId)
             queueMicrotask(() => toast.show({ variant: "info", message: "Task paused", duration: 2000 }))
             handleTaskNavigate("show", taskId)
           }}
           onResume={() => {
-            const { ProactiveTaskStore } = require("@/kiloclaw/proactive/scheduler.store")
-            ProactiveTaskStore.update(taskId, { status: "active" })
+            const task = SchedulerControlService.resumeTask(taskId)
+            if (!task) {
+              queueMicrotask(() => toast.show({ variant: "error", message: "Task not found", duration: 2000 }))
+              return
+            }
             queueMicrotask(() => toast.show({ variant: "info", message: "Task resumed", duration: 2000 }))
             handleTaskNavigate("show", taskId)
           }}
           onRunNow={() => {
-            if (Flag.KILOCLAW_TASK_ACTIONS_EXEC) {
-              // Real execution via scheduler engine
-              const task = ProactiveTaskStore.get(taskId)
-              if (!task) {
-                queueMicrotask(() => toast.show({ variant: "error", message: "Task not found", duration: 2000 }))
-                return
+            SchedulerControlService.runNow(taskId, "manual").then((out) => {
+              if (out.accepted) {
+                queueMicrotask(() => toast.show({ variant: "success", message: "Task executed", duration: 2000 }))
+              } else {
+                queueMicrotask(() =>
+                  toast.show({ variant: "error", message: `Run blocked: ${out.reasonCode}`, duration: 2000 }),
+                )
               }
-              // Ensure engine is initialized and started before execution
-              if (!ProactiveSchedulerEngine.getIsRunning()) {
-                ProactiveSchedulerEngine.init({})
-                ProactiveSchedulerEngine.start()
-              }
-              // Execute immediately by setting nextRunAt to now and triggering
-              ProactiveTaskStore.update(taskId, { nextRunAt: Date.now() })
-              ProactiveSchedulerEngine.executeTask({ taskId }).then((ok) => {
-                if (ok) {
-                  queueMicrotask(() => toast.show({ variant: "success", message: "Task executed", duration: 2000 }))
-                } else {
-                  queueMicrotask(() =>
-                    toast.show({ variant: "error", message: "Task execution failed", duration: 2000 }),
-                  )
-                }
-                handleTaskNavigate("show", taskId)
-              })
-            } else {
-              queueMicrotask(() => toast.show({ variant: "info", message: "Run now is not enabled", duration: 2000 }))
-            }
+              handleTaskNavigate("show", taskId)
+            })
           }}
           onDelete={() => {
+            // Show confirmation dialog before delete
             const { ProactiveTaskStore } = require("@/kiloclaw/proactive/scheduler.store")
-            ProactiveTaskStore.remove(taskId)
-            queueMicrotask(() => toast.show({ variant: "info", message: "Task deleted", duration: 2000 }))
-            dialog.clear()
+            const taskToDelete = ProactiveTaskStore.get(taskId)
+            const taskName = taskToDelete?.name || taskId
+            dialog.replace(() => (
+              <DialogAlert
+                title="Delete Task"
+                message={`Are you sure you want to delete "${taskName}"? This cannot be undone.`}
+                onConfirm={() => {
+                  SchedulerControlService.deleteTask(taskId)
+                  queueMicrotask(() => toast.show({ variant: "info", message: "Task deleted", duration: 2000 }))
+                  dialog.clear()
+                }}
+              />
+            ))
           }}
           onClose={() => dialog.clear()}
+        />
+      ))
+      return
+    }
+
+    if (action === "wizard") {
+      // Separate wizard route - opens task wizard for edit
+      if (!Flag.KILOCLAW_SCHEDULED_TASKS_WIZARD_ENABLED && Flag.KILOCLAW_SCHEDULED_TASKS_ENABLED) {
+        queueMicrotask(() => toast.show({ variant: "error", message: "Task wizard is disabled", duration: 2000 }))
+        return
+      }
+      dialog.replace(() => (
+        <DialogTaskWizard
+          taskId={taskId}
+          onComplete={() => {
+            queueMicrotask(() =>
+              toast.show({ variant: "success", message: "Task updated successfully", duration: 3000 }),
+            )
+          }}
         />
       ))
       return
@@ -938,47 +967,133 @@ function App() {
         <DialogTaskDLQ
           taskId={taskId}
           onReplayEntry={(entryId) => {
-            if (Flag.KILOCLAW_TASK_ACTIONS_EXEC) {
-              // Replay DLQ entry - re-queue the task for immediate execution
-              const entry = ProactiveTaskStore.getDLQEntry(entryId)
-              if (!entry) {
-                queueMicrotask(() => toast.show({ variant: "error", message: "DLQ entry not found", duration: 2000 }))
-                return
-              }
-              // Ensure engine is initialized and started before execution
-              if (!ProactiveSchedulerEngine.getIsRunning()) {
-                ProactiveSchedulerEngine.init({})
-                ProactiveSchedulerEngine.start()
-              }
-              // Move task back to active and execute
-              ProactiveTaskStore.update(entry.taskId, {
-                status: "active",
-                nextRunAt: Date.now(),
-              })
-              ProactiveTaskStore.removeFromDLQ(entryId)
-              ProactiveSchedulerEngine.executeTask({ taskId: entry.taskId }).then((ok) => {
-                if (ok) {
-                  queueMicrotask(() =>
-                    toast.show({ variant: "success", message: "DLQ entry replayed", duration: 2000 }),
-                  )
-                } else {
-                  queueMicrotask(() => toast.show({ variant: "error", message: "Replay failed", duration: 2000 }))
-                }
-              })
-            } else {
-              queueMicrotask(() => toast.show({ variant: "info", message: "Replay is not enabled", duration: 2000 }))
+            const replay = SchedulerControlService.replayDlq(entryId)
+            if (!replay.accepted) {
+              queueMicrotask(() =>
+                toast.show({ variant: "error", message: `Replay failed: ${replay.reasonCode}`, duration: 2000 }),
+              )
+              return
             }
+            queueMicrotask(() => toast.show({ variant: "success", message: "DLQ entry replayed", duration: 2000 }))
           }}
           onRemoveEntry={(entryId) => {
-            const { ProactiveTaskStore } = require("@/kiloclaw/proactive/scheduler.store")
-            ProactiveTaskStore.removeFromDLQ(entryId)
-            queueMicrotask(() => toast.show({ variant: "info", message: "DLQ entry removed", duration: 2000 }))
+            // Show confirmation dialog before removing DLQ entry
+            dialog.replace(() => (
+              <DialogAlert
+                title="Remove DLQ Entry"
+                message="Are you sure you want to remove this entry from the DLQ? This cannot be undone."
+                onConfirm={() => {
+                  const { ProactiveTaskStore } = require("@/kiloclaw/proactive/scheduler.store")
+                  ProactiveTaskStore.removeFromDLQ(entryId)
+                  queueMicrotask(() => toast.show({ variant: "info", message: "DLQ entry removed", duration: 2000 }))
+                  handleTaskNavigate("dlq", taskId)
+                }}
+              />
+            ))
           }}
           onClose={() => dialog.clear()}
         />
       ))
     }
   }
+
+  setTaskCommandHandlers({
+    list: () => handleTaskNavigate("list"),
+    new: () => handleTaskNavigate("new"),
+    help: () => command.trigger("task.help"),
+    show: (selector) => {
+      const result = SchedulerControlService.resolveTask(selector)
+      if (!result.ok) {
+        const message = result.code === "ambiguous" ? `Ambiguous selector: ${selector}` : `Task not found: ${selector}`
+        queueMicrotask(() => toast.show({ variant: "error", message, duration: 2500 }))
+        return
+      }
+      handleTaskNavigate("show", result.task.id)
+    },
+    edit: (selector) => {
+      const result = SchedulerControlService.resolveTask(selector)
+      if (!result.ok) {
+        const message = result.code === "ambiguous" ? `Ambiguous selector: ${selector}` : `Task not found: ${selector}`
+        queueMicrotask(() => toast.show({ variant: "error", message, duration: 2500 }))
+        return
+      }
+      handleTaskNavigate("wizard", result.task.id)
+    },
+    runs: (selector) => {
+      const result = SchedulerControlService.resolveTask(selector)
+      if (!result.ok) {
+        const message = result.code === "ambiguous" ? `Ambiguous selector: ${selector}` : `Task not found: ${selector}`
+        queueMicrotask(() => toast.show({ variant: "error", message, duration: 2500 }))
+        return
+      }
+      handleTaskNavigate("runs", result.task.id)
+    },
+    dlq: () => handleTaskNavigate("dlq"),
+    pause: (selector) => {
+      const result = SchedulerControlService.resolveTask(selector)
+      if (!result.ok) {
+        const message = result.code === "ambiguous" ? `Ambiguous selector: ${selector}` : `Task not found: ${selector}`
+        queueMicrotask(() => toast.show({ variant: "error", message, duration: 2500 }))
+        return
+      }
+      SchedulerControlService.pauseTask(result.task.id)
+      queueMicrotask(() => toast.show({ variant: "info", message: "Task paused", duration: 2000 }))
+      handleTaskNavigate("show", result.task.id)
+    },
+    resume: (selector) => {
+      const result = SchedulerControlService.resolveTask(selector)
+      if (!result.ok) {
+        const message = result.code === "ambiguous" ? `Ambiguous selector: ${selector}` : `Task not found: ${selector}`
+        queueMicrotask(() => toast.show({ variant: "error", message, duration: 2500 }))
+        return
+      }
+      const task = SchedulerControlService.resumeTask(result.task.id)
+      if (!task) {
+        queueMicrotask(() => toast.show({ variant: "error", message: "Task not found", duration: 2000 }))
+        return
+      }
+      queueMicrotask(() => toast.show({ variant: "info", message: "Task resumed", duration: 2000 }))
+      handleTaskNavigate("show", result.task.id)
+    },
+    run: (selector) => {
+      const result = SchedulerControlService.resolveTask(selector)
+      if (!result.ok) {
+        const message = result.code === "ambiguous" ? `Ambiguous selector: ${selector}` : `Task not found: ${selector}`
+        queueMicrotask(() => toast.show({ variant: "error", message, duration: 2500 }))
+        return
+      }
+      SchedulerControlService.runNow(result.task.id, "manual").then((out) => {
+        if (out.accepted) {
+          queueMicrotask(() => toast.show({ variant: "success", message: "Task executed", duration: 2000 }))
+        } else {
+          queueMicrotask(() =>
+            toast.show({ variant: "error", message: `Run blocked: ${out.reasonCode}`, duration: 2000 }),
+          )
+        }
+        handleTaskNavigate("show", result.task.id)
+      })
+    },
+    delete: (selector) => {
+      const result = SchedulerControlService.resolveTask(selector)
+      if (!result.ok) {
+        const message = result.code === "ambiguous" ? `Ambiguous selector: ${selector}` : `Task not found: ${selector}`
+        queueMicrotask(() => toast.show({ variant: "error", message, duration: 2500 }))
+        return
+      }
+      const label = result.task.name || result.task.ref
+      dialog.replace(() => (
+        <DialogAlert
+          title="Delete Task"
+          message={`Are you sure you want to delete "${label}"? This cannot be undone.`}
+          onConfirm={() => {
+            SchedulerControlService.deleteTask(result.task.id)
+            queueMicrotask(() => toast.show({ variant: "info", message: "Task deleted", duration: 2000 }))
+            dialog.clear()
+          }}
+        />
+      ))
+    },
+  })
   // kilocode_change end
 
   sdk.event.on(SessionApi.Event.Deleted.type, (evt) => {

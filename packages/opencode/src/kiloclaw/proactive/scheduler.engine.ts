@@ -31,7 +31,14 @@ export interface ExecutionContext {
   startedAt: number
 }
 
-export type TaskExecutor = (context: ExecutionContext) => Promise<void>
+export interface ExecutionResult {
+  ok: boolean
+  errorCode?: string
+  errorMessage?: string
+  evidenceRefs?: string[]
+}
+
+export type TaskExecutor = (context: ExecutionContext) => Promise<ExecutionResult | void>
 
 export interface PolicyGate {
   evaluate(task: ProactiveTask, context?: ExecutionContext): Promise<GateResult>
@@ -119,7 +126,7 @@ export const ProactiveSchedulerEngine = {
   config: null as SchedulerEngineConfig | null,
   policyGate: null as PolicyGate | null,
   taskExecutor: null as TaskExecutor | null,
-  inFlightTasks: new Set<string>(),
+  mode: "standalone" as "standalone" | "daemon",
 
   lastTickAt: null as number | null,
   tasksProcessed: 0,
@@ -127,7 +134,124 @@ export const ProactiveSchedulerEngine = {
   tasksFailed: 0,
   tasksBlocked: 0,
 
+  // Track in-flight task instances for max_instances enforcement
+  inFlightTasks: new Map<string, number>(),
+
   log: Log.create({ service: "kilocclaw.proactive.scheduler.engine" }),
+
+  /**
+   * Misfire handling conforming to APScheduler semantics:
+   * - skip: do not run missed jobs at all
+   * - catchup_one: run the most recent missed job once
+   * - catchup_all: run all missed jobs (burst mode)
+   */
+  misfireDecision(
+    task: ProactiveTask,
+    now: number,
+  ): { action: "skip" | "catchup_one" | "catchup_all"; coalescedCount: number } {
+    const cfg = this.taskConfig(task)
+    const policy: "skip" | "catchup_one" | "catchup_all" =
+      (cfg.missedRunPolicy as "skip" | "catchup_one" | "catchup_all") ?? "catchup_one"
+    const nextRunAt = task.nextRunAt ?? 0
+    const startingDeadlineMs = (cfg.startingDeadlineMs as number) ?? 600_000
+
+    if (nextRunAt > now) {
+      return { action: "skip", coalescedCount: 0 }
+    }
+
+    if (now - nextRunAt > startingDeadlineMs) {
+      this.log.info("task missed starting deadline, applying misfire policy", {
+        taskId: task.id,
+        nextRunAt,
+        now,
+        overdueMs: now - nextRunAt,
+        policy,
+      })
+    }
+
+    switch (policy) {
+      case "skip":
+        return { action: "skip", coalescedCount: 0 }
+      case "catchup_one":
+        return { action: "catchup_one", coalescedCount: 1 }
+      case "catchup_all":
+        // Count how many runs we missed
+        const missedCount = Math.floor((now - nextRunAt) / (this.config?.tickMs ?? 1000))
+        return { action: "catchup_all", coalescedCount: Math.min(missedCount, 100) }
+    }
+  },
+
+  /**
+   * Check if task has reached max_instances limit.
+   */
+  checkMaxInstances(task: ProactiveTask): boolean {
+    const cfg = this.taskConfig(task)
+    const maxInstances = (cfg.maxInstances as number) ?? 1
+    const currentCount = this.inFlightTasks.get(task.id) ?? 0
+    return currentCount < maxInstances
+  },
+
+  /**
+   * Increment in-flight count for a task.
+   */
+  addInFlight(taskId: string): void {
+    const current = this.inFlightTasks.get(taskId) ?? 0
+    this.inFlightTasks.set(taskId, current + 1)
+  },
+
+  /**
+   * Decrement in-flight count for a task.
+   */
+  removeInFlight(taskId: string): void {
+    const current = this.inFlightTasks.get(taskId) ?? 0
+    if (current <= 1) {
+      this.inFlightTasks.delete(taskId)
+    } else {
+      this.inFlightTasks.set(taskId, current - 1)
+    }
+  },
+
+  /**
+   * Calculate retry backoff with deterministic jitter.
+   * Jitter is based on retry count and task id for idempotency.
+   * Conforms to Celery exponential backoff + jitter pattern.
+   */
+  calculateBackoff(retryCount: number, taskId: string): number {
+    if (!this.config) return 1000 * Math.pow(2, retryCount - 1)
+    const delay = this.config.baseBackoffMs * Math.pow(2, retryCount - 1)
+    const cappedDelay = Math.min(delay, this.config.maxBackoffMs)
+
+    // Extract jitter config from task
+    const jitter = 0.2 // default
+    const jitteredDelay = this.applyJitter(cappedDelay, retryCount, taskId, jitter)
+    return jitteredDelay
+  },
+
+  /**
+   * Apply deterministic jitter based on retry count and task id.
+   * Uses a simple hash to ensure same retry count + task id always produces same jitter factor.
+   */
+  applyJitter(delay: number, retryCount: number, taskId: string, jitterFactor: number): number {
+    if (jitterFactor <= 0) return delay
+    // Deterministic hash using taskId + retryCount
+    const hash = this.simpleHash(`${taskId}:${retryCount}`)
+    // Normalize to [0, jitterFactor] range
+    const jitterAmount = jitterFactor * delay
+    const randomFactor = (hash % 1000) / 1000 // [0, 0.999]
+    return Math.floor(delay + randomFactor * jitterAmount)
+  },
+
+  /**
+   * Simple string hash for deterministic jitter.
+   */
+  simpleHash(input: string): number {
+    let hash = 0
+    for (let i = 0; i < input.length; i++) {
+      const char = input.charCodeAt(i)
+      hash = ((hash << 5) - hash + char) | 0
+    }
+    return Math.abs(hash)
+  },
 
   init(input: Partial<SchedulerEngineConfig> & { policyGate?: PolicyGate } = {}): void {
     this.config = {
@@ -149,9 +273,14 @@ export const ProactiveSchedulerEngine = {
     this.log.info("task executor set")
   },
 
-  start(): void {
+  start(input?: { mode?: "standalone" | "daemon" }): void {
     if (!this.config) {
       this.log.error("scheduler engine not initialized, call init() first")
+      return
+    }
+
+    if (!this.taskExecutor) {
+      this.log.error("scheduler engine cannot start: no executor registered. Call setExecutor() before start()")
       return
     }
 
@@ -160,14 +289,18 @@ export const ProactiveSchedulerEngine = {
       return
     }
 
+    this.mode = input?.mode ?? "standalone"
     this.isRunning = true
 
-    this.tickInterval = setInterval(() => this.tick(), this.config!.tickMs)
-    this.dlqCheckInterval = setInterval(() => this.dlqTick(), this.config!.dlqCheckIntervalMs)
+    if (this.mode === "standalone") {
+      this.tickInterval = setInterval(() => this.tick(), this.config!.tickMs)
+      this.dlqCheckInterval = setInterval(() => this.dlqTick(), this.config!.dlqCheckIntervalMs)
+    }
 
     this.recoverPendingTasks()
 
     this.log.info("scheduler engine started", {
+      mode: this.mode,
       tickMs: this.config.tickMs,
       dlqCheckIntervalMs: this.config.dlqCheckIntervalMs,
     })
@@ -200,6 +333,10 @@ export const ProactiveSchedulerEngine = {
     return this.isRunning
   },
 
+  hasExecutor(): boolean {
+    return this.taskExecutor !== null
+  },
+
   getStats(): SchedulerEngineStats {
     const pendingTasks = ProactiveTaskStore.getPending()
     const dlqEntries = ProactiveTaskStore.getDLQ()
@@ -216,14 +353,14 @@ export const ProactiveSchedulerEngine = {
     }
   },
 
-  async executeTask(input: { taskId: string }): Promise<boolean> {
+  async executeTask(input: { taskId: string; runType?: "scheduled" | "manual" | "replay" }): Promise<boolean> {
     const task = ProactiveTaskStore.get(input.taskId)
     if (!task) {
       this.log.error("task not found for execution", { taskId: input.taskId })
       return false
     }
 
-    return this.executeTaskInternal(task)
+    return this.executeTaskInternal(task, input.runType ?? "scheduled")
   },
 
   async processDLQ(): Promise<number> {
@@ -314,7 +451,10 @@ export const ProactiveSchedulerEngine = {
     return retried
   },
 
-  async executeTaskInternal(task: ProactiveTask): Promise<boolean> {
+  async executeTaskInternal(
+    task: ProactiveTask,
+    runType: "scheduled" | "manual" | "replay" = "scheduled",
+  ): Promise<boolean> {
     const runId = `run_${crypto.randomUUID()}`
     const scheduledFor = task.nextRunAt ?? Date.now()
     const attempt = task.retryCount + 1
@@ -329,7 +469,7 @@ export const ProactiveSchedulerEngine = {
       return false
     }
 
-    this.inFlightTasks.add(task.id)
+    this.inFlightTasks.set(task.id, 1)
 
     const startedAt = Date.now()
     let outcome: RunOutcome = "success"
@@ -357,6 +497,7 @@ export const ProactiveSchedulerEngine = {
           correlationId,
           idempotencyKey,
           traceId,
+          runType,
         })
         const run = ProactiveTaskStore.getRuns(task.id, 1)[0]
         if (run) emitTaskNotification(task, { type: "run_policy_denied", run })
@@ -374,6 +515,7 @@ export const ProactiveSchedulerEngine = {
           correlationId,
           idempotencyKey,
           traceId,
+          runType,
         })
         const run = ProactiveTaskStore.getRuns(task.id, 1)[0]
         if (run) emitTaskNotification(task, { type: "run_budget_exceeded", run })
@@ -384,19 +526,77 @@ export const ProactiveSchedulerEngine = {
       }
 
       if (this.taskExecutor) {
-        await this.taskExecutor(context)
+        const result = await this.taskExecutor(context)
+        const exec = result ?? { ok: true, evidenceRefs: [] }
+        if (!exec.ok) {
+          outcome = "failed"
+          this.recordTaskRun(
+            runId,
+            task,
+            outcome,
+            startedAt,
+            gateResult,
+            { error: exec.errorMessage ?? "executor failed" },
+            {
+              attempt,
+              scheduledFor,
+              correlationId,
+              idempotencyKey,
+              traceId,
+              runType,
+              errorCode: exec.errorCode ?? "task_execution_failed",
+              evidenceRefs: exec.evidenceRefs ?? null,
+            },
+          )
+          const failedRun = ProactiveTaskStore.getRuns(task.id, 1)[0]
+          if (failedRun)
+            emitTaskNotification(task, {
+              type: "run_failed",
+              run: failedRun,
+              error: exec.errorMessage ?? exec.errorCode ?? "executor failed",
+            })
+          this.tasksFailed++
+          this.tasksProcessed++
+          return false
+        }
+        outcome = "success"
+        this.recordTaskRun(runId, task, outcome, startedAt, gateResult, null, {
+          attempt,
+          scheduledFor,
+          correlationId,
+          idempotencyKey,
+          traceId,
+          runType,
+          evidenceRefs: exec.evidenceRefs ?? null,
+        })
       } else {
         this.log.warn("no task executor registered", { taskId: task.id })
+        outcome = "executor_missing"
+        this.recordTaskRun(
+          runId,
+          task,
+          outcome,
+          startedAt,
+          gateResult,
+          { error: "no executor registered" },
+          {
+            attempt,
+            scheduledFor,
+            correlationId,
+            idempotencyKey,
+            traceId,
+            runType,
+            errorCode: "executor_missing",
+          },
+        )
+        const run = ProactiveTaskStore.getRuns(task.id, 1)[0]
+        if (run) emitTaskNotification(task, { type: "run_failed", run, error: "no executor registered" })
+        this.tasksFailed++
+        this.tasksProcessed++
+        this.inFlightTasks.delete(task.id)
+        return false
       }
 
-      outcome = "success"
-      this.recordTaskRun(runId, task, outcome, startedAt, gateResult, null, {
-        attempt,
-        scheduledFor,
-        correlationId,
-        idempotencyKey,
-        traceId,
-      })
       const run = ProactiveTaskStore.getRuns(task.id, 1)[0]
       if (run) emitTaskNotification(task, { type: "run_success", run })
 
@@ -438,7 +638,7 @@ export const ProactiveSchedulerEngine = {
           runId,
           error: errorMsg,
           payload: { triggerConfig: task.triggerConfig },
-          retryAt: Date.now() + this.calculateBackoff(retryCount),
+          retryAt: Date.now() + this.calculateBackoff(retryCount, task.id),
         })
 
         ProactiveTaskStore.update(task.id, {
@@ -454,7 +654,7 @@ export const ProactiveSchedulerEngine = {
         })
         emitTaskNotification(task, { type: "dlq_move", entry: dlqEntry })
       } else {
-        const nextRunAt = Date.now() + this.calculateBackoff(retryCount)
+        const nextRunAt = Date.now() + this.calculateBackoff(retryCount, task.id)
 
         ProactiveTaskStore.update(task.id, {
           status: "active",
@@ -467,7 +667,7 @@ export const ProactiveSchedulerEngine = {
           taskId: task.id,
           retryCount,
           nextRunAt,
-          backoffMs: this.calculateBackoff(retryCount),
+          backoffMs: this.calculateBackoff(retryCount, task.id),
         })
       }
 
@@ -484,6 +684,8 @@ export const ProactiveSchedulerEngine = {
           correlationId,
           idempotencyKey,
           traceId,
+          runType,
+          errorCode: "task_execution_failed",
         },
       )
       const failedRun = ProactiveTaskStore.getRuns(task.id, 1)[0]
@@ -514,6 +716,9 @@ export const ProactiveSchedulerEngine = {
       correlationId: string
       idempotencyKey: string
       traceId: string
+      runType?: "scheduled" | "manual" | "replay"
+      errorCode?: string
+      evidenceRefs?: string[] | null
     },
   ): void {
     const durationMs = Date.now() - startedAt
@@ -531,7 +736,7 @@ export const ProactiveSchedulerEngine = {
     ProactiveTaskStore.recordRun({
       id: runId,
       taskId: task.id,
-      runType: "scheduled",
+      runType: meta?.runType ?? "scheduled",
       attempt: meta?.attempt,
       scheduledFor: meta?.scheduledFor,
       startedAt,
@@ -539,18 +744,20 @@ export const ProactiveSchedulerEngine = {
       outcome,
       durationMs,
       gateDecisions,
-      errorCode: errorInfo
-        ? "task_execution_failed"
-        : outcome === "policy_denied"
-          ? "policy_denied"
-          : outcome === "budget_exceeded"
-            ? "budget_exceeded"
-            : null,
+      errorCode: meta?.errorCode
+        ? meta.errorCode
+        : errorInfo
+          ? "task_execution_failed"
+          : outcome === "policy_denied"
+            ? "policy_denied"
+            : outcome === "budget_exceeded"
+              ? "budget_exceeded"
+              : null,
       errorMessage: errorInfo?.error ?? null,
       correlationId: meta?.correlationId,
       idempotencyKey: meta?.idempotencyKey,
       traceId: meta?.traceId,
-      evidenceRefs: null,
+      evidenceRefs: meta?.evidenceRefs ?? null,
     })
   },
 
@@ -601,12 +808,6 @@ export const ProactiveSchedulerEngine = {
 
     return Date.now() + 86400000
   },
-
-  calculateBackoff(retryCount: number): number {
-    if (!this.config) return 1000 * Math.pow(2, retryCount - 1)
-    const delay = this.config.baseBackoffMs * Math.pow(2, retryCount - 1)
-    return Math.min(delay, this.config.maxBackoffMs)
-  },
 }
 
 export const ProactiveSchedulerEngine$ = {
@@ -616,7 +817,8 @@ export const ProactiveSchedulerEngine$ = {
       start: () => ProactiveSchedulerEngine.start(),
       stop: () => ProactiveSchedulerEngine.stop(),
       getStats: () => ProactiveSchedulerEngine.getStats(),
-      executeTask: (taskId: string) => ProactiveSchedulerEngine.executeTask({ taskId }),
+      executeTask: (taskId: string, runType?: "scheduled" | "manual" | "replay") =>
+        ProactiveSchedulerEngine.executeTask({ taskId, runType }),
       processDLQ: () => ProactiveSchedulerEngine.processDLQ(),
       setExecutor: (executor: TaskExecutor) => ProactiveSchedulerEngine.setExecutor(executor),
     }

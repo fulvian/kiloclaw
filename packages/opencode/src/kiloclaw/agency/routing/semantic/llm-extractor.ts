@@ -48,6 +48,7 @@ Given a user intent, classify it into one of these domains:
 - knowledge: Web search, research, information gathering, fact checking
 - nutrition: Diet, food, nutrition analysis, recipes
 - weather: Weather forecasts, conditions, alerts
+- gworkspace: Gmail, Google Drive, Calendar, Docs, Sheets, workspace operations
 - custom: Custom/unknown tasks
 
 User intent: "{intent}"
@@ -144,6 +145,17 @@ function extractCapabilitiesFromKeywords(text: string): string[] {
     forecast: ["weather_query"],
     temperature: ["weather_query"],
     document: ["document_analysis"],
+    gmail: ["gmail.search", "gmail.read"],
+    "google drive": ["drive.search", "drive.read"],
+    drive: ["drive.search", "drive.read"],
+    folder: ["drive.list"],
+    cartella: ["drive.list"],
+    calendar: ["calendar.list", "calendar.read"],
+    evento: ["calendar.read"],
+    docs: ["docs.read"],
+    sheets: ["sheets.read"],
+    documento: ["docs.read"],
+    foglio: ["sheets.read"],
     refactor: ["refactoring"],
     simplify: ["refactoring"],
   }
@@ -191,6 +203,21 @@ export function classifyDomainWithLLM(intent: SemanticIntent): string {
     ],
     nutrition: ["food", "diet", "nutrition", "meal", "recipe", "calories", "cibo", "dieta", "nutrizione", "ricetta"],
     weather: ["weather", "temperature", "forecast", "rain", "meteo", "previsioni", "sole"],
+    gworkspace: [
+      "gmail",
+      "google drive",
+      "drive",
+      "calendar",
+      "google calendar",
+      "docs",
+      "sheets",
+      "cartella",
+      "cartelle",
+      "documenti",
+      "fogli",
+      "workspace",
+      "condivisi",
+    ],
   }
 
   let bestDomain = "knowledge"

@@ -405,6 +405,85 @@ export function bootstrapWeatherCapabilities(): void {
 }
 
 /**
+ * Bootstrap default capabilities for Google Workspace domain
+ */
+export function bootstrapGWorkspaceCapabilities(): void {
+  const registry = getCapabilityRegistry()
+
+  const capabilities = [
+    {
+      id: "gmail.search",
+      domain: "gworkspace" as Domain,
+      description: "Search messages in Gmail",
+      keywords: ["gmail", "email", "search", "mail", "posta"],
+      capabilities: ["gmail.search", "search"],
+    },
+    {
+      id: "gmail.read",
+      domain: "gworkspace" as Domain,
+      description: "Read Gmail messages",
+      keywords: ["gmail", "read", "message", "messaggio"],
+      capabilities: ["gmail.read", "read"],
+    },
+    {
+      id: "drive.search",
+      domain: "gworkspace" as Domain,
+      description: "Search files in Google Drive",
+      keywords: ["drive", "google drive", "search", "file", "documenti"],
+      capabilities: ["drive.search", "search"],
+    },
+    {
+      id: "drive.list",
+      domain: "gworkspace" as Domain,
+      description: "List files and folders in Google Drive",
+      keywords: ["drive", "list", "folder", "cartella", "cartelle"],
+      capabilities: ["drive.list", "list"],
+    },
+    {
+      id: "drive.read",
+      domain: "gworkspace" as Domain,
+      description: "Read a file from Google Drive",
+      keywords: ["drive", "read", "file", "documento", "documenti"],
+      capabilities: ["drive.read", "read"],
+    },
+    {
+      id: "calendar.list",
+      domain: "gworkspace" as Domain,
+      description: "List events from Google Calendar",
+      keywords: ["calendar", "event", "events", "calendario", "evento"],
+      capabilities: ["calendar.list", "calendar.read"],
+    },
+    {
+      id: "docs.read",
+      domain: "gworkspace" as Domain,
+      description: "Read Google Docs documents",
+      keywords: ["docs", "document", "google docs", "documento"],
+      capabilities: ["docs.read", "read"],
+    },
+    {
+      id: "sheets.read",
+      domain: "gworkspace" as Domain,
+      description: "Read Google Sheets spreadsheets",
+      keywords: ["sheets", "spreadsheet", "google sheets", "foglio", "fogli"],
+      capabilities: ["sheets.read", "read"],
+    },
+  ]
+
+  for (const cap of capabilities) {
+    try {
+      registry.register({
+        ...cap,
+        metadata: { source: "bootstrap", domain: "gworkspace" },
+      })
+    } catch (err) {
+      // Skip if already exists
+    }
+  }
+
+  log.info("gworkspace capabilities bootstrapped", { count: capabilities.length })
+}
+
+/**
  * Bootstrap all default capabilities
  */
 export function bootstrapAllCapabilities(): void {
@@ -412,6 +491,7 @@ export function bootstrapAllCapabilities(): void {
   bootstrapKnowledgeCapabilities()
   bootstrapNutritionCapabilities()
   bootstrapWeatherCapabilities()
+  bootstrapGWorkspaceCapabilities()
 
   log.info("all default capabilities bootstrapped", {
     total: getCapabilityRegistry().size(),

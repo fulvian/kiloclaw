@@ -4,7 +4,7 @@
 
 ## Started: 2026-04-02T12:21:02+02:00
 
-## Last Updated: 2026-04-10T10:28:18+02:00
+## Last Updated: 2026-04-11T20:04:00+02:00
 
 ## Corrective Track: Task Scheduling (2026-04-09)
 
@@ -646,6 +646,97 @@ Weighted:    0.42375 + 0.18 boost = 0.60375 → recall ✅
 ### Files Created
 
 ```
+
+---
+
+## Agency 2 NBA Betting - PHASE M1/M2 FOUNDATION IN PROGRESS
+
+**Started**: 2026-04-11
+**Plan**: `docs/plans/KILOCLAW_AGENCY2_NBA_IMPLEMENTATION_PLAN_2026-04-11.md`
+
+### Current Implementation Status
+
+| Milestone | Scope | Status |
+| --------- | ----- | ------ |
+| M1 | Schema normalizzati v1 (`Game/Odds/Signal/Recommendation`) | ✅ Baseline implemented |
+| M2 | Policy hard matrix SAFE/NOTIFY/CONFIRM/DENY + deny-by-default | ✅ Baseline implemented |
+| M2 | Confidence cap `<=95%` | ✅ Enforced in schema transform |
+| M2 | Stale recommendation blocking helper | ✅ Baseline helper implemented |
+
+### Files Added (NBA Foundation)
+
+- `packages/opencode/src/kiloclaw/agency/nba/schema.ts`
+- `packages/opencode/src/kiloclaw/agency/manifests/nba-manifest.ts`
+- `packages/opencode/test/kiloclaw/nba-schema.test.ts`
+- `packages/opencode/test/kiloclaw/nba-manifest.test.ts`
+
+### Files Updated (Registration/Exports)
+
+- `packages/opencode/src/kiloclaw/agency/bootstrap.ts`
+- `packages/opencode/src/kiloclaw/agency/manifests/index.json`
+- `packages/opencode/src/kiloclaw/agency/manifests/index.ts`
+- `packages/opencode/src/kiloclaw/agency/index.ts`
+
+### Verification Evidence
+
+- `bun run --cwd packages/opencode test test/kiloclaw/nba-manifest.test.ts test/kiloclaw/nba-schema.test.ts` → ✅ 8 pass, 0 fail
+- `bun run --cwd packages/opencode typecheck` → ✅ pass
+
+### Phase 4 + Next Steps Progress (2026-04-11)
+
+| Area | Status | Evidence |
+| ---- | ------ | -------- |
+| Runtime safety gate (policy + stale + HITL outcome) | ✅ Implemented | `agency/nba/runtime.ts`, `nba-runtime.test.ts` |
+| Agency2 telemetry baseline events | ✅ Implemented | `agency2.request_*`, `agency2.policy_decision`, `agency2.signal_emitted` |
+| Dynamic payload budgeting baseline | ✅ Implemented | `agency/nba/budgeting.ts`, `nba-budgeting.test.ts` |
+| End-to-end NBA focused verification | ✅ Passed | 17 tests pass across 4 NBA suites |
+
+### Fresh Verification Evidence
+
+- `bun run --cwd packages/opencode test test/kiloclaw/nba-manifest.test.ts test/kiloclaw/nba-schema.test.ts test/kiloclaw/nba-runtime.test.ts test/kiloclaw/nba-budgeting.test.ts` → ✅ 17 pass, 0 fail
+- `bun run --cwd packages/opencode typecheck` → ✅ pass
+
+### Phase 6 Delivery Progress (2026-04-11)
+
+| Area | Status | Evidence |
+| ---- | ------ | -------- |
+| Provider resiliency primitives (freshness, classifier, backoff) | ✅ Implemented | `agency/nba/resilience.ts` |
+| Circuit breaker baseline | ✅ Implemented | `NbaCircuitBreaker` + tests |
+| Quota-aware market planner | ✅ Implemented | `selectMarketPlan` + tests |
+| Provider call telemetry contract | ✅ Implemented | `agency2.provider_call` schema/event |
+
+### Fresh Phase 6 Verification Evidence
+
+- `bun run --cwd packages/opencode test test/kiloclaw/nba-manifest.test.ts test/kiloclaw/nba-schema.test.ts test/kiloclaw/nba-runtime.test.ts test/kiloclaw/nba-budgeting.test.ts test/kiloclaw/nba-resilience.test.ts` → ✅ 25 pass, 0 fail
+- `bun run --cwd packages/opencode typecheck` → ✅ pass
+
+### M4 Rollout-Readiness Progress (2026-04-11)
+
+| Area | Status | Evidence |
+| ---- | ------ | -------- |
+| Calibration/backtest metrics utilities | ✅ Implemented | `agency/nba/calibration.ts` |
+| Go/No-Go evaluator with rollback triggers | ✅ Implemented | `agency/nba/gates.ts` |
+| Chaos scenario guardrail checks | ✅ Implemented | `agency/nba/chaos.ts` |
+| Export wiring for M4 modules | ✅ Implemented | `agency/index.ts` |
+
+### Fresh M4 Verification Evidence
+
+- `bun run --cwd packages/opencode test test/kiloclaw/nba-manifest.test.ts test/kiloclaw/nba-schema.test.ts test/kiloclaw/nba-runtime.test.ts test/kiloclaw/nba-budgeting.test.ts test/kiloclaw/nba-resilience.test.ts test/kiloclaw/nba-calibration.test.ts test/kiloclaw/nba-gates.test.ts test/kiloclaw/nba-chaos.test.ts` → ✅ 37 pass, 0 fail
+- `bun run --cwd packages/opencode typecheck` → ✅ pass
+
+### API Key Migration & Rotation Progress (2026-04-11)
+
+| Area | Status | Evidence |
+| ---- | ------ | -------- |
+| Local key discovery from Me4BrAIn | ✅ Completed | `/home/fulvio/Me4BrAIn/.env`, `docker/.env.geekcom`, `data/harvested_keys.env` |
+| Local migration to Kilo config | ✅ Completed | Managed block in `/home/fulvio/.config/kilo/.env` with rotation variables |
+| Rotation support for NBA providers | ✅ Completed | `agency/key-pool.ts` (BALLDONTLIE/ODDS/POLYMARKET + aliases) |
+| Remote server extraction (100.99.43.29) | ⛔ Blocked | Tailscale SSH interactive auth required |
+
+### Fresh Verification Evidence (Key Rotation)
+
+- `bun run --cwd packages/opencode test test/kiloclaw/key-pool.test.ts test/kiloclaw/nba-manifest.test.ts test/kiloclaw/nba-schema.test.ts test/kiloclaw/nba-runtime.test.ts test/kiloclaw/nba-budgeting.test.ts test/kiloclaw/nba-resilience.test.ts test/kiloclaw/nba-calibration.test.ts test/kiloclaw/nba-gates.test.ts test/kiloclaw/nba-chaos.test.ts` → ✅ 39 pass, 0 fail
+- `bun run --cwd packages/opencode typecheck` → ✅ pass
 packages/opencode/src/kiloclaw/agency/
 ├── manifests/gworkspace-manifest.ts   # Agency manifest + policy matrix
 ├── skills/gworkspace.ts             # Gmail/Calendar/Drive/Docs/Sheets skills
@@ -667,6 +758,46 @@ packages/opencode/src/kiloclaw/agency/
 └── audit/gworkspace/ # Audit trail
 
 packages/opencode/test/gworkspace/ # Test suite
+
+````
+
+---
+
+## Agency 2 NBA - Key Migration & Rotation (2026-04-11)
+
+| Area | Status | Evidence |
+| ---- | ------ | -------- |
+| Key migration automation | ✅ Implemented | `script/migrate-agency2-keys.ts`, `key-migration.ts` |
+| NBA provider pools (BALLDONTLIE/ODDS/POLYMARKET) | ✅ Implemented | `key-pool.ts` updated with alias loading |
+| Local key extraction from Me4BrAIn | ✅ Completed | 170 entries parsed, 7 provider buckets |
+| Managed env block in `~/.config/kilo/.env` | ✅ Applied | rotation block with backup |
+| PERPLEXITY provider loading | ✅ Added | `loadAllFromEnv()` includes PERPLEXITY |
+| Test coverage (key migration + NBA) | ✅ 44 pass | 150 `expect()` calls across 10 test files |
+| Remote extraction (100.99.43.29) | ⛔ Blocked | Tailscale SSH interactive auth required |
+
+### Migration script usage
+
+```bash
+# Local only (uses defaults: Me4BrAIn sources -> ~/.config/kilo/.env)
+bun script/migrate-agency2-keys.ts
+
+# With remote sources (non-fatal if unreachable)
+bun script/migrate-agency2-keys.ts --remote 100.99.43.29:/home/fulvio/Me4BrAIn/.env --target ~/.config/kilo/.env
+````
+
+### Managed block contents (keys not shown)
+
+```
+TAVILY=1  FIRECRAWL=0  BRAVE=1  PERPLEXITY=2  BALLDONTLIE=1  ODDS=1  POLYMARKET=0
+```
+
+### Blocker resolution
+
+Tailscale SSH interactive auth required once:
+
+1. Visit https://login.tailscale.com/a/l10d9959233e7a1 (from browser session on this machine)
+2. Approve the pending SSH request
+3. After approval, re-run: `bun script/migrate-agency2-keys.ts --remote 100.99.43.29:/home/fulvio/Me4BrAIn/.env`
 
 ```
 

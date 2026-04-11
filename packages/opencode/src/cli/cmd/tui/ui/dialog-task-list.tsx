@@ -5,15 +5,22 @@ import { useDialog } from "./dialog"
 import { useKeyboard } from "@opentui/solid"
 import type { ProactiveTask, TaskStatus } from "@/kiloclaw/proactive/scheduler.store"
 import { publishViewNavigation, publishTaskAction } from "@/kiloclaw/telemetry/scheduled-tasks.telemetry"
+import { Log } from "@/util/log"
+import { useToast } from "./toast"
+
+const log = Log.create({ service: "kilocclaw.tui.dialog-task-list" })
 
 export type TaskListFilter = {
-  status?: TaskStatus | "all"
+  status?: TaskStatus | "all" | "running"
   search?: string
 }
 
-const STATUS_COLORS: Record<TaskStatus | "all", { fg: string; label: string }> = {
+type TaskStatusAll = TaskStatus | "all" | "running"
+
+const STATUS_COLORS: Record<TaskStatusAll, { fg: string; label: string }> = {
   active: { fg: "green", label: "active" },
   paused: { fg: "yellow", label: "paused" },
+  running: { fg: "cyan", label: "running" },
   dlq: { fg: "red", label: "dlq" },
   completed: { fg: "blue", label: "completed" },
   failed: { fg: "red", label: "failed" },
@@ -27,6 +34,7 @@ export function DialogTaskList(props: {
 }) {
   const dialog = useDialog()
   const { theme } = useTheme()
+  const toast = useToast()
 
   const [filter, setFilter] = createSignal<TaskListFilter>({ status: "all", search: "" })
   const [selectedIndex, setSelectedIndex] = createSignal(0)
@@ -38,7 +46,9 @@ export function DialogTaskList(props: {
         require("@/kiloclaw/proactive/scheduler.store") as typeof import("@/kiloclaw/proactive/scheduler.store")
       const tenantId = process.env.KILOCLAW_TENANT_ID ?? "local"
       return ProactiveTaskStore.list(tenantId)
-    } catch {
+    } catch (err) {
+      log.error("failed to load task list", { err })
+      toast.show({ variant: "error", message: "Failed to load tasks", duration: 3000 })
       return [] as ProactiveTask[]
     }
   })
@@ -51,7 +61,9 @@ export function DialogTaskList(props: {
       if (runs.length > 0) {
         return runs[0].outcome
       }
-    } catch {}
+    } catch (err) {
+      log.warn("failed to get last run outcome", { taskId, err })
+    }
     return "-"
   }
 
@@ -73,7 +85,11 @@ export function DialogTaskList(props: {
     const f = filter()
 
     if (f.status && f.status !== "all") {
-      result = result.filter((t) => t.status === f.status)
+      if (f.status === "running") {
+        result = result.filter((t) => t.state === "running")
+      } else {
+        result = result.filter((t) => t.status === f.status)
+      }
     }
 
     if (f.search) {
@@ -81,6 +97,7 @@ export function DialogTaskList(props: {
       result = result.filter(
         (t) =>
           t.name.toLowerCase().includes(search) ||
+          t.ref.toLowerCase().includes(search) ||
           t.id.toLowerCase().includes(search) ||
           t.scheduleCron?.toLowerCase().includes(search),
       )
@@ -122,7 +139,7 @@ export function DialogTaskList(props: {
     publishViewNavigation("list")
   })
 
-  const statusOptions: Array<TaskStatus | "all"> = ["all", "active", "paused", "dlq", "completed", "failed"]
+  const statusOptions: Array<TaskStatusAll> = ["all", "active", "running", "paused", "dlq", "completed", "failed"]
 
   return (
     <box paddingLeft={2} paddingRight={2} gap={1} flexGrow={1} flexShrink={0} overflow="hidden">
@@ -171,7 +188,7 @@ export function DialogTaskList(props: {
           setFilter((f) => ({ ...f, search: val }))
           setSelectedIndex(0)
         }}
-        placeholder="Search by name, id, or schedule..."
+        placeholder="Search by name, ref, id, or schedule..."
         backgroundColor={theme.backgroundElement}
         textColor={theme.text}
       />
@@ -194,7 +211,9 @@ export function DialogTaskList(props: {
           <For each={filteredTasks()}>
             {(task, index) => {
               const isSelected = () => index() === selectedIndex()
-              const statusColor = STATUS_COLORS[task.status]?.fg ?? "white"
+              // Use state for running visibility (Phase 2 RCA-09)
+              const displayStatus = task.state === "running" ? "running" : task.status
+              const statusColor = STATUS_COLORS[displayStatus]?.fg ?? "white"
 
               return (
                 <box
@@ -218,11 +237,11 @@ export function DialogTaskList(props: {
                         {task.name}
                       </text>
                       <text fg={theme.textMuted}>-</text>
-                      <text fg={theme.textMuted}>{task.id.slice(0, 12)}...</text>
+                      <text fg={theme.textMuted}>{task.ref}</text>
                     </box>
                     <box flexDirection="row" gap={1}>
                       <text fg={theme.textMuted}>{formatNextRun(task.nextRunAt)}</text>
-                      <text fg={statusColor as any}>[{task.status}]</text>
+                      <text fg={statusColor as any}>[{displayStatus}]</text>
                     </box>
                   </box>
                   <box flexDirection="row" gap={2}>

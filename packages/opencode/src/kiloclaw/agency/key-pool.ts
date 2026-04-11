@@ -269,34 +269,37 @@ export class KeyManager {
 
   // Auto-discover and load keys from environment
   // Format: PROVIDER_API_KEY_1, PROVIDER_API_KEY_2, ... or PROVIDER_API_KEYS=key1,key2,key3
-  loadKeysFromEnv(prefix: string, config?: RateLimitConfig): void {
+  loadKeysFromEnv(prefix: string, config?: RateLimitConfig, alias: string[] = []): void {
     const pool = this.getPool(prefix, config)
+    const names = [prefix, ...alias]
     let loaded = 0
 
-    // First try indexed format: TAVILY_API_KEY_1, TAVILY_API_KEY_2, etc.
-    for (let i = 1; i <= 100; i++) {
-      const key = process.env[`${prefix}_API_KEY_${i}`]
-      if (key) {
-        pool.addKey(key)
-        loaded++
-      } else if (i === 1) {
-        // If _1 doesn't exist, try just PROVIDER_API_KEY (single key)
-        const singleKey = process.env[`${prefix}_API_KEY`]
-        if (singleKey) {
-          pool.addKey(singleKey)
-          loaded++
-        }
-        break
-      }
-    }
-
-    // Also check comma-separated format: TAVILY_API_KEYS=key1,key2,key3
-    const commaKeys = process.env[`${prefix}_API_KEYS`]
-    if (commaKeys) {
-      for (const key of commaKeys.split(",").map((k) => k.trim())) {
+    for (const name of names) {
+      // First try indexed format: TAVILY_API_KEY_1, TAVILY_API_KEY_2, etc.
+      for (let i = 1; i <= 100; i++) {
+        const key = process.env[`${name}_API_KEY_${i}`]
         if (key) {
           pool.addKey(key)
           loaded++
+        } else if (i === 1) {
+          // If _1 doesn't exist, try just PROVIDER_API_KEY (single key)
+          const singleKey = process.env[`${name}_API_KEY`]
+          if (singleKey) {
+            pool.addKey(singleKey)
+            loaded++
+          }
+          break
+        }
+      }
+
+      // Also check comma-separated format: TAVILY_API_KEYS=key1,key2,key3
+      const commaKeys = process.env[`${name}_API_KEYS`]
+      if (commaKeys) {
+        for (const key of commaKeys.split(",").map((k) => k.trim())) {
+          if (key) {
+            pool.addKey(key)
+            loaded++
+          }
         }
       }
     }
@@ -314,8 +317,13 @@ export class KeyManager {
   loadAllFromEnv(): void {
     // Knowledge providers
     this.loadKeysFromEnv("TAVILY", { requestsPerMinute: 15, requestsPerDay: 500, retryAfterMs: 60000 })
-    this.loadKeysFromEnv("BRAVE", { requestsPerMinute: 60, requestsPerDay: 2000, retryAfterMs: 60000 })
+    this.loadKeysFromEnv("BRAVE", { requestsPerMinute: 60, requestsPerDay: 2000, retryAfterMs: 60000 }, [
+      "BRAVE_SEARCH",
+    ])
     this.loadKeysFromEnv("FIRECRAWL", { requestsPerMinute: 20, requestsPerDay: 1000, retryAfterMs: 60000 })
+    this.loadKeysFromEnv("PERPLEXITY", { requestsPerMinute: 20, requestsPerDay: 1000, retryAfterMs: 60000 }, [
+      "API_STORE_PERPLEXITY",
+    ])
     this.loadKeysFromEnv("PUBMED", { requestsPerMinute: 10, requestsPerDay: 500, retryAfterMs: 60000 })
     this.loadKeysFromEnv("SEMANTICSCHOLAR", { requestsPerMinute: 10, requestsPerDay: 500, retryAfterMs: 60000 })
     this.loadKeysFromEnv("CROSSREF", { requestsPerMinute: 50, requestsPerDay: 5000, retryAfterMs: 60000 })
@@ -327,6 +335,25 @@ export class KeyManager {
     // Weather providers
     this.loadKeysFromEnv("OPENWEATHERMAP", { requestsPerMinute: 60, requestsPerDay: 50000, retryAfterMs: 60000 })
     this.loadKeysFromEnv("WEATHERAPI", { requestsPerMinute: 60, requestsPerDay: 1000000, retryAfterMs: 60000 })
+
+    // NBA providers
+    this.loadKeysFromEnv("BALLDONTLIE", { requestsPerMinute: 60, requestsPerDay: 10000, retryAfterMs: 60000 }, [
+      "API_STORE_BALLDONTLIE",
+    ])
+    this.loadKeysFromEnv("ODDS", { requestsPerMinute: 10, requestsPerDay: 5000, retryAfterMs: 120000 }, [
+      "THE_ODDS",
+      "ODDS_API",
+      "API_STORE_ODDS_API",
+    ])
+    this.loadKeysFromEnv("ODDS_BET365", { requestsPerMinute: 10, requestsPerDay: 5000, retryAfterMs: 120000 }, [
+      "ODDS_BET365_API",
+      "BET365_API_KEY",
+      "ODDS_BET365_KEY",
+    ])
+    this.loadKeysFromEnv("PARLAY", { requestsPerMinute: 10, requestsPerDay: 5000, retryAfterMs: 120000 }, [
+      "PARLAY_API",
+    ])
+    this.loadKeysFromEnv("POLYMARKET", { requestsPerMinute: 50, requestsPerDay: 20000, retryAfterMs: 60000 })
 
     this.log.info("key manager initialization complete", {
       providers: this.pools.size,

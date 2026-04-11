@@ -5,10 +5,15 @@ import { useDialog } from "./dialog"
 import { useKeyboard } from "@opentui/solid"
 import type { ProactiveTask, ProactiveTaskRun } from "@/kiloclaw/proactive/scheduler.store"
 import { publishViewNavigation, publishTaskAction } from "@/kiloclaw/telemetry/scheduled-tasks.telemetry"
+import { Log } from "@/util/log"
+import { useToast } from "./toast"
+
+const log = Log.create({ service: "kilocclaw.tui.dialog-task-detail" })
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   active: { label: "Active", color: "green" },
   paused: { label: "Paused", color: "yellow" },
+  running: { label: "Running", color: "cyan" },
   dlq: { label: "Dead Letter", color: "red" },
   completed: { label: "Completed", color: "blue" },
   failed: { label: "Failed", color: "red" },
@@ -35,13 +40,16 @@ export function DialogTaskDetail(props: {
 }) {
   const dialog = useDialog()
   const { theme } = useTheme()
+  const toast = useToast()
 
   // Load task from store
   const task = createMemo(() => {
     try {
       const { ProactiveTaskStore } = require("@/kiloclaw/proactive/scheduler.store")
       return ProactiveTaskStore.get(props.taskId)
-    } catch {
+    } catch (err) {
+      log.error("failed to load task", { taskId: props.taskId, err })
+      toast.show({ variant: "error", message: "Failed to load task details", duration: 3000 })
       return null
     }
   })
@@ -51,7 +59,8 @@ export function DialogTaskDetail(props: {
     try {
       const { ProactiveTaskStore } = require("@/kiloclaw/proactive/scheduler.store")
       return ProactiveTaskStore.getRuns(props.taskId, 3)
-    } catch {
+    } catch (err) {
+      log.warn("failed to load recent runs", { taskId: props.taskId, err })
       return [] as ProactiveTaskRun[]
     }
   })
@@ -107,7 +116,9 @@ export function DialogTaskDetail(props: {
     )
   }
 
-  const status = STATUS_LABELS[t.status] ?? { label: t.status, color: "white" }
+  // Use state for running visibility (Phase 2 RCA-09), fall back to status
+  const displayState = t.state === "running" ? "running" : t.status
+  const status = STATUS_LABELS[displayState] ?? { label: displayState, color: "white" }
   const cfg = config()
 
   return (
@@ -118,6 +129,7 @@ export function DialogTaskDetail(props: {
           <text attributes={TextAttributes.BOLD} fg={theme.primary}>
             {t.name}
           </text>
+          <text fg={theme.textMuted}>{t.ref}</text>
           <text fg={theme.textMuted}>{t.id}</text>
         </box>
         <box flexDirection="row" gap={1}>

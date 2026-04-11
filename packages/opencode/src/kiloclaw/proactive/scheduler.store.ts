@@ -31,11 +31,19 @@ export type TaskState = z.infer<typeof TaskState>
 export const RunType = z.enum(["scheduled", "manual", "replay"])
 export type RunType = z.infer<typeof RunType>
 
-export const RunOutcome = z.enum(["success", "failed", "blocked", "budget_exceeded", "policy_denied"])
+export const RunOutcome = z.enum([
+  "success",
+  "failed",
+  "blocked",
+  "budget_exceeded",
+  "policy_denied",
+  "executor_missing",
+])
 export type RunOutcome = z.infer<typeof RunOutcome>
 
 export const ProactiveTaskSchema = z.object({
   id: z.string(),
+  ref: z.string(),
   tenantId: z.string(),
   name: z.string(),
   triggerConfig: z.string(),
@@ -105,6 +113,7 @@ export const CreateTaskInputSchema = ProactiveTaskSchema.omit({
   .partial()
   .extend({
     id: z.string(),
+    ref: z.string().optional(),
     tenantId: z.string(),
     name: z.string(),
     triggerConfig: z.string(),
@@ -120,6 +129,7 @@ export const UpdateTaskInputSchema = z.object({
   scheduleCron: z.string().nullable().optional(),
   nextRunAt: z.number().nullable().optional(),
   status: TaskStatus.optional(),
+  state: TaskState.optional(),
   retryCount: z.number().int().nonnegative().optional(),
   maxRetries: z.number().int().positive().optional(),
   lastError: z.string().nullable().optional(),
@@ -206,6 +216,7 @@ export type ReleaseLeaseInput = z.infer<typeof ReleaseLeaseInputSchema>
 export const PROACTIVE_TABLES_SQL = `
 CREATE TABLE IF NOT EXISTS proactive_tasks (
   id TEXT PRIMARY KEY,
+  ref TEXT UNIQUE,
   tenant_id TEXT NOT NULL,
   name TEXT NOT NULL,
   trigger_config TEXT NOT NULL,
@@ -227,6 +238,7 @@ CREATE TABLE IF NOT EXISTS proactive_tasks (
 );
 
 CREATE INDEX IF NOT EXISTS proactive_task_tenant_idx ON proactive_tasks(tenant_id);
+CREATE UNIQUE INDEX IF NOT EXISTS proactive_task_ref_idx ON proactive_tasks(ref);
 CREATE INDEX IF NOT EXISTS proactive_task_status_idx ON proactive_tasks(status);
 CREATE INDEX IF NOT EXISTS proactive_task_state_idx ON proactive_tasks(state);
 CREATE INDEX IF NOT EXISTS proactive_task_next_run_idx ON proactive_tasks(next_run_at) WHERE next_run_at IS NOT NULL;
@@ -288,15 +300,18 @@ CREATE INDEX IF NOT EXISTS proactive_lease_expires_idx ON proactive_runtime_leas
 
 /**
  * Get the path for the proactive task database.
- * Uses XDG_DATA_HOME/.kiloclaw/proactive.db to match the rest of the system.
+ * Canonical path: $XDG_DATA_HOME/kiloclaw/.kilocode/proactive.db (or $HOME/.local/share/kiloclaw/.kilocode/proactive.db)
+ * This aligns with the install service which sets KILOCLAW_PROACTIVE_DB_PATH to the same location.
+ * Override with KILOCLAW_PROACTIVE_DB_PATH env var for testing or custom paths.
  */
 function getProactiveDbPath(): string {
   if (process.env["KILOCLAW_PROACTIVE_DB_PATH"]) {
     return process.env["KILOCLAW_PROACTIVE_DB_PATH"]!
   }
-  const xdgDataHome =
-    process.env["XDG_DATA_HOME"] ?? join(process.env["HOME"] ?? "/home/fulvio", ".local", "share", "kiloclaw")
-  return join(xdgDataHome, ".kiloclaw", "proactive.db")
+  // Canonical path: XDG_DATA_HOME/kiloclaw/.kilocode/proactive.db
+  // This matches what install service sets in daemon.ts
+  const xdgDataHome = process.env["XDG_DATA_HOME"] ?? join(process.env["HOME"] ?? "", ".local", "share", "kiloclaw")
+  return join(xdgDataHome, ".kilocode", "proactive.db")
 }
 
 const PROACTIVE_DB_PATH = getProactiveDbPath()
@@ -314,6 +329,11 @@ const dlqCache = new Map<string, ProactiveDlqEntry>()
 const leaseCache = new Map<string, RuntimeLease>()
 
 const log = Log.create({ service: "kilocclaw.proactive.scheduler.store" })
+const REF = "tsk_"
+
+export type ResolveTaskSelectorResult =
+  | { ok: true; task: ProactiveTask }
+  | { ok: false; code: "not_found" | "ambiguous"; matches: ProactiveTask[] }
 
 // =============================================================================
 // Helper functions
@@ -331,6 +351,7 @@ function initDb(): void {
     _sqlite.exec(PROACTIVE_TABLES_SQL)
     ensureRunColumns()
     ensureTaskColumns()
+    ensureTaskRefs()
     _dbInitialized = true
     log.info("proactive database initialized", { path: PROACTIVE_DB_PATH })
   } catch (err) {
@@ -356,13 +377,17 @@ function ensureRunColumns(): void {
   for (const [name, kind] of cols) {
     try {
       _sqlite.run(`ALTER TABLE proactive_task_runs ADD COLUMN ${name} ${kind}`)
-    } catch {}
+    } catch (err) {
+      // Column may already exist, ignore
+      log.warn("ensureRunColumns: ALTER TABLE ADD COLUMN failed (column may exist)", { column: name, err })
+    }
   }
 }
 
 function ensureTaskColumns(): void {
   if (!_sqlite) return
   const cols = [
+    ["ref", "TEXT"],
     ["schedule_type", "TEXT NOT NULL DEFAULT 'recurring'"],
     ["timezone", "TEXT"],
     ["display_schedule", "TEXT"],
@@ -374,7 +399,78 @@ function ensureTaskColumns(): void {
   for (const [name, kind] of cols) {
     try {
       _sqlite.run(`ALTER TABLE proactive_tasks ADD COLUMN ${name} ${kind}`)
-    } catch {}
+    } catch (err) {
+      // Column may already exist, ignore
+      log.warn("ensureTaskColumns: ALTER TABLE ADD COLUMN failed (column may exist)", { column: name, err })
+    }
+  }
+
+  try {
+    _sqlite.run("CREATE UNIQUE INDEX IF NOT EXISTS proactive_task_ref_idx ON proactive_tasks(ref)")
+  } catch (err) {
+    log.warn("ensureTaskColumns: failed creating proactive_task_ref_idx", { err })
+  }
+}
+
+function compact(id: string): string {
+  return id.toLowerCase().replace(/[^a-z0-9]/g, "")
+}
+
+function fallbackRef(id: string): string {
+  const raw = compact(id)
+  const base = raw.length >= 8 ? raw.slice(0, 8) : raw.padEnd(8, "0")
+  return `${REF}${base}`
+}
+
+function hasRef(ref: string, skip?: string): boolean {
+  if (_sqlite) {
+    const row = _sqlite.prepare("SELECT id FROM proactive_tasks WHERE ref = ? LIMIT 1").get(ref) as
+      | { id: string }
+      | undefined
+    if (!row) return false
+    return skip ? row.id !== skip : true
+  }
+
+  for (const task of taskCache.values()) {
+    if (task.ref !== ref) continue
+    if (skip && task.id === skip) continue
+    return true
+  }
+
+  return false
+}
+
+function uniqueRef(id: string): string {
+  const raw = compact(id)
+  const sizes = [8, 10, 12, 14, 16, 20]
+  for (const size of sizes) {
+    const base = raw.length >= size ? raw.slice(0, size) : raw.padEnd(size, "0")
+    const candidate = `${REF}${base}`
+    if (!hasRef(candidate)) return candidate
+  }
+
+  const extra = compact(crypto.randomUUID()).slice(0, 12)
+  const randomRef = `${REF}${extra}`
+  if (!hasRef(randomRef)) return randomRef
+
+  const stamp = Date.now().toString(36)
+  return `${REF}${extra}${stamp}`
+}
+
+function ensureTaskRefs(): void {
+  if (!_sqlite) return
+  try {
+    const rows = _sqlite.prepare("SELECT id, ref FROM proactive_tasks").all() as Array<{
+      id: string
+      ref: string | null
+    }>
+    for (const row of rows) {
+      if (typeof row.ref === "string" && row.ref.trim().length > 0) continue
+      const ref = uniqueRef(row.id)
+      _sqlite.prepare("UPDATE proactive_tasks SET ref = ? WHERE id = ?").run(ref, row.id)
+    }
+  } catch (err) {
+    log.warn("ensureTaskRefs: failed to backfill refs", { err })
   }
 }
 
@@ -382,9 +478,29 @@ function now(): number {
   return Date.now()
 }
 
+function stateFromStatus(input: TaskStatus): TaskState {
+  if (input === "active") return "active"
+  if (input === "paused") return "paused"
+  if (input === "completed") return "completed"
+  if (input === "dlq") return "dlq"
+  return "failed"
+}
+
+function statusFromState(input: TaskState): TaskStatus {
+  if (input === "active") return "active"
+  if (input === "paused") return "paused"
+  if (input === "completed") return "completed"
+  if (input === "dlq") return "dlq"
+  if (input === "running") return "active"
+  if (input === "archived") return "completed"
+  return "failed"
+}
+
 function rowToTask(row: Record<string, unknown>): ProactiveTask {
+  const id = row["id"] as string
   return {
-    id: row["id"] as string,
+    id,
+    ref: (row["ref"] as string | null) ?? fallbackRef(id),
     tenantId: row["tenant_id"] as string,
     name: row["name"] as string,
     triggerConfig: row["trigger_config"] as string,
@@ -464,8 +580,10 @@ type SqlBindings = string | number | null
 export const ProactiveTaskStore = {
   create(input: CreateTaskInput): ProactiveTask {
     const timestamp = now()
+    const ref = input.ref ?? uniqueRef(input.id)
     const task: ProactiveTask = {
       id: input.id,
+      ref,
       tenantId: input.tenantId,
       name: input.name,
       triggerConfig: input.triggerConfig,
@@ -491,11 +609,12 @@ export const ProactiveTaskStore = {
     if (_sqlite) {
       try {
         const stmt = _sqlite.prepare(
-          `INSERT INTO proactive_tasks (id, tenant_id, name, trigger_config, schedule_cron, schedule_type, timezone, display_schedule, next_run_at, last_scheduled_for, status, state, archived_at, completed_at, retry_count, max_retries, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO proactive_tasks (id, ref, tenant_id, name, trigger_config, schedule_cron, schedule_type, timezone, display_schedule, next_run_at, last_scheduled_for, status, state, archived_at, completed_at, retry_count, max_retries, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         stmt.run(
           task.id,
+          task.ref,
           task.tenantId,
           task.name,
           task.triggerConfig,
@@ -544,6 +663,54 @@ export const ProactiveTaskStore = {
     return taskCache.get(id) ?? null
   },
 
+  getByRef(ref: string): ProactiveTask | null {
+    if (!_dbInitialized) initDb()
+
+    if (_sqlite) {
+      try {
+        const row = _sqlite.prepare("SELECT * FROM proactive_tasks WHERE ref = ?").get(ref) as
+          | Record<string, unknown>
+          | undefined
+        if (!row) return null
+        return rowToTask(row)
+      } catch {
+        // Fall back to memory
+      }
+    }
+
+    for (const task of taskCache.values()) {
+      if (task.ref === ref) return task
+    }
+    return null
+  },
+
+  resolveSelector(selector: string, tenantId: string): ResolveTaskSelectorResult {
+    const raw = selector.trim()
+    if (!raw) return { ok: false, code: "not_found", matches: [] }
+
+    const byId = this.get(raw)
+    if (byId && byId.tenantId === tenantId) return { ok: true, task: byId }
+
+    const byRef = this.getByRef(raw)
+    if (byRef && byRef.tenantId === tenantId) return { ok: true, task: byRef }
+
+    const tasks = this.list(tenantId)
+    const lower = raw.toLowerCase()
+    const names = tasks.filter((task) => task.name.toLowerCase() === lower)
+    if (names.length === 1) return { ok: true, task: names[0] }
+    if (names.length > 1) return { ok: false, code: "ambiguous", matches: names }
+
+    const refs = tasks.filter((task) => task.ref.startsWith(raw))
+    if (refs.length === 1) return { ok: true, task: refs[0] }
+    if (refs.length > 1) return { ok: false, code: "ambiguous", matches: refs }
+
+    const index = /^#?(\d+)$/.exec(raw)
+    if (!index) return { ok: false, code: "not_found", matches: [] }
+    const value = Number.parseInt(index[1] ?? "0", 10)
+    if (value <= 0 || value > tasks.length) return { ok: false, code: "not_found", matches: [] }
+    return { ok: true, task: tasks[value - 1]! }
+  },
+
   update(id: string, updates: UpdateTaskInput): ProactiveTask | null {
     const existing = this.get(id)
     if (!existing) return null
@@ -554,6 +721,8 @@ export const ProactiveTaskStore = {
       try {
         const sets: string[] = []
         const values: SqlBindings[] = []
+        const state = updates.state ?? (updates.status ? stateFromStatus(updates.status) : undefined)
+        const status = updates.status ?? (updates.state ? statusFromState(updates.state) : undefined)
 
         if (updates.name !== undefined) {
           sets.push("name = ?")
@@ -571,9 +740,13 @@ export const ProactiveTaskStore = {
           sets.push("next_run_at = ?")
           values.push(updates.nextRunAt ?? null)
         }
-        if (updates.status !== undefined) {
+        if (status !== undefined) {
           sets.push("status = ?")
-          values.push(updates.status)
+          values.push(status)
+        }
+        if (state !== undefined) {
+          sets.push("state = ?")
+          values.push(state)
         }
         if (updates.retryCount !== undefined) {
           sets.push("retry_count = ?")
@@ -600,13 +773,17 @@ export const ProactiveTaskStore = {
       }
     }
 
+    const state = updates.state ?? (updates.status ? stateFromStatus(updates.status) : existing.state)
+    const status = updates.status ?? (updates.state ? statusFromState(updates.state) : existing.status)
+
     const updated: ProactiveTask = {
       ...existing,
       name: updates.name ?? existing.name,
       triggerConfig: updates.triggerConfig ?? existing.triggerConfig,
       scheduleCron: updates.scheduleCron !== undefined ? (updates.scheduleCron ?? null) : existing.scheduleCron,
       nextRunAt: updates.nextRunAt !== undefined ? (updates.nextRunAt ?? null) : existing.nextRunAt,
-      status: updates.status ?? existing.status,
+      status,
+      state,
       retryCount: updates.retryCount ?? existing.retryCount,
       maxRetries: updates.maxRetries ?? existing.maxRetries,
       lastError: updates.lastError !== undefined ? (updates.lastError ?? null) : existing.lastError,
@@ -667,7 +844,7 @@ export const ProactiveTaskStore = {
     if (_sqlite) {
       try {
         let query =
-          "SELECT * FROM proactive_tasks WHERE status = 'active' AND next_run_at IS NOT NULL AND next_run_at <= ? ORDER BY next_run_at ASC"
+          "SELECT * FROM proactive_tasks WHERE (state = 'active' OR (state IS NULL AND status = 'active')) AND next_run_at IS NOT NULL AND next_run_at <= ? ORDER BY next_run_at ASC"
 
         if (limit) {
           query += " LIMIT ?"
@@ -683,7 +860,10 @@ export const ProactiveTaskStore = {
       }
     }
 
-    return [...taskCache.values()].filter((t) => t.status === "active" && t.nextRunAt != null && t.nextRunAt <= before)
+    return [...taskCache.values()].filter((t) => {
+      const active = t.state === "active" || (t.state == null && t.status === "active")
+      return active && t.nextRunAt != null && t.nextRunAt <= before
+    })
   },
 
   recordRun(input: RecordRunInput): ProactiveTaskRun {

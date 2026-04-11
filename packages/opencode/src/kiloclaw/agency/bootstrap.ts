@@ -139,6 +139,33 @@ const agencyDefinitions: AgencyDefinition[] = [
     providers: ["googleapis_native", "google_workspace_mcp"],
     metadata: { wave: 3, description: "Gmail, Calendar, Drive, Docs, and Sheets operations" },
   },
+  {
+    id: "agency-nba",
+    name: "NBA Betting Agency",
+    domain: "nba",
+    policies: {
+      allowedCapabilities: [
+        "schedule_live",
+        "team_player_stats",
+        "injury_status",
+        "odds_markets",
+        "probability_estimation",
+        "vig_removal",
+        "edge_detection",
+        "calibration_monitoring",
+        "game_preview",
+        "value_watchlist",
+        "recommendation_report",
+        "stake_sizing",
+      ],
+      deniedCapabilities: ["auto_bet", "auto_bet_execution", "execution_orders", "martingale"],
+      maxRetries: 3,
+      requiresApproval: true,
+      dataClassification: "internal",
+    },
+    providers: ["espn", "balldontlie", "odds_api", "odds_bet365", "parlay", "polymarket", "nba_api"],
+    metadata: { wave: 3, description: "NBA data ingestion, probability analytics, and guarded recommendations" },
+  },
 ]
 
 // Pre-defined skill chains for knowledge agency
@@ -177,6 +204,59 @@ const chainDefinitions: SkillChain[] = [
   },
 ]
 
+const gworkspaceSkillDefinitions: SkillDefinition[] = [
+  {
+    id: "gworkspace-gmail-search",
+    name: "Google Workspace Gmail Search",
+    version: "1.0.0",
+    description: "Search Gmail messages via Google Workspace agency",
+    inputSchema: {},
+    outputSchema: {},
+    capabilities: ["gmail.search", "search"],
+    tags: ["gworkspace", "gmail"],
+  },
+  {
+    id: "gworkspace-drive-search",
+    name: "Google Workspace Drive Search",
+    version: "1.0.0",
+    description: "Search Google Drive files via Google Workspace agency",
+    inputSchema: {},
+    outputSchema: {},
+    capabilities: ["drive.search", "drive.list", "drive.read"],
+    tags: ["gworkspace", "drive"],
+  },
+  {
+    id: "gworkspace-calendar-list",
+    name: "Google Workspace Calendar List",
+    version: "1.0.0",
+    description: "List Calendar events via Google Workspace agency",
+    inputSchema: {},
+    outputSchema: {},
+    capabilities: ["calendar.list", "calendar.read"],
+    tags: ["gworkspace", "calendar"],
+  },
+  {
+    id: "gworkspace-docs-read",
+    name: "Google Workspace Docs Read",
+    version: "1.0.0",
+    description: "Read Google Docs documents via Google Workspace agency",
+    inputSchema: {},
+    outputSchema: {},
+    capabilities: ["docs.read"],
+    tags: ["gworkspace", "docs"],
+  },
+  {
+    id: "gworkspace-sheets-read",
+    name: "Google Workspace Sheets Read",
+    version: "1.0.0",
+    description: "Read Google Sheets spreadsheets via Google Workspace agency",
+    inputSchema: {},
+    outputSchema: {},
+    capabilities: ["sheets.read"],
+    tags: ["gworkspace", "sheets"],
+  },
+]
+
 let bootstrapped = false
 
 /**
@@ -204,6 +284,19 @@ function doBootstrap(): void {
     try {
       const definition = skillToDefinition(skill)
       SkillRegistry.registerSkill(definition)
+      log.debug("skill registered", { skillId: skill.id })
+    } catch (error: any) {
+      if (error?.message?.includes("already registered")) {
+        log.debug("skill already registered", { skillId: skill.id })
+      } else {
+        log.error("failed to register skill", { skillId: skill.id, error: error?.message })
+      }
+    }
+  }
+
+  for (const skill of gworkspaceSkillDefinitions) {
+    try {
+      SkillRegistry.registerSkill(skill)
       log.debug("skill registered", { skillId: skill.id })
     } catch (error: any) {
       if (error?.message?.includes("already registered")) {

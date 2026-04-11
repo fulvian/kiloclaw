@@ -2,12 +2,10 @@ import { TextAttributes } from "@opentui/core"
 import { useTheme } from "@tui/context/theme"
 import { useDialog } from "./dialog"
 import { useKeyboard } from "@opentui/solid"
-import { useKeybind } from "@tui/context/keybind"
 
 export function DialogTaskHelp() {
   const dialog = useDialog()
   const { theme } = useTheme()
-  const keybind = useKeybind()
 
   useKeyboard((evt) => {
     if (evt.name === "return" || evt.name === "escape") {
@@ -32,66 +30,35 @@ export function DialogTaskHelp() {
         <text attributes={TextAttributes.BOLD} fg={theme.primary}>
           Usage
         </text>
-        <text fg={theme.text}>
-          <text fg={theme.primary}>{"  /tasks"}</text>
-          {"          Open task list"}
-        </text>
-        <text fg={theme.text}>
-          <text fg={theme.primary}>{"  /tasks new"}</text>
-          {"         Create new task (wizard)"}
-        </text>
-        <text fg={theme.text}>
-          <text fg={theme.primary}>{"  /tasks new --advanced"}</text>
-          {"   Create with full options"}
-        </text>
-        <text fg={theme.text}>
-          <text fg={theme.primary}>{"  /tasks show <id>"}</text>
-          {"    Show task details"}
-        </text>
-        <text fg={theme.text}>
-          <text fg={theme.primary}>{"  /tasks edit <id>"}</text>
-          {"     Edit task"}
-        </text>
-        <text fg={theme.text}>
-          <text fg={theme.primary}>{"  /tasks list"}</text>
-          {"          List all tasks"}
-        </text>
-        <text fg={theme.text}>
-          <text fg={theme.primary}>{"  /tasks runs <id>"}</text>
-          {"     Show task run history"}
-        </text>
-        <text fg={theme.text}>
-          <text fg={theme.primary}>{"  /tasks dlq"}</text>
-          {"           Show dead letter queue"}
-        </text>
-        <text fg={theme.text}>
-          <text fg={theme.primary}>{"  /tasks pause <id>"}</text>
-          {"    Pause task"}
-        </text>
-        <text fg={theme.text}>
-          <text fg={theme.primary}>{"  /tasks resume <id>"}</text>
-          {"   Resume task"}
-        </text>
-        <text fg={theme.text}>
-          <text fg={theme.primary}>{"  /tasks run <id>"}</text>
-          {"       Run task now"}
-        </text>
-        <text fg={theme.text}>
-          <text fg={theme.primary}>{"  /tasks delete <id>"}</text>
-          {"    Delete task"}
-        </text>
-        <text fg={theme.text}>
-          <text fg={theme.primary}>{"  /tasks replay <dlq>"}</text>
-          {"   Replay failed run"}
-        </text>
+        <text fg={theme.text}> /tasks Open task list</text>
+        <text fg={theme.text}> /tasks list List all tasks</text>
+        <text fg={theme.text}> /tasks new Create new task (wizard)</text>
+        <text fg={theme.textMuted}> /tasks show &lt;selector&gt; Show task details</text>
+        <text fg={theme.textMuted}> /tasks edit &lt;selector&gt; Edit task</text>
+        <text fg={theme.text}> /tasks runs &lt;selector&gt; Show task run history</text>
+        <text fg={theme.text}> /tasks dlq Show dead letter queue</text>
+        <text fg={theme.text}> /tasks pause &lt;selector&gt; Pause task</text>
+        <text fg={theme.text}> /tasks resume &lt;selector&gt; Resume task</text>
+        <text fg={theme.text}> /tasks run &lt;selector&gt; Run task immediately</text>
+        <text fg={theme.text}> /tasks delete &lt;selector&gt; Delete task (with confirmation)</text>
       </box>
       <box flexDirection="column" gap={0} paddingTop={1}>
         <text attributes={TextAttributes.BOLD} fg={theme.primary}>
-          Examples
+          Selector
         </text>
-        <text fg={theme.textMuted}>{"  /tasks new --preset daily-09:00"}</text>
-        <text fg={theme.textMuted}>{"  /tasks show task_01HZYF4S8M0V6Y6Q7C2N2J9R5A"}</text>
-        <text fg={theme.textMuted}>{"  /tasks runs task_01HZYF4S8M0V6Y6Q7C2N2J9R5A --failed"}</text>
+        <text fg={theme.textMuted}> Allowed forms: task ref, full id, #index in list, exact task name</text>
+        <text fg={theme.textMuted}> Names with spaces are supported directly or quoted</text>
+        <text fg={theme.textMuted}> Example: /tasks show weekly report check</text>
+        <text fg={theme.textMuted}> Example: /tasks show "weekly report check"</text>
+      </box>
+      <box flexDirection="column" gap={0} paddingTop={1}>
+        <text attributes={TextAttributes.BOLD} fg={theme.primary}>
+          Quick Actions
+        </text>
+        <text fg={theme.textMuted}> From task list: click a task to open detail</text>
+        <text fg={theme.textMuted}> From detail: Edit button opens wizard</text>
+        <text fg={theme.textMuted}> From detail: Pause/Resume/Run now buttons</text>
+        <text fg={theme.textMuted}> Delete is available in detail footer</text>
       </box>
       <box flexDirection="row" justifyContent="flex-end" paddingTop={1}>
         <box paddingLeft={3} paddingRight={3} backgroundColor={theme.primary} onMouseUp={() => dialog.clear()}>

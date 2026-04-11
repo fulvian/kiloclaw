@@ -123,7 +123,10 @@ export namespace CapabilityRouter {
    * Route a task intent to the best matching skill, chain, or agent
    */
   export function routeTask(taskIntent: TaskIntent, agency?: string): RouteResult {
-    const capabilities = extractCapabilitiesFromIntent(taskIntent)
+    const extracted = extractCapabilitiesFromIntent(taskIntent)
+    const allowedCaps = agency ? AgencyRegistry.getAllowedCapabilities(agency) : []
+    const capabilities =
+      agency && allowedCaps.length > 0 ? extracted.filter((cap) => allowedCaps.includes(cap)) : extracted
     log.debug("routing task", { intent: taskIntent.intent, capabilities, agency })
 
     // Check agency policies if agency is specified
@@ -138,7 +141,11 @@ export namespace CapabilityRouter {
 
     // 1. Try to find a matching skill
     if (capabilities.length > 0) {
-      const skills = SkillRegistry.findByCapabilities(capabilities)
+      const skills = SkillRegistry.findByCapabilities(capabilities).filter((skill) => {
+        if (!agency) return true
+        if (allowedCaps.length === 0) return true
+        return skill.capabilities.some((cap) => allowedCaps.includes(cap))
+      })
       const bestSkill = findBestSkill(skills, capabilities)
       if (bestSkill) {
         const score = calculateMatchScore(bestSkill.capabilities, capabilities)

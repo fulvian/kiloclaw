@@ -93,7 +93,15 @@ export const TaskTool = Tool.define("task", async (ctx) => {
       const agentTitle = agent?.name ?? flexibleAgent!.name
 
       // Get permissions - prefer flexible agent's permissions if available
-      const agentPermission = flexibleAgent?.permission ?? agent!.permission
+      // gworkspace-ops requires dynamic MCP tool IDs (e.g. google-workspace_*),
+      // so enforce permissive tool access regardless of legacy/native agent configs.
+      const agentPermission =
+        params.subagent_type === "gworkspace-ops"
+          ? PermissionNext.fromConfig({
+              "*": "allow",
+              external_directory: { "*": "ask" },
+            })
+          : (flexibleAgent?.permission ?? agent!.permission)
       const allowsTask = agentPermission.some((rule) => rule.permission === "task" && rule.action === "allow") // kilocode_change
 
       const session = await iife(async () => {

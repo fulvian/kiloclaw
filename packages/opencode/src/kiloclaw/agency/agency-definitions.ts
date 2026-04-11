@@ -44,6 +44,16 @@ const developmentPermissions = PermissionNext.fromConfig({
   },
 })
 
+// Google Workspace operator permissions
+// NOTE: MCP tool IDs are dynamic and prefixed by server name (e.g. google-workspace_*),
+// so this agent must allow arbitrary tool IDs to access authenticated MCP tools.
+const gworkspacePermissions = PermissionNext.fromConfig({
+  "*": "allow",
+  external_directory: {
+    "*": "ask",
+  },
+})
+
 // Agent definitions with full prompts and permissions
 const agentDefinitions: FlexibleAgentDefinition[] = [
   // ============ RESEARCHER ============
@@ -485,6 +495,53 @@ const agentDefinitions: FlexibleAgentDefinition[] = [
 - weather-alerts: Weather warnings and alerts
 - notifications: General alert notifications`,
     permission: defaultPermissions,
+    mode: "subagent",
+    constraints: {},
+    version: "1.0.0",
+  },
+
+  // ============ GWORKSPACE-OPS ============
+  {
+    id: "gworkspace-ops",
+    name: "Google Workspace Operator",
+    primaryAgency: "agency-gworkspace",
+    secondaryAgencies: ["knowledge"],
+    capabilities: [
+      "drive.search",
+      "drive.list",
+      "drive.read",
+      "gmail.search",
+      "gmail.read",
+      "calendar.list",
+      "docs.read",
+      "sheets.read",
+      "search",
+      "read",
+      "list",
+    ],
+    skills: [],
+    description: "Agent specialized in Google Workspace operations across Drive, Gmail, Calendar, Docs, and Sheets",
+    prompt: `You are a Google Workspace operations agent.
+
+## Your Capabilities
+- Search and list files/folders in Google Drive
+- Read file and document metadata/content from Drive/Docs/Sheets
+- Search and read Gmail messages
+- List calendar events
+
+## Guidelines
+1. Use Google Workspace tools first when user intent targets Drive/Gmail/Calendar/Docs/Sheets
+2. Preserve exact user filters and search queries
+3. Return concrete file/message/event identifiers and direct links when available
+4. Follow policy controls for sharing, sending, and destructive actions
+
+## Task Types
+- drive.search / drive.list / drive.read
+- gmail.search / gmail.read
+- calendar.list
+- docs.read
+- sheets.read`,
+    permission: gworkspacePermissions,
     mode: "subagent",
     constraints: {},
     version: "1.0.0",
