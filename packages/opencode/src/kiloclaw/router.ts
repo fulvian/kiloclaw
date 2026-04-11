@@ -224,6 +224,36 @@ export const Router = {
     const log = Log.create({ service: "kiloclaw.router" })
     const domainHandlers = new Map<string, (intent: Intent) => Promise<AgencyAssignment["agencyId"]>>()
 
+    // Core keywords that should give immediate boost (highly domain-specific)
+    const CORE_KEYWORDS: Record<string, string[]> = {
+      nba: [
+        "nba",
+        "basketball",
+        "basket",
+        "scommesse",
+        "scommessa",
+        "quote",
+        "quota",
+        "odds",
+        "betting",
+        "partita",
+        "partite",
+        "stagione",
+        "playoffs",
+        "injury",
+        "infortunio",
+        " roster",
+        "giocatore",
+        "giocatori",
+        "squadre",
+      ],
+      weather: ["weather", "meteo", "forecast", "temperatura", "pioggia"],
+      development: ["code", "debug", "build", "deploy", "git", "function", "class", "react", "component"],
+      knowledge: ["search", "research", "find", "lookup", "document", "information"],
+      nutrition: ["nutrition", "diet", "food", "recipe", "calories", "macros", "proteins"],
+      gworkspace: ["gmail", "drive", "calendar", "docs", "sheets", "workspace"],
+    }
+
     // Calculate keyword match score
     function keywordScore(intent: Intent, domain: string): number {
       const keywords = DOMAIN_KEYWORDS[domain]
@@ -231,13 +261,29 @@ export const Router = {
 
       const text = norm(`${intent.type} ${intent.description}`)
       const toks = text.split(/[^a-z0-9]+/).filter(Boolean)
+      const coreKeywords = CORE_KEYWORDS[domain] || []
+
+      // Check for core keyword matches (high-value specific keywords)
+      const coreMatches = coreKeywords.filter((core) => {
+        const key = norm(core.trim())
+        if (!key) return false
+        if (key.includes(" ")) return text.includes(key)
+        return toks.some((tok) => tokenMatch(tok, key))
+      }).length
+
       const matches = keywords.filter((raw) => {
         const key = norm(raw.trim())
         if (!key) return false
         if (key.includes(" ")) return text.includes(key)
         return toks.some((tok) => tokenMatch(tok, key))
       }).length
-      const base = matches / keywords.length
+
+      // Use sqrt scaling to not overly penalize short queries with few matches
+      // Also add bonus for core keyword matches
+      const baseScaled = Math.sqrt(matches / keywords.length)
+      const coreBonus = coreMatches > 0 ? 0.2 + coreMatches * 0.1 : 0
+      const base = Math.min(0.7, baseScaled * 0.7) // Cap base at 0.7 to leave room for boosts
+
       const type = norm(intent.type)
       const typeBoost =
         domain === "weather" && type.includes("weather")
@@ -264,7 +310,7 @@ export const Router = {
                         type.includes("score"))
                     ? 0.25
                     : 0
-      return Math.min(1, base + typeBoost)
+      return Math.min(1, base + coreBonus + typeBoost)
     }
 
     // Calculate risk-adjusted score

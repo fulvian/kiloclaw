@@ -6,6 +6,7 @@ import { Flag } from "@/flag/flag"
 import { Router, type IntentRouter } from "../../../router"
 import { SemanticRouter, getSemanticRouter } from "./semantic-router"
 import { bootstrapAllCapabilities } from "./bootstrap"
+import { bootstrapRegistries } from "../../bootstrap"
 import type { SemanticIntent } from "./types"
 import type { Intent, AgencyAssignment } from "../../../types"
 
@@ -52,6 +53,9 @@ export const HybridRouter = {
    * Create a hybrid router that uses semantic routing with keyword fallback
    */
   create: (): HybridIntentRouter => {
+    // Bootstrap registries (agencies, skills, agents, chains) before routing
+    bootstrapRegistries()
+
     const keywordRouter = Router.create({})
     let semanticRouter: SemanticRouter | null = null
 
