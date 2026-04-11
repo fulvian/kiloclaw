@@ -874,46 +874,92 @@ export namespace SessionPrompt {
       }
 
       // kilocode_change start - Inject agency context into system prompt for knowledge agency
-      if (Flag.KILO_ROUTING_AGENCY_CONTEXT_ENABLED && agencyContext && agencyContext.agencyId === "agency-knowledge") {
-        const agencyBlock = [
-          "",
-          "<!-- Agency Context: Knowledge Agency -->",
-          "This conversation has been routed to the Knowledge Agency.",
-          `Routing confidence: ${Math.round(agencyContext.confidence * 100)}%`,
-          `Routing reason: ${agencyContext.reason}`,
-          `Routing source: ${agencyContext.routeSource}`,
-          ...(agencyContext.fallbackUsed ? [`Routing fallback: ${agencyContext.fallbackReason ?? "none"}`] : []),
-          ...(agencyContext.layers?.L1
-            ? [
-                `L1 capabilities: ${agencyContext.layers.L1.capabilities.join(", ") || "none"}`,
-                `L1 route type: ${agencyContext.layers.L1.routeResult?.type ?? "fallback"}`,
-              ]
-            : []),
-          ...(agencyContext.layers?.L2
-            ? [
-                `L2 agent: ${agencyContext.layers.L2.agentId ?? "none"}`,
-                `L2 health: ${agencyContext.layers.L2.agentHealth}`,
-              ]
-            : []),
-          ...(agencyContext.layers?.L3
-            ? [
-                `L3 tools denied: ${agencyContext.layers.L3.toolsDenied}`,
-                `L3 fallback used: ${agencyContext.layers.L3.fallbackUsed}`,
-              ]
-            : []),
-          "",
-          "CRITICAL TOOL INSTRUCTIONS:",
-          "- For web search, research, and information gathering: use ONLY the 'websearch' tool",
-          "- 'websearch' routes to Tavily/Firecrawl/Brave Search providers via the agency catalog",
-          "- DO NOT use 'codesearch', 'exa_search', 'get_code_context_exa', or any other search tool",
-          "- DO NOT use any MCP-based search tools (like mcp.exa.ai)",
-          "- The only authorized search tool is 'websearch'",
-          "",
-          "Knowledge Agency provides: web search, academic research, fact-checking, synthesis, and critical analysis.",
-          "Available tools: websearch (REQUIRED for search), webfetch, skill (for loading knowledge skills).",
-          "",
-        ].join("\n")
-        system.push(agencyBlock)
+      if (Flag.KILO_ROUTING_AGENCY_CONTEXT_ENABLED && agencyContext) {
+        let agencyBlock = ""
+
+        if (agencyContext.agencyId === "agency-knowledge") {
+          agencyBlock = [
+            "",
+            "<!-- Agency Context: Knowledge Agency -->",
+            "This conversation has been routed to the Knowledge Agency.",
+            `Routing confidence: ${Math.round(agencyContext.confidence * 100)}%`,
+            `Routing reason: ${agencyContext.reason}`,
+            `Routing source: ${agencyContext.routeSource}`,
+            ...(agencyContext.fallbackUsed ? [`Routing fallback: ${agencyContext.fallbackReason ?? "none"}`] : []),
+            ...(agencyContext.layers?.L1
+              ? [
+                  `L1 capabilities: ${agencyContext.layers.L1.capabilities.join(", ") || "none"}`,
+                  `L1 route type: ${agencyContext.layers.L1.routeResult?.type ?? "fallback"}`,
+                ]
+              : []),
+            ...(agencyContext.layers?.L2
+              ? [
+                  `L2 agent: ${agencyContext.layers.L2.agentId ?? "none"}`,
+                  `L2 health: ${agencyContext.layers.L2.agentHealth}`,
+                ]
+              : []),
+            ...(agencyContext.layers?.L3
+              ? [
+                  `L3 tools denied: ${agencyContext.layers.L3.toolsDenied}`,
+                  `L3 fallback used: ${agencyContext.layers.L3.fallbackUsed}`,
+                ]
+              : []),
+            "",
+            "CRITICAL TOOL INSTRUCTIONS:",
+            "- For web search, research, and information gathering: use ONLY the 'websearch' tool",
+            "- 'websearch' routes to Tavily/Firecrawl/Brave Search providers via the agency catalog",
+            "- DO NOT use 'codesearch', 'exa_search', 'get_code_context_exa', or any other search tool",
+            "- DO NOT use any MCP-based search tools (like mcp.exa.ai)",
+            "- The only authorized search tool is 'websearch'",
+            "",
+            "Knowledge Agency provides: web search, academic research, fact-checking, synthesis, and critical analysis.",
+            "Available tools: websearch (REQUIRED for search), webfetch, skill (for loading knowledge skills).",
+            "",
+          ].join("\n")
+        } else if (agencyContext.agencyId === "agency-nba") {
+          agencyBlock = [
+            "",
+            "<!-- Agency Context: NBA Betting Agency -->",
+            "This conversation has been routed to the NBA Betting Agency.",
+            `Routing confidence: ${Math.round(agencyContext.confidence * 100)}%`,
+            `Routing reason: ${agencyContext.reason}`,
+            `Routing source: ${agencyContext.routeSource}`,
+            ...(agencyContext.fallbackUsed ? [`Routing fallback: ${agencyContext.fallbackReason ?? "none"}`] : []),
+            ...(agencyContext.layers?.L1
+              ? [
+                  `L1 capabilities: ${agencyContext.layers.L1.capabilities.join(", ") || "none"}`,
+                  `L1 route type: ${agencyContext.layers.L1.routeResult?.type ?? "fallback"}`,
+                ]
+              : []),
+            ...(agencyContext.layers?.L2
+              ? [
+                  `L2 agent: ${agencyContext.layers.L2.agentId ?? "none"}`,
+                  `L2 health: ${agencyContext.layers.L2.agentHealth}`,
+                ]
+              : []),
+            ...(agencyContext.layers?.L3
+              ? [
+                  `L3 tools denied: ${agencyContext.layers.L3.toolsDenied}`,
+                  `L3 fallback used: ${agencyContext.layers.L3.fallbackUsed}`,
+                ]
+              : []),
+            "",
+            "CRITICAL TOOL INSTRUCTIONS:",
+            "- For NBA analysis, use the 'nba-analysis' skill which provides game data, odds, and betting recommendations",
+            "- DO NOT use generic web search for NBA queries",
+            "- DO NOT make up NBA statistics or odds - use the NBA Agency data providers",
+            "- All betting recommendations require human approval (HITL) before execution",
+            "",
+            "NBA Agency provides: NBA game analysis, betting odds, injury reports, value betting detection, and guarded recommendations.",
+            "Available tools: nba-analysis skill (REQUIRED for NBA queries), webfetch (for supplementary data only).",
+            "IMPORTANT: Never suggest actual bets without clear odds comparison and value assessment.",
+            "",
+          ].join("\n")
+        }
+
+        if (agencyBlock) {
+          system.push(agencyBlock)
+        }
       }
       // kilocode_change end
 
