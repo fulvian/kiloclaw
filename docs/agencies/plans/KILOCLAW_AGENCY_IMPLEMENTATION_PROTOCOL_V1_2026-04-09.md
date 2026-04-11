@@ -404,6 +404,123 @@ Aggiorna la guida ufficiale quando cambia il comportamento operativo o il contra
 
 ---
 
+## Routing Implementation Checklist (Obbligatorio)
+
+Ogni nuova agency richiede la seguente checklist di routing. Senza questa checklist verificata, l'agenzia NON funzionera in produzione.
+
+### A. Aggiunta Domain al type system
+
+```typescript
+// types.ts - Domain enum
+export const Domain = z.enum(["development", "knowledge", "nutrition", "weather", "nba", "custom"])
+```
+
+### B. Aggiunta DOMAIN_KEYWORDS in router.ts
+
+Ogni dominio richiede keywords specifiche con:
+
+1. **CORE_KEYWORDS**: 15-25 termini ad alta specificita per il dominio
+   - Devono essere termini che raramente appaiono in altri domini
+   - Esempio NBA: ["nba", "basketball", "scommesse", "quote", "odds", "partita", "betting"]
+
+2. **EXTENDED_KEYWORDS**: 50-100 termini correlati
+   - Includi sinonimi, termini correlati, e variazioni linguistiche
+   - Include termini sia in inglese che italiano per query multilinguali
+
+### C. Formula di scoring corretta
+
+La formula legacy `matches / totalKeywords` NON funziona per domini con molte keywords. Usare:
+
+```typescript
+// 1. Core keyword bonus (alta priorita per match specifici)
+const coreMatches = coreKeywords.filter((k) => text.includes(k)).length
+const coreBonus = coreMatches > 0 ? 0.2 + coreMatches * 0.1 : 0
+
+// 2. Scaled base score (sqrt per non penalizzare query brevi)
+const baseScaled = Math.sqrt(matches / totalKeywords)
+const base = Math.min(0.7, baseScaled * 0.7) // Cap base at 0.7
+
+// 3. Type boost per query matching il tipo
+const typeBoost = typeIncludes(domainSpecificTerms) ? 0.25 : 0
+
+// 4. Score finale
+return Math.min(1, base + coreBonus + typeBoost)
+```
+
+### D. Bootstrap agencies in HybridRouter (CRITICO)
+
+L'AgencyRegistry deve essere bootstrapped PRIMA del routing. In `hybrid-router.ts`:
+
+```typescript
+export const HybridRouter = {
+  create: (): HybridIntentRouter => {
+    // CRITICAL: Bootstrap agencies before routing
+    bootstrapRegistries()
+    bootstrapAllCapabilities()
+
+    const keywordRouter = Router.create({})
+    // ... resto init
+  },
+}
+```
+
+### E. Bootstrap capabilities
+
+In `agency/routing/semantic/bootstrap.ts`, aggiungere capability bootstrap per il nuovo dominio:
+
+```typescript
+export function bootstrapAllCapabilities(): void {
+  bootstrapDevelopmentCapabilities()
+  bootstrapKnowledgeCapabilities()
+  bootstrapNutritionCapabilities()
+  bootstrapWeatherCapabilities()
+  bootstrapGWorkspaceCapabilities()
+  bootstrapNbaCapabilities() // AGGIUNGERE SEMPRE
+}
+```
+
+### F. Test di routing end-to-end (Obbligatorio per G4)
+
+```typescript
+describe("NBA Routing", () => {
+  it("routes NBA query to agency-nba", async () => {
+    bootstrapRegistries()
+    HybridRouter.reset()
+    const router = HybridRouter.create()
+
+    const intent: Intent = {
+      id: "test-nba-1",
+      type: "query",
+      description: "analizza partite NBA per questa notte",
+      risk: "low",
+    }
+
+    const result = await router.route(intent)
+    expect(result.agencyId).toBe("agency-nba")
+    expect(result.confidence).toBeGreaterThan(0.4) // Minimo 40%
+  })
+})
+```
+
+### G. Gate G4 aggiornato - Routing Verification
+
+Oltre ai test unitari standard, G4 richiede:
+
+- [ ] Routing test per ogni query di esempio dal Discovery Brief
+- [ ] Confidence score >= 40% per query representative
+- [ ] Agency correttamente registrata in AgencyRegistry
+- [ ] Nessun fallback a "custom" o "knowledge" per query del dominio
+
+### H. Fallback domain mapping
+
+Se il routing fallisce, il sistema cade in "custom" che mappa a web-search. Per evitare questo:
+
+- Verificare che il dominio abbia almeno 3 CORE_KEYWORDS
+- Il typeBoost deve essere >= 0.2 per il dominio
+- Se il confidence e < 0.3, investigate - il routing sta fallendo silenziosamente
+
+---
+
 ## Esegui governance finale
 
 Questo protocollo e vincolante per ogni nuova agency e per refactor che cambiano behavior. Se un gate fallisce, il flusso torna alla fase precedente con aggiornamento degli artefatti.
