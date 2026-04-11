@@ -99,6 +99,7 @@ const AGENCY_ENV_MAPPINGS: Record<string, { kiloclaw: string; transform: (v: str
   ARIA_AGENCIES_KNOWLEDGE_ENABLED: { kiloclaw: "KILOCLAW_AGENCY_KNOWLEDGE_ENABLED", transform: (v) => v === "true" },
   ARIA_AGENCIES_NUTRITION_ENABLED: { kiloclaw: "KILOCLAW_AGENCY_NUTRITION_ENABLED", transform: (v) => v === "true" },
   ARIA_AGENCIES_WEATHER_ENABLED: { kiloclaw: "KILOCLAW_AGENCY_WEATHER_ENABLED", transform: (v) => v === "true" },
+  ARIA_AGENCIES_NBA_ENABLED: { kiloclaw: "KILOCLAW_AGENCY_NBA_ENABLED", transform: (v) => v === "true" },
 }
 
 const SCHEDULER_ENV_MAPPINGS: Record<
