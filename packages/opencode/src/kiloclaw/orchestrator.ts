@@ -8,6 +8,7 @@ import { Router } from "./router"
 import { PolicyEngine } from "./policy/engine"
 import { Policy } from "./policy/rules"
 import { AuditStore, type AuditEntry } from "./audit/store"
+import { getOrchestratorMemory } from "./memory.adapter"
 
 // Memory broker interface
 export interface MemoryBroker {
@@ -58,6 +59,7 @@ export const CoreOrchestrator = {
       const auditPath = input.auditPath ?? join(tmpdir(), "kiloclaw", "audit", "events.jsonl")
       const auditStore = AuditStore.create({ path: auditPath })
       const auditLogs: AuditEntry[] = []
+      const mem = getOrchestratorMemory()
       const router = Router.create({})
       const policy = new PolicyEngine({ enableCaching: true, fallbackToConsultative: false })
 
@@ -167,21 +169,7 @@ export const CoreOrchestrator = {
           return out
         },
         memory(): MemoryBroker {
-          const store = new Map<string, unknown>()
-          return {
-            async read(key: string): Promise<unknown> {
-              return store.get(key)
-            },
-            async write(key: string, value: unknown): Promise<void> {
-              store.set(key, value)
-            },
-            async delete(key: string): Promise<void> {
-              store.delete(key)
-            },
-            async list(prefix: string): Promise<string[]> {
-              return [...store.keys()].filter((k) => k.startsWith(prefix))
-            },
-          }
+          return mem
         },
         scheduler(): Scheduler {
           const tasks = new Map<string, { id: string; priority: number; run: () => Promise<void> }>()

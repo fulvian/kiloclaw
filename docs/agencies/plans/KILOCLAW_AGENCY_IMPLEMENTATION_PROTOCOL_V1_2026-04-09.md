@@ -11,6 +11,7 @@ Usa queste fasi in ordine, senza saltare gate. Ogni gate richiede evidenze tracc
 1. **Fase 1 - Discovery con utente**
    - Obiettivo: chiarire bisogni reali, vincoli, rischi, confini operativi
    - Deliverable: `Discovery Brief` approvato
+   - Classifica dominio: `task spot` vs `progetto continuativo`; se `progetto continuativo`, esegui valutazione `LLM Wiki fit check`
    - Gate `G1`: requisiti non ambigui, KPI misurabili, limiti rischio e legali firmati
 
 2. **Fase 2 - Research su tools/skills online**
@@ -45,6 +46,7 @@ Usa queste fasi in ordine, senza saltare gate. Ogni gate richiede evidenze tracc
 La Discovery e una discussione strutturata tra coding agent e utente, con output concreti e verificabili. Niente sviluppo prima di `G1`.
 
 **Template domande pratiche**
+
 - Problema reale: quale risultato operativo deve cambiare da domani
 - Utenti target: chi usa la soluzione, con quale frequenza, in quale contesto
 - Input/output: quali dati entrano, quali dati escono, in quale formato
@@ -57,6 +59,7 @@ La Discovery e una discussione strutturata tra coding agent e utente, con output
 - Successo: KPI iniziali, target, orizzonte temporale, soglia go/no-go
 
 **Output attesi non ambigui**
+
 - Scope in/out in punti numerati
 - User intent principali con esempi reali
 - Casi limite critici
@@ -66,15 +69,23 @@ La Discovery e una discussione strutturata tra coding agent e utente, con output
 - Confini legali espliciti e azioni vietate
 
 **KPI minimi Discovery**
+
 - `% requisiti con criterio di accettazione`: target 100%
 - `% KPI con baseline e target`: target 100%
 - `tempo medio chiarimento requisito critico`: target definito per team
 - `% rischi high con mitigazione`: target 100%
 
 **Limiti rischio e confini legali**
+
 - Definisci soglie hard per perdita dati, azioni irreversibili, costo massimo per run
 - Definisci blocchi legali hard: dati personali, mercati regolati, automazioni vietate
 - Se i confini non sono chiari, stato obbligatorio: `NO-GO`
+
+**LLM Wiki fit check (solo per agency project-oriented)**
+
+- Criteri GO: continuita temporale, conoscenza cumulativa da mantenere, valore di citazione/provenance
+- Criteri NO-GO: richieste one-shot, alta volatilita senza memoria utile
+- Regola architetturale: `LLM Wiki` e artefatto compilato opzionale sopra il sistema 4-layer, non una sostituzione
 
 ---
 
@@ -83,6 +94,7 @@ La Discovery e una discussione strutturata tra coding agent e utente, con output
 Usa un metodo unico per scegliere tra tool nativi e MCP. Registra tutto nel `Tool Decision Record`.
 
 **Metodo di confronto (scorecard)**
+
 - Valuta ogni opzione su scala 1-5 per:
   - performance (latency, throughput, error rate)
   - token/context cost (prompt size, schema size, retries)
@@ -93,6 +105,7 @@ Usa un metodo unico per scegliere tra tool nativi e MCP. Registra tutto nel `Too
 - Calcola score totale e seleziona opzione con miglior tradeoff, non solo punteggio massimo
 
 **Regole decisionali**
+
 - Preferisci native tool se equivalenti e con minore context footprint
 - Usa MCP quando aggiunge capacita necessarie non coperte nativamente
 - Richiedi fallback per tool con affidabilita non provata o SLA assente
@@ -105,6 +118,7 @@ Usa un metodo unico per scegliere tra tool nativi e MCP. Registra tutto nel `Too
 Il design deve mappare in modo esplicito l intera catena operativa. Nessuna capacita implicita.
 
 **Mapping obbligatorio**
+
 - `Intent`: cosa vuole ottenere l utente
 - `Agency`: orchestrazione di alto livello
 - `Agent`: unita esecutiva per sotto-obiettivo
@@ -112,8 +126,10 @@ Il design deve mappare in modo esplicito l intera catena operativa. Nessuna capa
 - `Tool`: capacita concreta invocabile
 
 **Policy obbligatorie**
+
 - Hard deny-by-default su tutte le capability
 - Capability allowlist per agent e per fase
+- Se `LLM Wiki` e approvata, modellala come capability esplicita (`wiki.ingest`, `wiki.query`, `wiki.lint`) con allowlist e budget context dedicato
 - Metadata provider/fallback:
   - provider primario
   - provider fallback
@@ -123,6 +139,7 @@ Il design deve mappare in modo esplicito l intera catena operativa. Nessuna capa
 - Guardrail su azioni esterne e su workspace
 
 **Check context footprint esplicito**
+
 - Numero tool esposti per agent: target minimo necessario
 - Dimensione schema input/output per tool: riduci campi non usati
 - Strategia lazy-loading:
@@ -138,10 +155,12 @@ Il design deve mappare in modo esplicito l intera catena operativa. Nessuna capa
 Implementa solo cio che e approvato in `G3`. Ogni deviazione richiede update del manifest e nuovo review.
 
 **Regole operative**
+
 - Traccia ogni change a requisito Discovery
 - Mantieni configurazioni versionate e replicabili
 - Aggiungi telemetry minima per ogni decisione critica
 - Blocca feature extra non richieste dal perimetro approvato
+- Anti over-engineering: introduci solo capability wiki minime se il fit check e `GO`; default `OFF` negli altri casi
 
 ---
 
@@ -150,12 +169,14 @@ Implementa solo cio che e approvato in `G3`. Ogni deviazione richiede update del
 Usa questa checklist minima prima di `G5`. Tutti i test devono essere ripetibili.
 
 **Checklist test**
+
 - Unit test: logica core, policy gates, fallback routing
 - Integration test: catena Intent -> Tool con dipendenze reali o sandbox fedeli
 - Regression test: casi storici critici e bug fix principali
 - Telemetry contract test: eventi obbligatori, campi richiesti, cardinalita stabile
 
 **Criteri di accettazione**
+
 - 100% test critici verdi
 - Nessun bug severita alta aperto
 - Error budget e latency nei limiti definiti in Discovery
@@ -169,12 +190,14 @@ Usa questa checklist minima prima di `G5`. Tutti i test devono essere ripetibili
 Per domini ad alto rischio, il sistema passa in HITL obbligatorio. Esempi: betting, trading, azioni esterne su workspace.
 
 **Trigger HITL hard**
+
 - Invio ordini o puntate
 - Scrittura/modifica/cancellazione file fuori perimetro consentito
 - Operazioni finanziarie o legali regolamentate
 - Azioni irreversibili o con impatto economico diretto
 
 **Protocollo HITL**
+
 - Step 1: genera piano azione con impatto stimato
 - Step 2: mostra diff/anteprima e rischi
 - Step 3: richiedi approvazione umana esplicita con ID approvatore
@@ -182,6 +205,7 @@ Per domini ad alto rischio, il sistema passa in HITL obbligatorio. Esempi: betti
 - Step 5: genera post-action report e possibilita rollback dove applicabile
 
 **Regola**
+
 - Se approvazione manca, scade o e incoerente: `DENY` automatico
 
 ---
@@ -191,6 +215,7 @@ Per domini ad alto rischio, il sistema passa in HITL obbligatorio. Esempi: betti
 Aggiorna la guida ufficiale quando cambia il comportamento operativo o il contratto di implementazione. Usa PR docs formale.
 
 **Quando aggiornare**
+
 - Nuova fase, gate o criterio di accettazione
 - Nuova policy sicurezza o HITL
 - Nuovo standard mapping o context footprint
@@ -198,6 +223,7 @@ Aggiorna la guida ufficiale quando cambia il comportamento operativo o il contra
 - Introduzione/rimozione tool class o fallback policy
 
 **Processo PR docs**
+
 1. Apri branch docs dedicato
 2. Aggiorna guida canonica e riferimenti correlati
 3. Aggiungi sezione `Change rationale` con impatto e backward compatibility
@@ -215,19 +241,28 @@ Aggiorna la guida ufficiale quando cambia il comportamento operativo o il contra
 # Discovery Brief
 
 ## Contesto
+
 - Problema operativo:
 - Utenti coinvolti:
 - Processo attuale:
 
 ## Obiettivi
+
 - Obiettivo 1:
 - Obiettivo 2:
 
 ## Scope
+
 - In scope:
 - Out of scope:
 
+## LLM Wiki fit check
+
+- Esito: GO | NO-GO | N/A
+- Rationale breve:
+
 ## KPI
+
 - KPI:
   - Formula:
   - Baseline:
@@ -235,12 +270,14 @@ Aggiorna la guida ufficiale quando cambia il comportamento operativo o il contra
   - Finestra misura:
 
 ## Vincoli
+
 - Tecnici:
 - Operativi:
 - Sicurezza:
 - Legali:
 
 ## Rischi
+
 - Rischio:
   - Severita:
   - Probabilita:
@@ -248,6 +285,7 @@ Aggiorna la guida ufficiale quando cambia il comportamento operativo o il contra
   - Limite hard:
 
 ## Decisione gate
+
 - Stato G1: GO | NO-GO
 - Owner:
 - Data:
@@ -259,24 +297,28 @@ Aggiorna la guida ufficiale quando cambia il comportamento operativo o il contra
 # Tool Decision Record
 
 ## Caso d uso
+
 - Intent:
 - Requisiti minimi:
 
 ## Opzioni
+
 - Opzione A (Native):
 - Opzione B (MCP):
 - Opzione C (Ibrida):
 
 ## Scorecard (1-5)
-| Criterio | Peso | A | B | C |
-|---|---:|---:|---:|---:|
-| Performance | 0.20 |  |  |  |
-| Token/context cost | 0.15 |  |  |  |
-| Affidabilita | 0.25 |  |  |  |
-| Sicurezza | 0.30 |  |  |  |
-| Maintenance | 0.10 |  |  |  |
+
+| Criterio           | Peso |   A |   B |   C |
+| ------------------ | ---: | --: | --: | --: |
+| Performance        | 0.20 |     |     |     |
+| Token/context cost | 0.15 |     |     |     |
+| Affidabilita       | 0.25 |     |     |     |
+| Sicurezza          | 0.30 |     |     |     |
+| Maintenance        | 0.10 |     |     |     |
 
 ## Decisione
+
 - Scelta:
 - Rationale:
 - Fallback:
@@ -290,6 +332,7 @@ Aggiorna la guida ufficiale quando cambia il comportamento operativo o il contra
 # Agency Manifest Draft
 
 ## Mapping
+
 - Intent:
 - Agency:
 - Agent:
@@ -297,6 +340,7 @@ Aggiorna la guida ufficiale quando cambia il comportamento operativo o il contra
 - Tool:
 
 ## Policy
+
 - Deny-by-default: true
 - Capability allowlist:
   - agent:
@@ -305,12 +349,14 @@ Aggiorna la guida ufficiale quando cambia il comportamento operativo o il contra
 - Workspace boundaries:
 
 ## Provider metadata
+
 - Primary provider:
 - Fallback provider:
 - Retry policy:
 - Timeout policy:
 
 ## Context footprint
+
 - Tool esposti:
 - Dimensione schema totale:
 - Lazy-loading strategy:
@@ -324,6 +370,7 @@ Aggiorna la guida ufficiale quando cambia il comportamento operativo o il contra
 # Go No-Go Review
 
 ## Stato gate
+
 - G1:
 - G2:
 - G3:
@@ -332,6 +379,7 @@ Aggiorna la guida ufficiale quando cambia il comportamento operativo o il contra
 - G6:
 
 ## Evidenze
+
 - Build:
 - Unit:
 - Integration:
@@ -340,11 +388,13 @@ Aggiorna la guida ufficiale quando cambia il comportamento operativo o il contra
 - Security checks:
 
 ## Rischio residuo
+
 - Livello:
 - Motivazione:
 - Mitigazioni attive:
 
 ## Decisione finale
+
 - Esito: GO | NO-GO
 - Condizioni:
 - Owner:

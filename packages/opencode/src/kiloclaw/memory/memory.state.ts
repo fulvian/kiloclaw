@@ -21,6 +21,7 @@ const log = Log.create({ service: "kiloclaw.memory.state" })
 
 // Maintenance scheduler state
 let maintenanceInterval: ReturnType<typeof setInterval> | null = null
+let maintenanceTimeout: ReturnType<typeof setTimeout> | null = null
 const MAINTENANCE_INTERVAL_MS = 6 * 60 * 60 * 1000 // 6 hours
 
 /**
@@ -32,7 +33,8 @@ function startMaintenanceScheduler(): void {
   // Run initial maintenance after 5 minutes (give system time to settle)
   const initialDelay = 5 * 60 * 1000
 
-  setTimeout(() => {
+  maintenanceTimeout = setTimeout(() => {
+    maintenanceTimeout = null
     log.info("running initial maintenance")
     MemoryMaintenance.run({ dryRun: false }).catch((err) => {
       log.error("initial maintenance failed", { err: String(err) })
@@ -54,8 +56,13 @@ function startMaintenanceScheduler(): void {
  * Stop the maintenance scheduler
  */
 function stopMaintenanceScheduler(): void {
+  if (maintenanceTimeout) {
+    clearTimeout(maintenanceTimeout)
+    maintenanceTimeout = null
+  }
+
   if (maintenanceInterval) {
-    clearTimeout(maintenanceInterval as unknown as number)
+    clearInterval(maintenanceInterval)
     maintenanceInterval = null
     log.info("maintenance scheduler stopped")
   }

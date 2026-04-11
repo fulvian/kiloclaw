@@ -555,17 +555,17 @@ async function postgresSimilaritySearch(
     const rows = await db()
       .select({
         fact: FactTable,
-        distance: sql<string>`(fv.embedding <=> ${embeddingStr}::vector)`,
+        distance: sql<string>`(${FactVectorTable.embedding} <=> ${embeddingStr}::vector)`,
       })
       .from(FactVectorTable)
       .innerJoin(FactTable, eq(FactVectorTable.fact_id, FactTable.id))
       .where(
         and(
           eq(FactTable.tenant_id, tenantId),
-          sql`fv.embedding <=> ${embeddingStr}::vector < 1`, // Only get results with similarity > 0
+          sql`${FactVectorTable.embedding} <=> ${embeddingStr}::vector < 1`, // Only get results with similarity > 0
         ),
       )
-      .orderBy(sql`fv.embedding <=> ${embeddingStr}::vector`)
+      .orderBy(sql`${FactVectorTable.embedding} <=> ${embeddingStr}::vector`)
       .limit(k)
 
     return rows.map((row) => ({

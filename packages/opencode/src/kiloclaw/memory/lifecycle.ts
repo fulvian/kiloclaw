@@ -1,4 +1,5 @@
 import { Log } from "@/util/log"
+import { Flag } from "@/flag/flag"
 import type {
   RunArtifacts,
   MemoryEntry,
@@ -25,6 +26,10 @@ import { memoryBroker, MemoryBroker } from "./broker.js"
 import { semanticMemory } from "./semantic.js"
 import { episodicMemory } from "./episodic.js"
 import { proceduralMemory } from "./procedural.js"
+import { purgeEntry } from "../memory.adapter.js"
+import { MemoryBrokerV2 } from "./memory.broker.v2.js"
+import { EpisodicMemoryRepo, ProceduralMemoryRepo, SemanticMemoryRepo, WorkingMemoryRepo } from "./memory.repository.js"
+import { MemoryRetention } from "./memory.retention.js"
 
 const log = Log.create({ service: "kiloclaw.memory.lifecycle" })
 
@@ -110,6 +115,64 @@ export namespace MemoryLifecycle {
   export async function consolidate(sourceEpisodes: EpisodeId[]): Promise<ConsolidationResult> {
     log.info("starting consolidation", { episodeCount: sourceEpisodes.length })
 
+    if (Flag.KILO_EXPERIMENTAL_MEMORY_V2) {
+      try {
+        const rows = await Promise.all(sourceEpisodes.map((episodeId) => EpisodicMemoryRepo.getEpisode(episodeId)))
+        const episodes = rows.filter((row) => row !== null)
+
+        if (episodes.length === 0) {
+          return {
+            sourceEpisodes,
+            targetEntry: MemoryEntrySchema.parse({
+              id: `mem_${crypto.randomUUID()}` as MemoryId,
+              layer: "semantic",
+              key: "empty_consolidation",
+              value: { message: "No episodes found" },
+              sensitivity: "low",
+              category: "system",
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            }),
+            confidence: 0,
+          }
+        }
+
+        const outcomes = episodes.map((item) => item.outcome)
+        const agencies = [...new Set(episodes.map((item) => item.agency_id).filter((item) => !!item))]
+        const value = {
+          sourceEpisodes,
+          outcomes,
+          agencies,
+          count: episodes.length,
+        }
+        const key = `consolidated:${Date.now()}`
+
+        await MemoryBrokerV2.write({
+          layer: "semantic",
+          key,
+          value,
+          sensitivity: "low",
+        })
+
+        return {
+          sourceEpisodes,
+          targetEntry: MemoryEntrySchema.parse({
+            id: `mem_${crypto.randomUUID()}` as MemoryId,
+            layer: "semantic",
+            key,
+            value,
+            sensitivity: "low",
+            category: "system",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          }),
+          confidence: 0.8,
+        }
+      } catch (err) {
+        log.warn("persistent consolidation unavailable, falling back to legacy", { err: String(err) })
+      }
+    }
+
     // Get episode details
     const episodes = []
     for (const episodeId of sourceEpisodes) {
@@ -153,7 +216,7 @@ export namespace MemoryLifecycle {
    * Purge a single entry
    */
   export async function purge(entryId: MemoryId, reason: PurgeReason): Promise<void> {
-    await memoryBroker.purge(entryId, reason)
+    await purgeEntry(entryId, reason)
     log.info("entry purged", { entryId, reason })
   }
 
@@ -219,6 +282,16 @@ export namespace MemoryLifecycle {
   async function enforceRetention(): Promise<void> {
     log.debug("running retention enforcement")
 
+    if (Flag.KILO_EXPERIMENTAL_MEMORY_V2) {
+      const workingResult = await MemoryRetention.enforcePolicy("default", "working")
+      const episodicResult = await MemoryRetention.enforcePolicy("default", "episodic")
+      log.info("retention enforcement complete", {
+        workingPurged: workingResult.purged,
+        episodicPurged: episodicResult.purged,
+      })
+      return
+    }
+
     const workingPurged = memoryBroker.working().cleanup()
     const episodicPolicy = MemoryBroker.getRetentionPolicy("episodic")
     const episodicPurged = episodicPolicy.ttlMs
@@ -240,6 +313,26 @@ export namespace MemoryLifecycle {
     semantic: { totalFacts: number }
     procedural: { totalProcedures: number; totalPatterns: number }
   }> {
+    if (Flag.KILO_EXPERIMENTAL_MEMORY_V2) {
+      try {
+        const workingMap = await WorkingMemoryRepo.getMany("default", [])
+        const keys = Object.keys(workingMap)
+        const totalEpisodes = await EpisodicMemoryRepo.count("default")
+        const totalEvents = await EpisodicMemoryRepo.countEvents("default")
+        const totalFacts = await SemanticMemoryRepo.count("default")
+        const totalProcedures = await ProceduralMemoryRepo.count("default")
+
+        return {
+          working: { size: keys.length, keys },
+          episodic: { totalEpisodes, totalEvents },
+          semantic: { totalFacts },
+          procedural: { totalProcedures, totalPatterns: 0 },
+        }
+      } catch (err) {
+        log.warn("persistent stats unavailable, falling back to legacy stats", { err: String(err) })
+      }
+    }
+
     const episodicStats = await episodicMemory.getStats()
     const procedures = await memoryBroker.procedural().list()
     const facts = await semanticMemory.query()

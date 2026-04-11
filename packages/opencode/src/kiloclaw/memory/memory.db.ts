@@ -78,6 +78,7 @@ export namespace MemoryDb {
 let _db: ReturnType<typeof drizzle> | null = null
 let _path: string | null = null
 let _sqlite: BunDatabase | null = null
+let _cleanupTimer: ReturnType<typeof setInterval> | null = null
 
 /**
  * SQL statements to create memory tables
@@ -518,6 +519,10 @@ export namespace MemoryDb {
    */
   export function close(): void {
     if (_db) {
+      if (_cleanupTimer) {
+        clearInterval(_cleanupTimer)
+        _cleanupTimer = null
+      }
       if (_sqlite) {
         _sqlite.close()
       }
@@ -533,10 +538,15 @@ export namespace MemoryDb {
    * Schedule periodic cleanup of expired entries
    */
   function scheduleCleanup(): void {
+    if (_cleanupTimer) {
+      clearInterval(_cleanupTimer)
+      _cleanupTimer = null
+    }
+
     // Run cleanup every 5 minutes
     const cleanupInterval = 5 * 60 * 1000
 
-    setInterval(async () => {
+    _cleanupTimer = setInterval(async () => {
       if (!isEnabled()) return
 
       try {

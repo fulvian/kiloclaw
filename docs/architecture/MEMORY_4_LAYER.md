@@ -1,8 +1,8 @@
 # Memory 4-Layer Architecture
 
-> **Status**: Implemented + Enhanced + Semantic Trigger V1 (Bug Fixed)  
-> **Date**: 2026-04-05  
-> **Last Updated**: 2026-04-07 (Semantic Memory Trigger Bug Fix - Persistent Storage)  
+> **Status**: Implemented + Enhanced + Semantic Trigger V1 + Persistence Hardening completed  
+> **Date**: 2026-04-12  
+> **Last Updated**: 2026-04-12 (Persistence hardening completed)  
 > **ADR**: ADR-002, ADR-005  
 > **Implementation**: Phase 3 (Base) + KILOCLAW_MEMORY_ENHANCEMENT_PLAN (SOTA) + KILOCLAW_SEMANTIC_MEMORY_TRIGGER_PLAN
 
@@ -12,12 +12,19 @@ Kiloclaw implements a 4-layer memory architecture as defined in the Blueprint an
 
 ## Layer Definitions
 
-| Layer          | Purpose                              | TTL/Retention             | Storage                     | Primary Access           |
-| -------------- | ------------------------------------ | ------------------------- | --------------------------- | ------------------------ |
-| **Working**    | Live operational context             | Minutes/hours             | In-memory + local cache     | Agent runtime            |
-| **Episodic**   | Completed events and tasks           | 30-180 days               | Append-only event store     | Orchestrator + analytics |
-| **Semantic**   | Consolidated facts and knowledge     | Long-term with review     | Vector + Graph + Docs store | Cross-agency retrieval   |
-| **Procedural** | Strategies, policies, skill patterns | Versioned, no auto-expiry | Versioned registry          | Planner + skill engine   |
+| Layer          | Purpose                              | TTL/Retention             | Storage                                                  | Primary Access              |
+| -------------- | ------------------------------------ | ------------------------- | -------------------------------------------------------- | --------------------------- |
+| **Working**    | Live operational context             | Minutes/hours             | Persistent SQLite/Repo (V2 primary path) + runtime cache | Agent runtime (repo-backed) |
+| **Episodic**   | Completed events and tasks           | 30-180 days               | Append-only event store                                  | Orchestrator + analytics    |
+| **Semantic**   | Consolidated facts and knowledge     | Long-term with review     | Vector + Graph + Docs store                              | Cross-agency retrieval      |
+| **Procedural** | Strategies, policies, skill patterns | Versioned, no auto-expiry | Versioned registry                                       | Planner + skill engine      |
+
+## Runtime Persistence Hardening (2026-04-12)
+
+- CoreOrchestrator memory backend now uses a persistent adapter, not a volatile `Map`
+- Lifecycle purge, retention, stats, and consolidation are aligned to persistent V2 paths
+- Timer cleanup fixed in `memory.db` and `memory.state` to avoid dangling intervals/timeouts
+- Repository query updated to fix `pgvector` alias handling
 
 ## Architecture
 
@@ -595,6 +602,13 @@ KILO_RUN_MEMORY_BENCHMARK=true bun test test/kiloclaw/memory-retrieval-benchmark
 # Full V2 integration
 bun test test/kiloclaw/
 ```
+
+## Verification
+
+- `memory-v2-persistence-and-cleanup`: PASS
+- `runtime`: PASS
+- `memory`: PASS
+- `kiloclaw` suite: PASS
 
 ## References
 
