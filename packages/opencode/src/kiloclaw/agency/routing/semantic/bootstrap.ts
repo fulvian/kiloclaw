@@ -3,7 +3,14 @@
 
 import { Log } from "@/util/log"
 import { CapabilityRegistry, getCapabilityRegistry } from "./capability-registry"
-import { developmentSkills, knowledgeSkills, nutritionSkills, weatherSkills, allSkills } from "@/kiloclaw/skills"
+import {
+  developmentSkills,
+  knowledgeSkills,
+  nutritionSkills,
+  weatherSkills,
+  nbaSkills,
+  allSkills,
+} from "@/kiloclaw/skills"
 import type { Skill } from "@/kiloclaw/skill"
 import type { Domain } from "@/kiloclaw/types"
 
@@ -25,6 +32,9 @@ function inferDomain(skill: Skill): Domain {
   }
   if (tags.includes("weather") || name.includes("weather")) {
     return "weather"
+  }
+  if (tags.includes("nba") || tags.includes("sports") || tags.includes("betting")) {
+    return "custom" // NBA uses custom routing via agency-nba
   }
 
   return "knowledge" // default

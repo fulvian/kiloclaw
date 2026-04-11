@@ -1,7 +1,8 @@
-// Kiloclaw Skills - Wave 1 + Wave 2 Implementation
+// Kiloclaw Skills - Wave 1 + Wave 2 + Wave 3 Implementation
 // Wave 1: Development Agency (6 skills) + Knowledge Agency (5 skills) = 11 skills
 // Wave 2: Nutrition Agency (4 skills) + Weather Agency (3 skills) = 7 skills
-// Total: 18 skills
+// Wave 3: NBA Betting Agency (1 skill) = 1 skill
+// Total: 19 skills
 
 // Development Agency Skills
 export { CodeReviewSkill, type Issue, type IssueSeverity } from "./development/code-review"
@@ -96,6 +97,9 @@ export { WeatherAlertsSkill, type Alert } from "./weather/weather-alerts"
 
 export { WeatherCurrentSkill, type Current } from "./weather/weather-current"
 
+// NBA Betting Agency Skills
+export { NbaAnalysisSkill, type NbaAnalysisInput, type NbaAnalysisOutput } from "./nba"
+
 // Aggregate exports for agency registration
 import { CodeReviewSkill } from "./development/code-review"
 import { DebuggingSkill } from "./development/debugging"
@@ -115,6 +119,7 @@ import { RecipeSearchSkill } from "./nutrition/recipe-search"
 import { WeatherForecastSkill } from "./weather/weather-forecast"
 import { WeatherAlertsSkill } from "./weather/weather-alerts"
 import { WeatherCurrentSkill } from "./weather/weather-current"
+import { NbaAnalysisSkill } from "./nba"
 import type { Skill } from "../skill"
 
 // Development agency skills
@@ -148,14 +153,18 @@ export const allWave1Skills: Skill[] = [...developmentSkills, ...knowledgeSkills
 // All Wave 2 skills
 export const allWave2Skills: Skill[] = [...nutritionSkills, ...weatherSkills]
 
+// Wave 3: NBA Betting Agency skills
+export const nbaSkills: Skill[] = [NbaAnalysisSkill]
+
 // All skills combined
-export const allSkills: Skill[] = [...allWave1Skills, ...allWave2Skills]
+export const allSkills: Skill[] = [...allWave1Skills, ...allWave2Skills, ...nbaSkills]
 
 // Skill count constants
 export const DEVELOPMENT_SKILL_COUNT = developmentSkills.length
 export const KNOWLEDGE_SKILL_COUNT = knowledgeSkills.length
 export const NUTRITION_SKILL_COUNT = nutritionSkills.length
 export const WEATHER_SKILL_COUNT = weatherSkills.length
+export const NBA_SKILL_COUNT = nbaSkills.length
 export const TOTAL_WAVE1_SKILL_COUNT = allWave1Skills.length
 export const TOTAL_WAVE2_SKILL_COUNT = allWave2Skills.length
 export const TOTAL_SKILL_COUNT = allSkills.length
