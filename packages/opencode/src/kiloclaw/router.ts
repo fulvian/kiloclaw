@@ -125,6 +125,84 @@ const DOMAIN_KEYWORDS: Record<string, string[]> = {
     "documenti",
     "fogli",
   ],
+  nba: [
+    "nba",
+    "basketball",
+    "basket",
+    "lakers",
+    "celtics",
+    "warriors",
+    "heat",
+    "game",
+    "games",
+    "score",
+    "scores",
+    "schedule",
+    "today",
+    "tonight",
+    "player",
+    "players",
+    "team",
+    "teams",
+    "roster",
+    "injury",
+    "injuries",
+    "odds",
+    "betting",
+    "bet",
+    "scommesse",
+    "scommessa",
+    "quote",
+    "quota",
+    "partita",
+    "partite",
+    "stagione",
+    "playoffs",
+    "regular season",
+    "conference",
+    "western",
+    "eastern",
+    "champions league",
+    "serie a",
+    "premier league",
+    "bundesliga",
+    "calcio",
+    "football",
+    "soccer",
+    "tennis",
+    "nfl",
+    "mlb",
+    "nhl",
+    "mma",
+    "ufc",
+    "formula 1",
+    "motogp",
+    "golf",
+    "atleta",
+    "atleti",
+    "campionato",
+    "classifica",
+    "classifiche",
+    "pronostico",
+    "pronostici",
+    "analisi",
+    "statistiche",
+    "stats",
+    "victory",
+    "win",
+    "puntata",
+    "puntate",
+    "multiple",
+    "multipla",
+    "over",
+    "under",
+    "handicap",
+    "spread",
+    "totals",
+    "moneyline",
+    "parlay",
+    "acca",
+  ],
   custom: [],
 }
 
@@ -177,7 +255,15 @@ export const Router = {
                       type.includes("calendar") ||
                       type.includes("workspace"))
                   ? 0.25
-                  : 0
+                  : domain === "nba" &&
+                      (type.includes("nba") ||
+                        type.includes("basketball") ||
+                        type.includes("betting") ||
+                        type.includes("odds") ||
+                        type.includes("game") ||
+                        type.includes("score"))
+                    ? 0.25
+                    : 0
       return Math.min(1, base + typeBoost)
     }
 
@@ -198,7 +284,7 @@ export const Router = {
 
         // Calculate scores for each domain
         const scores: DomainScore[] = (
-          ["development", "knowledge", "nutrition", "weather", "gworkspace", "custom"] as string[]
+          ["development", "knowledge", "nutrition", "weather", "gworkspace", "nba", "custom"] as string[]
         ).map((domain) => {
           const keywordScoreValue = keywordScore(intent, domain)
           const reasons: string[] = []

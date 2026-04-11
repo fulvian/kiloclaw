@@ -34,7 +34,7 @@ function inferDomain(skill: Skill): Domain {
     return "weather"
   }
   if (tags.includes("nba") || tags.includes("sports") || tags.includes("betting")) {
-    return "custom" // NBA uses custom routing via agency-nba
+    return "nba"
   }
 
   return "knowledge" // default
@@ -494,6 +494,95 @@ export function bootstrapGWorkspaceCapabilities(): void {
 }
 
 /**
+ * Bootstrap NBA agency capabilities
+ */
+function bootstrapNbaCapabilities(): void {
+  const registry = getCapabilityRegistry()
+
+  const capabilities = [
+    {
+      id: "nba_analysis",
+      domain: "nba" as Domain,
+      description:
+        "Analyze NBA games for betting opportunities with probability estimation, edge detection, and guarded recommendations",
+      keywords: [
+        "nba",
+        "basketball",
+        "betting",
+        "odds",
+        "games",
+        "teams",
+        "players",
+        "injuries",
+        "schedule",
+        "live",
+        "score",
+        "preview",
+        "analysis",
+        "scommesse",
+        "quote",
+        "partite",
+        "squadre",
+      ],
+      capabilities: ["nba_analysis", "nba-analysis"],
+    },
+    {
+      id: "nba_games",
+      domain: "nba" as Domain,
+      description: "Get NBA games schedule and live scores",
+      keywords: ["nba", "games", "schedule", "live", "score", "scores", "today", "tonight", "partite", "stagione"],
+      capabilities: ["schedule_live"],
+    },
+    {
+      id: "nba_injuries",
+      domain: "nba" as Domain,
+      description: "Get NBA injury reports",
+      keywords: ["injury", "injuries", "injured", "out", "doubtful", "questionable", "infortunio", "infortuni"],
+      capabilities: ["injury_status"],
+    },
+    {
+      id: "nba_odds",
+      domain: "nba" as Domain,
+      description: "Get NBA betting odds",
+      keywords: [
+        "odds",
+        "betting",
+        "bet",
+        "moneyline",
+        "spread",
+        "totals",
+        "over",
+        "under",
+        "quote",
+        "scommesse",
+        "quota",
+      ],
+      capabilities: ["odds_markets"],
+    },
+    {
+      id: "nba_edge_detection",
+      domain: "nba" as Domain,
+      description: "Detect betting edges in NBA games",
+      keywords: ["edge", "value", "betting", "odds", "probability", "expected", "vig", "juice"],
+      capabilities: ["edge_detection"],
+    },
+  ]
+
+  for (const cap of capabilities) {
+    try {
+      registry.register({
+        ...cap,
+        metadata: { source: "bootstrap", domain: "nba" },
+      })
+    } catch (err) {
+      // Skip if already exists
+    }
+  }
+
+  log.info("nba capabilities bootstrapped", { count: capabilities.length })
+}
+
+/**
  * Bootstrap all default capabilities
  */
 export function bootstrapAllCapabilities(): void {
@@ -502,6 +591,7 @@ export function bootstrapAllCapabilities(): void {
   bootstrapNutritionCapabilities()
   bootstrapWeatherCapabilities()
   bootstrapGWorkspaceCapabilities()
+  bootstrapNbaCapabilities()
 
   log.info("all default capabilities bootstrapped", {
     total: getCapabilityRegistry().size(),

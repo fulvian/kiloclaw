@@ -415,6 +415,7 @@ export class SemanticRouter {
       knowledge: "web-search",
       nutrition: "nutrition-analysis",
       weather: "weather-forecast",
+      nba: "nba-analysis",
       custom: "web-search",
     }
     return defaults[domain as Domain] || "web-search"
