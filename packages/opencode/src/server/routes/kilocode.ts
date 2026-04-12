@@ -8,7 +8,7 @@ import { Skill } from "../../skill/skill"
 import { Agent } from "../../agent/agent"
 import { lazy } from "../../util/lazy"
 import { errors } from "../error"
-import { SessionImportRoutes } from "../../kilocode/session-import/routes"
+import { SessionImportRoutes } from "../../kilocaw-legacy/session-import/routes"
 
 export const KilocodeRoutes = lazy(() =>
   new Hono()

@@ -16,7 +16,10 @@ import type { EventSource } from "./context/sdk"
 import { win32DisableProcessedInput, win32InstallCtrlCGuard } from "./win32"
 import { TuiConfig } from "@/config/tui"
 import { Instance } from "@/project/instance"
-import { importCloudSession, validateCloudFork } from "@/kilocode/cloud-session" // kilocode_change
+import { importCloudSession, validateCloudFork } from "@/kilocaw-legacy/cloud-session" // kilocode_change
+import { DaemonRuntime } from "@/kiloclaw/proactive/runtime/daemon"
+import { Process } from "@/util/process"
+import { Global } from "@/global"
 
 declare global {
   const KILO_WORKER_PATH: string // kilocode_change
@@ -65,9 +68,212 @@ async function input(value?: string) {
   return piped + "\n" + value
 }
 
+function setDefaultEnv(name: string, value: string) {
+  if (process.env[name] !== undefined) return
+  process.env[name] = value
+}
+
+function parseEnvLine(line: string): [string, string] | null {
+  const text = line.trim()
+  if (!text || text.startsWith("#")) return null
+  const idx = text.indexOf("=")
+  if (idx <= 0) return null
+  const key = text.slice(0, idx).trim()
+  if (!key) return null
+  const raw = text.slice(idx + 1).trim()
+  const value =
+    (raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'")) ? raw.slice(1, -1) : raw
+  return [key, value]
+}
+
+async function loadDefaultSessionEnv(): Promise<void> {
+  const home = process.env.HOME
+  if (!home) return
+  const envFile = path.join(home, ".kilocode", ".env")
+  const text = await Filesystem.readText(envFile).catch(() => "")
+  if (!text) return
+  for (const line of text.split(/\r?\n/)) {
+    const parsed = parseEnvLine(line)
+    if (!parsed) continue
+    setDefaultEnv(parsed[0], parsed[1])
+  }
+}
+
+async function seedMcpAuthFromUserData(): Promise<void> {
+  const home = process.env.HOME
+  if (!home) return
+
+  const source = path.join(home, ".local", "share", "kiloclaw", "mcp-auth.json")
+  const target = path.join(Global.Path.data, "mcp-auth.json")
+  if (source === target) return
+
+  const src = await Filesystem.readJson<Record<string, Record<string, unknown>>>(source).catch(() => ({}))
+  if (Object.keys(src).length === 0) return
+
+  const dst = await Filesystem.readJson<Record<string, Record<string, unknown>>>(target).catch(() => ({}))
+  const merged: Record<string, Record<string, unknown>> = { ...dst }
+
+  for (const [name, entry] of Object.entries(src)) {
+    const current = merged[name]
+    if (!current) {
+      merged[name] = entry
+      continue
+    }
+
+    const hasTokens = typeof current["tokens"] === "object" && current["tokens"] !== null
+    const srcHasTokens = typeof entry["tokens"] === "object" && entry["tokens"] !== null
+    if (!hasTokens && srcHasTokens) {
+      merged[name] = { ...current, tokens: entry["tokens"] }
+    }
+
+    const hasServerUrl = typeof current["serverUrl"] === "string"
+    const srcServerUrl = entry["serverUrl"]
+    if (!hasServerUrl && typeof srcServerUrl === "string") {
+      merged[name] = { ...merged[name], serverUrl: srcServerUrl }
+    }
+  }
+
+  await Filesystem.writeJson(target, merged, 0o600).catch(() => undefined)
+}
+
+async function startIntegratedRuntime(projectPath: string): Promise<boolean> {
+  setDefaultEnv("KILOCLAW_DAEMON_RUNTIME_ENABLED", "true")
+  setDefaultEnv("KILOCLAW_DAEMON_EXECUTION_ENABLED", "true")
+  setDefaultEnv("KILOCLAW_TASK_ACTIONS_EXEC", "true")
+
+  const ownerId = `tui-${process.pid}`
+  try {
+    DaemonRuntime.init({ ownerId, projectPath })
+    await DaemonRuntime.start()
+    if (!DaemonRuntime.isRunning()) {
+      Log.Default.warn("integrated daemon runtime did not reach running state", { ownerId, projectPath })
+      return false
+    }
+    Log.Default.info("integrated daemon runtime started", { ownerId, projectPath })
+    return true
+  } catch (err) {
+    Log.Default.warn("integrated daemon runtime failed to start", {
+      ownerId,
+      projectPath,
+      error: err instanceof Error ? err.message : String(err),
+    })
+    return false
+  }
+}
+
+function readHealthUrl(mcpUrl: string): string {
+  const url = new URL(mcpUrl)
+  return `${url.protocol}//${url.host}/health`
+}
+
+async function canReach(url: string): Promise<boolean> {
+  try {
+    const res = await fetch(url, {
+      method: "GET",
+      signal: AbortSignal.timeout(1500),
+    })
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
+function shouldAutoStartGwsMcp(): boolean {
+  const value = process.env.KILOCLAW_GWS_MCP_AUTOSTART
+  if (!value) return true
+  const normalized = value.toLowerCase()
+  return normalized !== "0" && normalized !== "false" && normalized !== "off"
+}
+
+function hasGoogleOauthConfig(): boolean {
+  return !!process.env.GOOGLE_OAUTH_CLIENT_ID && !!process.env.GOOGLE_OAUTH_CLIENT_SECRET
+}
+
+async function waitHealthy(healthUrl: string, timeoutMs = 30_000): Promise<boolean> {
+  const start = Date.now()
+  while (Date.now() - start < timeoutMs) {
+    if (await canReach(healthUrl)) return true
+    await Bun.sleep(250)
+  }
+  return false
+}
+
+type IntegratedGwsMcpRuntime = {
+  started: boolean
+  spawned: boolean
+  proc?: Process.Child
+}
+
+async function startIntegratedGoogleWorkspaceMcp(): Promise<IntegratedGwsMcpRuntime> {
+  if (!shouldAutoStartGwsMcp()) {
+    return { started: false, spawned: false }
+  }
+
+  const mcpUrl = process.env.KILOCLAW_GWS_MCP_URL ?? "http://localhost:8000/mcp"
+  const healthUrl = readHealthUrl(mcpUrl)
+  if (await canReach(healthUrl)) {
+    Log.Default.info("google workspace MCP already reachable", { healthUrl })
+    return { started: true, spawned: false }
+  }
+
+  if (!hasGoogleOauthConfig()) {
+    Log.Default.warn("google workspace MCP autostart skipped: missing OAuth env", {
+      required: ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET"],
+    })
+    return { started: false, spawned: false }
+  }
+
+  const port = new URL(mcpUrl).port || "8000"
+  const hostBase = process.env.WORKSPACE_MCP_BASE_URI ?? "http://localhost"
+  setDefaultEnv("WORKSPACE_MCP_PORT", port)
+  setDefaultEnv("WORKSPACE_MCP_BASE_URI", hostBase)
+  setDefaultEnv("GOOGLE_OAUTH_REDIRECT_URI", `${hostBase}:${port}/oauth2callback`)
+  setDefaultEnv("MCP_ENABLE_OAUTH21", "true")
+  setDefaultEnv("OAUTHLIB_INSECURE_TRANSPORT", "1")
+
+  const cmd = [
+    "uvx",
+    "--from",
+    "workspace-mcp",
+    "workspace-mcp",
+    "--transport",
+    "streamable-http",
+    "--tool-tier",
+    "core",
+  ]
+  const proc = Process.spawn(cmd, {
+    stdin: "ignore",
+    stdout: "pipe",
+    stderr: "pipe",
+    env: process.env,
+  })
+
+  proc.stderr?.on("data", (chunk: Buffer) => {
+    Log.Default.debug("google workspace MCP stderr", { text: chunk.toString().trim() })
+  })
+
+  proc.stdout?.on("data", (chunk: Buffer) => {
+    Log.Default.debug("google workspace MCP stdout", { text: chunk.toString().trim() })
+  })
+
+  void waitHealthy(healthUrl).then((healthy) => {
+    if (healthy) {
+      Log.Default.info("google workspace MCP autostarted", { healthUrl, pid: proc.pid })
+      return
+    }
+    Log.Default.warn("google workspace MCP health check timed out; process left running", {
+      healthUrl,
+      cmd: cmd.join(" "),
+      pid: proc.pid,
+    })
+  })
+
+  return { started: true, spawned: true, proc }
+}
+
 export const TuiThreadCommand = cmd({
   command: "$0 [project]",
-  describe: "start kilo tui", // kilocode_change
+  describe: "start kilo tui with integrated scheduler runtime", // kilocode_change
   builder: (yargs) =>
     withNetworkOptions(yargs)
       .positional("project", {
@@ -113,10 +319,23 @@ export const TuiThreadCommand = cmd({
       pending: undefined as Promise<void> | undefined,
       exiting: false,
     }
+    const runtime = { started: false }
+    const gwsMcp = { started: false, spawned: false, proc: undefined as Process.Child | undefined }
     try {
       // Must be the very first thing — disables CTRL_C_EVENT before any Worker
       // spawn or async work so the OS cannot kill the process group.
       win32DisableProcessedInput()
+      await loadDefaultSessionEnv()
+
+      // kilocode_change start - Initialize auth coordinator at startup
+      // This ensures auth is checked/refreshed before chat renders
+      const { MCP } = await import("@/mcp")
+      MCP.ensureAtSessionStart().catch((err) => {
+        Log.Default.warn("MCP ensureAtSessionStart failed", { error: err instanceof Error ? err.message : String(err) })
+      })
+      // kilocode_change end
+
+      await seedMcpAuthFromUserData()
 
       if (args.fork && !args.continue && !args.session) {
         UI.error("--fork requires --continue or --session")
@@ -146,6 +365,11 @@ export const TuiThreadCommand = cmd({
         return
       }
       const cwd = Filesystem.resolve(process.cwd())
+      runtime.started = await startIntegratedRuntime(cwd)
+      const integrated = await startIntegratedGoogleWorkspaceMcp()
+      gwsMcp.started = integrated.started
+      gwsMcp.spawned = integrated.spawned
+      gwsMcp.proc = integrated.proc
 
       const worker = new Worker(file, {
         env: Object.fromEntries(
@@ -184,6 +408,16 @@ export const TuiThreadCommand = cmd({
           })
         })
         worker.terminate()
+        if (!runtime.started) return
+        await DaemonRuntime.stop().catch((err) => {
+          Log.Default.warn("integrated daemon runtime stop failed", {
+            error: err instanceof Error ? err.message : String(err),
+          })
+        })
+        if (!gwsMcp.spawned || !gwsMcp.proc) return
+        try {
+          gwsMcp.proc.kill("SIGTERM")
+        } catch {}
       }
       // kilocode_change start - graceful shutdown on external signals
       // The worker's postMessage for the RPC result may never be delivered

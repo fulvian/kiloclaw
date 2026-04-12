@@ -24,6 +24,34 @@ export {
   type EvaluationResult,
 } from "./scheduler"
 
+// Durable runtime
+export { TaskLedger, type LedgerTask, type TaskMeta, type TaskState, type ReconcileResult } from "./task-ledger"
+export { SchedulerService, type SchedulerTaskInput, type SchedulerReconcile } from "./scheduler-service"
+export { ProactiveWorker, type WorkerResult } from "./worker"
+export { SqliteProactiveStore, type ProactiveStore, type StoreRecord } from "./store/sqlite"
+export {
+  SchedulePreset,
+  ScheduleKind,
+  DEFAULT_PRESET,
+  presetToCron,
+  isValidTimezone,
+  validateCron,
+  nextRuns,
+} from "./schedule-parse"
+export {
+  DstPolicy,
+  RetryBackoff,
+  ConcurrencyPolicy,
+  MissedRunPolicy,
+  ApprovalPolicy,
+  ScheduledTaskCreateSchema,
+  ScheduledTaskUpdateSchema,
+  buildCreate,
+  buildUpdate,
+  parseConfig,
+  validateSchedule,
+} from "./scheduled-task"
+
 // Limits
 export {
   ProactivityLimitsManager,
@@ -34,3 +62,18 @@ export {
   DEFAULT_PROACTIVITY_LIMITS,
   type ProactivityPolicy,
 } from "./limits"
+
+// Daemon runtime
+export {
+  DaemonRuntime,
+  isSystemd,
+  notifyReady,
+  notifyStopping,
+  notifyWatchdog,
+  notifyStatus,
+  type DaemonConfig,
+  type DaemonFeatureFlags,
+  type DaemonHealthSnapshot,
+  type DaemonMetrics,
+  type DaemonState,
+} from "./runtime"

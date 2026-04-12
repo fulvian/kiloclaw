@@ -14,9 +14,9 @@ import { usePromptRef } from "../context/prompt"
 import { Installation } from "@/installation"
 import { useKV } from "../context/kv"
 import { useCommandDialog } from "../component/dialog-command"
-import { KiloNews } from "@/kilocode/components/kilo-news" // kilocode_change
+import { KiloNews } from "@/kilocaw-legacy/components/kilo-news" // kilocode_change
 import { useConnected } from "../component/dialog-model" // kilocode_change
-import { RemoteIndicator } from "@/kilocode/remote-tui" // kilocode_change
+import { RemoteIndicator } from "@/kilocaw-legacy/remote-tui" // kilocode_change
 import { useSDK } from "../context/sdk" // kilocode_change
 
 // TODO: what is the best way to do this?

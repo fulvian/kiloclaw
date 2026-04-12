@@ -58,7 +58,7 @@ import { TodoItem } from "../../component/todo-item"
 import { DialogMessage } from "./dialog-message"
 import type { PromptInfo } from "../../component/prompt/history"
 import { DialogConfirm } from "@tui/ui/dialog-confirm"
-import { KiloErrorBlock } from "@/kilocode/components/kilo-error-display" // kilocode_change
+import { KiloErrorBlock } from "@/kilocaw-legacy/components/kilo-error-display" // kilocode_change
 import { DialogTimeline } from "./dialog-timeline"
 import { DialogForkFromTimeline } from "./dialog-fork-from-timeline"
 import { DialogSessionRename } from "../../component/dialog-session-rename"
@@ -82,9 +82,21 @@ import { DialogExportOptions } from "../../ui/dialog-export-options"
 import { formatTranscript } from "../../util/transcript"
 import { UI } from "@/cli/ui.ts"
 import { useTuiConfig } from "../../context/tui-config"
+import {
+  FeedbackBar,
+  setPendingFeedback,
+  getLastFeedbackableMessageId,
+  requestSessionFeedback,
+  clearSessionFeedback,
+  hasPendingSessionFeedback,
+  getPendingSessionId,
+  getPendingExitAction,
+  SessionFeedbackDialog,
+  submitSessionFeedback,
+} from "./feedback-bar" // kilocode_change
 
 import { formatMarkdownTables } from "../../util/markdown" // kilocode_change
-import { bell } from "@/kilocode/bell" // kilocode_change
+import { bell } from "@/kilocaw-legacy/bell" // kilocode_change
 
 addDefaultParsers(parsers.parsers)
 
@@ -1215,6 +1227,8 @@ export function Session() {
                 }}
                 disabled={permissions().length > 0 || questions().length > 0}
                 onSubmit={() => {
+                  // kilocode_change - track follow-up to hide previous feedback pollice
+                  setPendingFeedback(getLastFeedbackableMessageId() ?? "pending")
                   toBottom()
                 }}
                 sessionID={route.sessionID}
@@ -1224,6 +1238,27 @@ export function Session() {
           <Toast />
           {/* kilocode_change */}
           <Footer />
+          {/* Session feedback dialog - shown when exit is triggered */}
+          <Show when={hasPendingSessionFeedback()}>
+            <SessionFeedbackDialog
+              sessionId={getPendingSessionId() ?? route.sessionID}
+              onSubmit={async (vote, reason) => {
+                // Get exit action BEFORE clearing
+                const exitAction = getPendingExitAction()
+                await submitSessionFeedback(route.sessionID, vote, reason)
+                clearSessionFeedback()
+                // Execute pending exit action AFTER DOM updates (defer to next tick)
+                if (exitAction) queueMicrotask(() => exitAction())
+              }}
+              onSkip={() => {
+                // Get exit action BEFORE clearing
+                const exitAction = getPendingExitAction()
+                clearSessionFeedback()
+                // Execute pending exit action AFTER DOM updates (defer to next tick)
+                if (exitAction) queueMicrotask(() => exitAction())
+              }}
+            />
+          </Show>
         </box>
         <Show when={sidebarVisible()}>
           <Switch>
@@ -1423,6 +1458,11 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
         />
         {/* kilocode_change end */}
       </Show>
+      {/* kilocode_change start - Feedback bar for last completed assistant message */}
+      <Show when={props.last && props.message.time.completed}>
+        <FeedbackBar messageId={props.message.id} sessionId={props.message.sessionID} />
+      </Show>
+      {/* kilocode_change end */}
       <Switch>
         <Match when={props.last || final() || props.message.error?.name === "MessageAbortedError"}>
           <box paddingLeft={3}>
@@ -2004,9 +2044,10 @@ function CodeSearch(props: ToolProps<any>) {
 function WebSearch(props: ToolProps<any>) {
   const input = props.input as any
   const metadata = props.metadata as any
+  const count = metadata.resultCount ?? metadata.numResults
   return (
     <InlineTool icon="◈" pending="Searching web..." complete={input.query} part={props.part}>
-      Exa Web Search "{input.query}" <Show when={metadata.numResults}>({metadata.numResults} results)</Show>
+      Web Search "{input.query}" <Show when={count}>({count} results)</Show>
     </InlineTool>
   )
 }

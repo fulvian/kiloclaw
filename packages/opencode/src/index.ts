@@ -1,10 +1,23 @@
+import { config } from "dotenv"
+import { existsSync } from "fs"
+import { homedir } from "os"
+import { join } from "path"
+const dotenvPath = process.env.XDG_DATA_HOME
+  ? join(process.env.XDG_DATA_HOME, "kiloclaw", ".env")
+  : join(homedir(), ".local", "share", "kiloclaw", ".env")
+const fallbackDotenvPath = join(homedir(), ".local", "share", "kiloclaw", ".env")
+config({ path: dotenvPath })
+if (dotenvPath !== fallbackDotenvPath && existsSync(fallbackDotenvPath)) {
+  config({ path: fallbackDotenvPath, override: false })
+}
 import yargs from "yargs"
 import { hideBin } from "yargs/helpers"
 import { RunCommand } from "./cli/cmd/run"
 import { GenerateCommand } from "./cli/cmd/generate"
 import { Log } from "./util/log"
 import { AuthCommand } from "./cli/cmd/auth"
-import { AgentCommand } from "./cli/cmd/agent"
+// kilocode_change start - AgentCommand removed, use 'kiloclaw agent' instead
+// import { AgentCommand } from "./cli/cmd/agent"
 import { UpgradeCommand } from "./cli/cmd/upgrade"
 import { UninstallCommand } from "./cli/cmd/uninstall"
 import { ModelsCommand } from "./cli/cmd/models"
@@ -29,6 +42,9 @@ import { EOL } from "os"
 import { PrCommand } from "./cli/cmd/pr"
 import { SessionCommand } from "./cli/cmd/session"
 import { RemoteCommand } from "./cli/cmd/remote" // kilocode_change
+import { KiloclawCommand } from "./cli/cmd/kiloclaw"
+import { TaskCommand } from "./cli/cmd/task"
+import { DaemonCommand } from "./cli/cmd/daemon"
 // kilocode_change start - Import telemetry, instance disposal, and legacy migration
 import { Telemetry } from "@kilocode/kilo-telemetry"
 import { Instance } from "./project/instance" // kilocode_change
@@ -75,7 +91,7 @@ process.on("SIGHUP", () => process.exit())
 
 let cli = yargs(hideBin(process.argv))
   .parserConfiguration({ "populate--": true })
-  .scriptName("kilo") // kilocode_change
+  .scriptName("kiloclaw")
   .wrap(100)
   .help("help", "show help")
   .alias("help", "h")
@@ -181,7 +197,7 @@ let cli = yargs(hideBin(process.argv))
   .command(GenerateCommand)
   .command(DebugCommand)
   .command(AuthCommand)
-  .command(AgentCommand)
+  // .command(AgentCommand) // kilocode_change - removed, use 'kiloclaw agent' instead
   .command(UpgradeCommand)
   .command(UninstallCommand)
   .command(ServeCommand)
@@ -195,6 +211,9 @@ let cli = yargs(hideBin(process.argv))
   .command(SessionCommand)
   .command(RemoteCommand) // kilocode_change
   .command(DbCommand)
+  .command(TaskCommand)
+  .command(DaemonCommand)
+  .command(KiloclawCommand)
 
 if (Installation.isLocal()) {
   cli = cli.command(WorkspaceServeCommand)

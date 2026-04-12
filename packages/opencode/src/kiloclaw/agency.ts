@@ -2,7 +2,9 @@ import z from "zod"
 import { Log } from "@/util/log"
 import { fn } from "@/util/fn"
 import { type AgencyId, type Domain, type AgencyStatus, type AgentId } from "./types"
+// kilocode_change start - use type-only import to avoid circular dependency
 import type { Agent } from "./agent"
+// kilocode_change end
 
 // Task and result types
 export const Task = z.object({
@@ -97,7 +99,7 @@ export type ToolHealth = z.infer<typeof ToolHealth>
 // Agency Info for registry
 export const AgencyInfo = z.object({
   id: z.string(),
-  domain: z.enum(["development", "knowledge", "nutrition", "weather", "custom"]),
+  domain: z.enum(["development", "knowledge", "nutrition", "weather", "nba", "custom"]),
   status: z.enum(["idle", "running", "paused", "stopped", "error"]),
 })
 export type AgencyInfo = z.infer<typeof AgencyInfo>
@@ -126,7 +128,7 @@ export namespace Agency {
 
   export const Info = z.object({
     id: z.string(),
-    domain: z.enum(["development", "knowledge", "nutrition", "weather", "custom"]),
+    domain: z.enum(["development", "knowledge", "nutrition", "weather", "nba", "custom"]),
   })
 
   export const create = fn(Info, (input) => {

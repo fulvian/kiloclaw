@@ -11,7 +11,8 @@
     "paths": {
       "@/*": ["./src/*"],
       "@tui/*": ["./src/cli/cmd/tui/*"],
-      "@/kiloclaw/*": ["./src/kiloclaw/*"]
+      "@/kiloclaw/*": ["./src/kiloclaw/*"],
+      "@/kilocaw-legacy/*": ["./src/kilocaw-legacy/*"]
     }
   }
 }

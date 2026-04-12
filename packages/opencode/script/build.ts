@@ -187,7 +187,7 @@ for (const item of targets) {
       autoloadTsconfig: true,
       autoloadPackageJson: true,
       target: name.replace(pkg.name, "bun") as any,
-      outfile: `dist/${name}/bin/kilo`, // kilocode_change
+      outfile: `dist/${name}/bin/kiloclaw`,
       execArgv: [`--user-agent=kilo/${Script.version}`, "--use-system-ca", "--"], // kilocode_change
       windows: {},
     },
@@ -214,7 +214,7 @@ for (const item of targets) {
     const interpreter = interpreters[key]
     if (interpreter) {
       try {
-        await $`patchelf --set-interpreter ${interpreter} dist/${name}/bin/kilo`
+        await $`patchelf --set-interpreter ${interpreter} dist/${name}/bin/kiloclaw`
         console.log(`patched interpreter for ${name} -> ${interpreter}`)
       } catch {
         console.warn(`patchelf not available, skipping interpreter fix for ${name}`)
@@ -248,7 +248,7 @@ for (const item of targets) {
 if (Script.release) {
   const archives: string[] = [] // kilocode_change
   for (const key of Object.keys(binaries)) {
-    const archive = key.replace(pkg.name, "kilo") // kilocode_change
+    const archive = key.replace(pkg.name, "kiloclaw")
     if (key.includes("linux")) {
       const out = path.resolve("dist", `${archive}.tar.gz`) // kilocode_change
       await $`tar -czf ${out} *`.cwd(`dist/${key}/bin`) // kilocode_change

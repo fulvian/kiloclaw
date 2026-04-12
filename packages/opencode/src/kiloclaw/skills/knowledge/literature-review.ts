@@ -2,6 +2,8 @@ import { Log } from "@/util/log"
 import { Skill } from "../../skill"
 import type { SkillContext } from "../../skill"
 import { SkillId } from "../../types"
+import { LiteratureProvider } from "./providers"
+import { Evidence, type Citation } from "./evidence"
 
 // Academic paper type
 export interface Paper {
@@ -26,67 +28,8 @@ export interface LiteratureReviewOutput {
   papers: Paper[]
   summary: string
   totalFound: number
-}
-
-// Mock academic paper database (in production, this would integrate with arXiv, PubMed, etc.)
-function searchAcademicPapers(topic: string, maxCount: number): Paper[] {
-  // This is a mock implementation that returns placeholder results
-  // In production, this would call actual academic APIs (arXiv, PubMed, Google Scholar)
-
-  const mockPapers: Paper[] = [
-    {
-      title: `Advances in ${topic}: A Comprehensive Survey`,
-      authors: ["Smith, J.", "Johnson, A.", "Williams, B."],
-      abstract: `This paper provides a comprehensive survey of recent advances in ${topic}, covering theoretical foundations, practical applications, and future research directions. We review over 100 relevant publications and provide a taxonomy of current approaches.`,
-      year: 2024,
-      journal: "Journal of Computer Science",
-      doi: "10.1234/jcs.2024.1234",
-      citations: 156,
-      url: "https://arxiv.org/abs/2401.12345",
-    },
-    {
-      title: `Deep Learning for ${topic}: Methods and Applications`,
-      authors: ["Chen, L.", "Brown, M.", "Davis, K."],
-      abstract: `We present novel deep learning methods applied to ${topic} that achieve state-of-the-art results on multiple benchmarks. Our approach combines transformer architectures with domain-specific optimizations.`,
-      year: 2024,
-      journal: "Nature Machine Intelligence",
-      doi: "10.1038/s42256-024-00789-1",
-      citations: 89,
-      url: "https://arxiv.org/abs/2402.23456",
-    },
-    {
-      title: `A Systematic Review of ${topic} Techniques`,
-      authors: ["Garcia, R.", "Martinez, E.", "Rodriguez, F."],
-      abstract: `This systematic review examines existing techniques for ${topic}, analyzing their strengths, limitations, and applicability across different domains. We identify key gaps in current research and propose future directions.`,
-      year: 2023,
-      journal: "ACM Computing Surveys",
-      doi: "10.1145/3485123.3485124",
-      citations: 234,
-      url: "https://dl.acm.org/10.1145/3485123",
-    },
-    {
-      title: `Scalable Algorithms for ${topic} at Large Scale`,
-      authors: ["Lee, S.", "Park, J.", "Kim, H."],
-      abstract: `We propose scalable algorithms for processing ${topic} at web scale. Our methods demonstrate linear time complexity while maintaining high accuracy across distributed computing environments.`,
-      year: 2023,
-      journal: "Proceedings of VLDB",
-      doi: "10.14778/3587555.3587556",
-      citations: 67,
-      url: "https://www.vldb.org/2023/paper1.pdf",
-    },
-    {
-      title: `${topic}: From Theory to Practice`,
-      authors: ["Anderson, P.", "Taylor, N.", "Wilson, C."],
-      abstract: `This paper bridges the gap between theoretical foundations and practical implementations of ${topic}. We present case studies from industry applications and derive best practices for practitioners.`,
-      year: 2022,
-      journal: "IEEE Transactions on Knowledge and Data Engineering",
-      doi: "10.1109/TKDE.2022.3189012",
-      citations: 312,
-      url: "https://ieeexplore.ieee.org/document/9876543",
-    },
-  ]
-
-  return mockPapers.slice(0, maxCount)
+  citations: Citation[]
+  evidence: string[]
 }
 
 // Generate summary
@@ -101,11 +44,16 @@ function generateSummary(papers: Paper[], topic: string): string {
   const avgCitations = Math.round(totalCitations / papers.length)
 
   const journals = [...new Set(papers.map((p) => p.journal || "Unknown"))]
+  const top = papers
+    .slice()
+    .sort((a, b) => (b.citations || 0) - (a.citations || 0))
+    .at(0)
+  const topTitle = top?.title ?? "N/A"
 
   return (
     `Found ${papers.length} academic papers on "${topic}" published between ${yearRange}. ` +
     `Papers from ${journals.length} journals with average ${avgCitations} citations per paper. ` +
-    `Most cited: "${papers.sort((a, b) => (b.citations || 0) - (a.citations || 0))[0].title}"`
+    `Most cited: "${topTitle}"`
   )
 }
 
@@ -142,6 +90,19 @@ export const LiteratureReviewSkill: Skill = {
       },
       summary: { type: "string", description: "Summary of literature review" },
       totalFound: { type: "number", description: "Total papers found" },
+      citations: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            title: { type: "string" },
+            url: { type: "string" },
+            source: { type: "string" },
+            snippet: { type: "string" },
+          },
+        },
+      },
+      evidence: { type: "array", items: { type: "string" } },
     },
   },
   capabilities: ["paper_search", "summarization", "academic_research", "citation_analysis"],
@@ -159,12 +120,37 @@ export const LiteratureReviewSkill: Skill = {
         papers: [],
         summary: "No topic provided",
         totalFound: 0,
+        citations: [],
+        evidence: [],
       }
     }
 
     const maxCount = Math.min(Math.max(count || 5, 1), 20)
-    const papers = searchAcademicPapers(topic, maxCount)
-    const summary = generateSummary(papers, topic)
+    const hits = await LiteratureProvider.search(topic, maxCount)
+    const papers = hits.map((hit) => ({
+      title: hit.title,
+      authors: hit.authors,
+      abstract: hit.abstract,
+      year: hit.year,
+      url: hit.url,
+    }))
+    const summary = `${generateSummary(papers, topic)} ${Evidence.summarize(
+      topic,
+      papers.map((paper) => ({
+        title: paper.title,
+        url: paper.url,
+        source: "arxiv.org",
+        snippet: paper.abstract.slice(0, 180),
+      })),
+    )}`
+    const citations = Evidence.pack(
+      papers.map((paper) => ({
+        title: paper.title,
+        url: paper.url,
+        source: "arxiv.org",
+        snippet: paper.abstract.slice(0, 180),
+      })),
+    )
 
     log.info("literature review completed", {
       correlationId: context.correlationId,
@@ -176,6 +162,8 @@ export const LiteratureReviewSkill: Skill = {
       papers,
       summary,
       totalFound: papers.length,
+      citations: citations.citations,
+      evidence: citations.references,
     }
   },
 }

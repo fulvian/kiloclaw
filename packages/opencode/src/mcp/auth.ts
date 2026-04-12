@@ -1,7 +1,6 @@
-import path from "path"
 import z from "zod"
-import { Global } from "../global"
-import { Filesystem } from "../util/filesystem"
+import { McpAuthStore } from "./auth-store"
+import { canonicalUrl } from "./auth-url"
 
 export namespace McpAuth {
   export const Tokens = z.object({
@@ -29,102 +28,68 @@ export namespace McpAuth {
   })
   export type Entry = z.infer<typeof Entry>
 
-  const filepath = path.join(Global.Path.data, "mcp-auth.json")
+  // Delegate to canonical+runtime store for all operations
+  // This ensures credentials are available across all worktrees
 
   export async function get(mcpName: string): Promise<Entry | undefined> {
-    const data = await all()
-    return data[mcpName]
+    return McpAuthStore.get(mcpName)
   }
 
   /**
    * Get auth entry and validate it's for the correct URL.
    * Returns undefined if URL has changed (credentials are invalid).
+   * Uses URL canonicalization for stable comparison.
    */
   export async function getForUrl(mcpName: string, serverUrl: string): Promise<Entry | undefined> {
-    const entry = await get(mcpName)
-    if (!entry) return undefined
-
-    // If no serverUrl is stored, this is from an old version - consider it invalid
-    if (!entry.serverUrl) return undefined
-
-    // If URL has changed, credentials are invalid
-    if (entry.serverUrl !== serverUrl) return undefined
-
-    return entry
+    return McpAuthStore.getForUrl(mcpName, serverUrl)
   }
 
   export async function all(): Promise<Record<string, Entry>> {
-    return Filesystem.readJson<Record<string, Entry>>(filepath).catch(() => ({}))
+    return McpAuthStore.all()
   }
 
   export async function set(mcpName: string, entry: Entry, serverUrl?: string): Promise<void> {
-    const data = await all()
-    // Always update serverUrl if provided
-    if (serverUrl) {
-      entry.serverUrl = serverUrl
-    }
-    await Filesystem.writeJson(filepath, { ...data, [mcpName]: entry }, 0o600)
+    return McpAuthStore.set(mcpName, entry, serverUrl)
   }
 
   export async function remove(mcpName: string): Promise<void> {
-    const data = await all()
-    delete data[mcpName]
-    await Filesystem.writeJson(filepath, data, 0o600)
+    return McpAuthStore.remove(mcpName)
   }
 
   export async function updateTokens(mcpName: string, tokens: Tokens, serverUrl?: string): Promise<void> {
-    const entry = (await get(mcpName)) ?? {}
-    entry.tokens = tokens
-    await set(mcpName, entry, serverUrl)
+    return McpAuthStore.updateTokens(mcpName, tokens, serverUrl)
   }
 
   export async function updateClientInfo(mcpName: string, clientInfo: ClientInfo, serverUrl?: string): Promise<void> {
-    const entry = (await get(mcpName)) ?? {}
-    entry.clientInfo = clientInfo
-    await set(mcpName, entry, serverUrl)
+    return McpAuthStore.updateClientInfo(mcpName, clientInfo, serverUrl)
   }
 
   export async function updateCodeVerifier(mcpName: string, codeVerifier: string): Promise<void> {
-    const entry = (await get(mcpName)) ?? {}
-    entry.codeVerifier = codeVerifier
-    await set(mcpName, entry)
+    return McpAuthStore.updateCodeVerifier(mcpName, codeVerifier)
   }
 
   export async function clearCodeVerifier(mcpName: string): Promise<void> {
-    const entry = await get(mcpName)
-    if (entry) {
-      delete entry.codeVerifier
-      await set(mcpName, entry)
-    }
+    return McpAuthStore.clearCodeVerifier(mcpName)
   }
 
   export async function updateOAuthState(mcpName: string, oauthState: string): Promise<void> {
-    const entry = (await get(mcpName)) ?? {}
-    entry.oauthState = oauthState
-    await set(mcpName, entry)
+    return McpAuthStore.updateOAuthState(mcpName, oauthState)
   }
 
   export async function getOAuthState(mcpName: string): Promise<string | undefined> {
-    const entry = await get(mcpName)
-    return entry?.oauthState
+    return McpAuthStore.getOAuthState(mcpName)
   }
 
   export async function clearOAuthState(mcpName: string): Promise<void> {
-    const entry = await get(mcpName)
-    if (entry) {
-      delete entry.oauthState
-      await set(mcpName, entry)
-    }
+    return McpAuthStore.clearOAuthState(mcpName)
   }
 
   /**
    * Check if stored tokens are expired.
    * Returns null if no tokens exist, false if no expiry or not expired, true if expired.
+   * Uses a 120-second skew to avoid race conditions near expiry.
    */
   export async function isTokenExpired(mcpName: string): Promise<boolean | null> {
-    const entry = await get(mcpName)
-    if (!entry?.tokens) return null
-    if (!entry.tokens.expiresAt) return false
-    return entry.tokens.expiresAt < Date.now() / 1000
+    return McpAuthStore.isTokenExpired(mcpName, 120)
   }
 }

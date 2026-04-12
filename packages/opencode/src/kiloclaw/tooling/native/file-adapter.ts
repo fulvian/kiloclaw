@@ -1,0 +1,18 @@
+import { AdapterOutput, type NativeAdapter } from "./capability-registry"
+
+export namespace NativeFileAdapter {
+  export function create(input?: {
+    id?: string
+    probe?: NativeAdapter["probe"]
+    run?: (data: Record<string, unknown>) => Promise<AdapterOutput>
+  }): NativeAdapter {
+    return {
+      id: input?.id ?? "native.file",
+      capability: "file_ops",
+      probe: input?.probe ?? (async () => ({ healthy: true, latency_ms: 0, reason: "ok" })),
+      invoke:
+        input?.run ??
+        (async () => ({ ok: false, error: "native.file adapter requires injected runner", transient: false })),
+    }
+  }
+}

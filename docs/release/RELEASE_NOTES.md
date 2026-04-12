@@ -1,6 +1,169 @@
+# Kiloclaw 7.4.0 Release Notes
+
+> **Release Date:** 2026-04-07  
+> **Version:** 7.4.0  
+> **Type:** Semantic Memory Major Release  
+> **Status:** Production Ready
+
+---
+
+## Corrective Update (2026-04-09)
+
+Task scheduling corrective work is now fully shipped for the runtime/TUI path.
+
+| Area                  | Update                                                                  | Status |
+| --------------------- | ----------------------------------------------------------------------- | ------ |
+| **TUI routing**       | Unified `/tasks` command parser and explicit dispatch in TUI            | ✅     |
+| **Runtime execution** | Daemon now uses a real executor adapter with no fake success path       | ✅     |
+| **Scheduling loop**   | Daemon-managed single loop mode removes duplicate runtime ticks         | ✅     |
+| **Run-now contract**  | `run-now` now returns typed reason codes for blocked/failed acceptance  | ✅     |
+| **Task selector UX**  | Selectors support short ref `tsk_...`, task name, and list index `#<n>` | ✅     |
+
+---
+
+## Executive Summary
+
+Kiloclaw 7.4.0 introduces the **Semantic Memory Trigger** - replacing hardcoded keyword-based recall with pure embedding-based semantic similarity. This enables multilingual recall without language-specific keyword maintenance.
+
+---
+
+## What's New in 7.4.0
+
+### Semantic Memory Trigger (Major)
+
+| Feature                   | Description                                                     | Status |
+| ------------------------- | --------------------------------------------------------------- | ------ |
+| **Pure Semantic Trigger** | Zero hardcoded keywords - works for ALL languages automatically | ✅     |
+| **BM25 Fallback**         | Lexical fallback when LM Studio unavailable                     | ✅     |
+| **Hybrid Retrieval**      | Vector (0.7) + BM25 (0.3) fusion (ReMe paper)                   | ✅     |
+| **Multilingual Support**  | Italian, English, any language without keyword config           | ✅     |
+
+**Architecture:**
+
+```
+User Query → SemanticTriggerPolicy → Embed + Cosine Similarity → Threshold Decision
+                                    ↓
+                            Recent Episodes Embedding
+                                    ↓
+                            max_similarity > threshold → recall/shadow/skip
+```
+
+**Feature Flags:**
+
+```bash
+KILOCLAW_SEMANTIC_TRIGGER_V1=true           # Semantic trigger PRIMARY (default)
+KILOCLAW_SEMANTIC_THRESHOLD_RECALL=0.42    # Recall threshold
+KILOCLAW_SEMANTIC_THRESHOLD_SHADOW=0.28    # Shadow threshold
+KILOCLAW_HYBRID_VECTOR_WEIGHT=0.7          # Vector weight (ReMe paper)
+KILOCLAW_HYBRID_BM25_WEIGHT=0.3            # BM25 weight (ReMe paper)
+```
+
+**Files:**
+
+- `semantic-trigger.policy.ts` - Core semantic trigger
+- `hybrid-retriever.ts` - Vector + BM25 fusion
+- `memory.recall-policy.ts` - Updated to use semantic trigger
+- `plugin.ts` - Simplified (regex arrays removed)
+
+**Tests:** 23 new tests + 707 existing tests passing
+
+### Bug Fixes in 7.4.0 (2026-04-07)
+
+| Issue                                           | Description                                                                                                                                                                                                                                                                      | Fix                                                                                                                |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| **Semantic trigger read from ephemeral memory** | `SemanticTriggerPolicy` was calling `EpisodicMemory.getRecentEpisodes()` which uses an in-memory `Map` that clears on restart. Users' queries about previously discussed topics (e.g., "motherboards") returned no recall because episodes were not persisted in the same store. | Changed to use `EpisodicMemoryRepo.getRecentEpisodes(TENANT, count)` which reads from SQLite (persistent storage). |
+
+---
+
+## Migration from 7.3.0
+
+Semantic Memory Trigger is **enabled by default**. To disable:
+
+```bash
+export KILOCLAW_SEMANTIC_TRIGGER_V1=false
+```
+
+---
+
+# Kiloclaw 7.3.0 Release Notes
+
+> **Release Date:** 2026-04-04  
+> **Version:** 7.3.0  
+> **Type:** Memory Persistence Major Release  
+> **Status:** Production Ready
+
+---
+
+## Executive Summary
+
+Kiloclaw 7.3.0 completes the **Memory Persistence Refoundation (ADR-005)** - enabling persistent storage for the 4-layer memory system with restart recovery, multi-factor ranking, retention enforcement, and audit trails.
+
+---
+
+## What's New in 7.3.0
+
+### Memory V2 - Persistent Memory System
+
+| Feature                   | Description                                                             | Status |
+| ------------------------- | ----------------------------------------------------------------------- | ------ |
+| **Persistence**           | SQLite-based storage survives restarts                                  | ✅     |
+| **Multi-factor Ranking**  | relevance + recency + confidence + success + provenance                 | ✅     |
+| **Token Budgeting**       | 20% working / 25% episodic / 35% semantic / 15% procedural / 5% reserve | ✅     |
+| **Retention Enforcement** | Hard TTL enforcement with configurable policies                         | ✅     |
+| **Feedback Loop**         | User corrections drive learning + pattern detection                     | ✅     |
+| **Audit Trail**           | Append-only hash-chain log for compliance                               | ✅     |
+| **Backfill**              | Legacy → V2 migration utilities                                         | ✅     |
+
+**Architecture:**
+
+- 10 database tables (Drizzle ORM)
+- Repository layer with clean interfaces for future Postgres+pgvector migration
+- Dual-write support during transition
+- Feature flag: `KILO_EXPERIMENTAL_MEMORY_V2` (enabled by default)
+
+**Tests:** 37 tests covering persistence, ranking, retention, and feedback
+
+### Bug Fixes in 7.3.0 (2026-04-04)
+
+| Issue                           | Description                                                                                                                                                                | Fix                                                                                                                                                                        |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Episodic write gap**          | `MemoryBrokerV2.write(layer: "episodic")` only recorded events, not episode records. `retrieve()` reads from `getRecentEpisodes()`, resulting in empty episodic retrieval. | `write()` now creates full episode records in `episodes` table alongside events                                                                                            |
+| **Purge no-op**                 | `purgeEntry()` in V2 path only logged to console, did not actually delete entries. Retention enforcement was not operational.                                              | Now calls `MemoryRetention.purgeEntries()` with proper layer inference and error handling                                                                                  |
+| **No memory context injection** | Router agent had no path to retrieve and inject memory context into prompts. Questions about "previous conversations" returned "I don't have access".                      | New `memory/plugin.ts` with two hooks: `chat.message` captures turns; `experimental.chat.messages.transform` intercepts recall queries and injects session + semantic hits |
+| **No-stub gate missing**        | No CI gate prevented placeholder/stub code in memory production paths                                                                                                      | Added `memory-no-stub.test.ts` checking for banned patterns (TODO, placeholder, pseudo-embedding, etc.)                                                                    |
+
+**Net effect:** Router agent can now answer "what did we talk about in our last conversations?" by recovering context from persistent memory.
+
+### Hardening updates (2026-04-06)
+
+| Area                           | Update                                                                                                                                                                                             | Status |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| **Strict env gating**          | `KILOCLAW_STRICT_ENV=true` now blocks legacy prefixes `ARIA_`, `KILO_`, `OPENCODE_` in runtime/config paths                                                                                        | ✅     |
+| **Policy audit observability** | Service health includes `policy-audit-trail` check item for audit trail visibility                                                                                                                 | ✅     |
+| **CI regression subset**       | `.github/workflows/test.yml` includes targeted regression run for `test/kiloclaw/config-legacy-adapter.test.ts`, `test/kiloclaw/config-strict-env.test.ts`, `test/kiloclaw/service-health.test.ts` | ✅     |
+| **Verification snapshot**      | Full Kiloclaw suite result: **690 pass, 3 skip, 0 fail**                                                                                                                                           | ✅     |
+
+---
+
+## Migration from 7.2.0
+
+Memory V2 is **enabled by default**. To disable:
+
+```bash
+export KILO_EXPERIMENTAL_MEMORY_V2=false
+```
+
+---
+
+## Upgrading from 7.2.0
+
+No migration needed - memory data is automatically persisted on first use.
+
+---
+
 # Kiloclaw 7.2.0 Release Notes
 
-> **Release Date:** 2026-04-02  
+> **Release Date:** 2026-04-03  
 > **Version:** 7.2.0  
 > **Type:** Major Foundation Release  
 > **Status:** Ready for Go-Live
@@ -73,13 +236,14 @@ Comprehensive safety system with multiple guardrails:
 
 Complete technical separation from upstream:
 
-| Domain         | Kiloclaw Target    | Verification |
-| -------------- | ------------------ | ------------ |
-| Namespace      | `@kilocode/*`      | ✅ Complete  |
-| Config prefix  | `KILOCLAW_*` only  | ✅ Enforced  |
-| Data directory | `~/.kiloclaw/`     | ✅ Isolated  |
-| Binary         | `kiloclaw`         | ✅ Named     |
-| Telemetry      | Dedicated pipeline | ✅ Isolated  |
+| Domain         | Kiloclaw Target                                           | Verification |
+| -------------- | --------------------------------------------------------- | ------------ |
+| Namespace      | `@kiloclaw/*`                                             | ✅ Complete  |
+| Config prefix  | `KILOCLAW_*` only                                         | ✅ Enforced  |
+| Data directory | `~/.kiloclaw/`                                            | ✅ Isolated  |
+| Binary         | `kiloclaw`                                                | ✅ Named     |
+| Telemetry      | Dedicated pipeline                                        | ✅ Isolated  |
+| Path isolation | No fallback to `~/.kilo/`, `~/.kilocode/`, `~/.opencode/` | ✅ Enforced  |
 
 ---
 
@@ -235,5 +399,11 @@ All 364 tests pass across 10 test suites:
 
 ---
 
-_Release Notes Version: 1.0.0_  
-_Generated: 2026-04-02_
+## Stabilization note (April 2026)
+
+See `docs/foundation/STABILIZZAZIONE_APRILE_2026.md` for consolidated infrastructure unblockers, core fixes, real agent-to-skill integration status, verification evidence, and updated dev-mode CLI commands.
+
+---
+
+_Release Notes Version: 1.0.2_  
+_Generated: 2026-04-06_

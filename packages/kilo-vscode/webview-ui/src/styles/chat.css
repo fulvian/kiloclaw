@@ -328,7 +328,7 @@
 .kilo-logo {
   width: 48px;
   height: 48px;
-  opacity: 0.85;
+  opacity: 1;
 }
 
 .kilo-logo img {
@@ -982,6 +982,7 @@
   position: relative;
   flex: 1;
   min-width: 0;
+  overflow: hidden;
 }
 
 .prompt-input-ghost-wrapper .prompt-input {

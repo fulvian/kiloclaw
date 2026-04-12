@@ -44,18 +44,21 @@ export namespace UI {
   export function logo(pad?: string) {
     const result: string[] = []
     const reset = "\x1b[0m"
-    const left = {
-      fg: "\x1b[90m",
-      shadow: "\x1b[38;5;235m",
-      bg: "\x1b[48;5;235m",
-    }
-    const right = {
-      fg: reset,
-      shadow: "\x1b[38;5;238m",
-      bg: "\x1b[48;5;238m",
-    }
+    // Green gradient colors (dark to bright)
+    const greenColors = [
+      { fg: "\x1b[38;5;22m", shadow: "\x1b[38;5;28m", bg: "\x1b[48;5;22m" }, // dark green
+      { fg: "\x1b[38;5;28m", shadow: "\x1b[38;5;34m", bg: "\x1b[48;5;28m" }, // darker green
+      { fg: "\x1b[38;5;34m", shadow: "\x1b[38;5;40m", bg: "\x1b[48;5;34m" }, // dark-medium green
+      { fg: "\x1b[38;5;40m", shadow: "\x1b[38;5;46m", bg: "\x1b[48;5;40m" }, // medium green
+      { fg: "\x1b[38;5;46m", shadow: "\x1b[38;5;82m", bg: "\x1b[48;5;46m" }, // medium-bright green
+      { fg: "\x1b[38;5;82m", shadow: "\x1b[38;5;118m", bg: "\x1b[48;5;82m" }, // bright green
+      { fg: "\x1b[38;5;118m", shadow: "\x1b[38;5;154m", bg: "\x1b[48;5;118m" }, // very bright green
+      { fg: "\x1b[38;5;154m", shadow: "\x1b[38;5;190m", bg: "\x1b[48;5;154m" }, // extremely bright green
+    ]
     const gap = " "
-    const draw = (line: string, fg: string, shadow: string, bg: string) => {
+    const draw = (line: string, colorIdx: number) => {
+      const color = greenColors[colorIdx % greenColors.length]!
+      const { fg, shadow, bg } = color
       const parts: string[] = []
       for (const char of line) {
         if (char === "_") {
@@ -78,14 +81,19 @@ export namespace UI {
       }
       return parts.join("")
     }
-    glyphs.left.forEach((row, index) => {
+    const totalRows = Math.max(glyphs.left.length, glyphs.right.length)
+    for (let i = 0; i < totalRows; i++) {
       if (pad) result.push(pad)
-      result.push(draw(row, left.fg, left.shadow, left.bg))
+      const leftRow = glyphs.left[i] ?? ""
+      const rightRow = glyphs.right[i] ?? ""
+      // Calculate gradient position based on row
+      const leftColorIdx = Math.floor((i / totalRows) * greenColors.length)
+      const rightColorIdx = Math.floor(((i + 1) / totalRows) * greenColors.length)
+      result.push(draw(leftRow, leftColorIdx))
       result.push(gap)
-      const other = glyphs.right[index] ?? ""
-      result.push(draw(other, right.fg, right.shadow, right.bg))
+      result.push(draw(rightRow, rightColorIdx))
       result.push(EOL)
-    })
+    }
     return result.join("").trimEnd()
   }
   // kilocode_change end

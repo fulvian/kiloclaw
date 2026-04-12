@@ -17,7 +17,27 @@ import { readdir } from "fs/promises"
 
 const SUBSCRIBE_TIMEOUT_MS = 10_000
 
-declare const KILO_LIBC: string | undefined
+/**
+ * Detect libc type on Linux at runtime.
+ * Tries multiple methods to determine if the system uses glibc or musl.
+ */
+function detectLibc(): string {
+  if (process.platform !== "linux") return "glibc"
+
+  // Check for musl-based distribution markers
+  try {
+    const { existsSync } = require("fs")
+    if (existsSync("/etc/alpine-release")) return "musl"
+    if (existsSync("/lib/libc.musl-x86_64.so.1")) return "musl"
+    if (existsSync("/lib64/libc.musl-x86_64.so.1")) return "musl"
+    // Check for glibc
+    if (existsSync("/lib/libc.so.6")) return "glibc"
+    if (existsSync("/lib64/libc.so.6")) return "glibc"
+  } catch {}
+
+  // Default to glibc (most common)
+  return "glibc"
+}
 
 export namespace FileWatcher {
   const log = Log.create({ service: "file.watcher" })
@@ -34,8 +54,9 @@ export namespace FileWatcher {
 
   const watcher = lazy((): typeof import("@parcel/watcher") | undefined => {
     try {
+      const libc = detectLibc()
       const binding = require(
-        `@parcel/watcher-${process.platform}-${process.arch}${process.platform === "linux" ? `-${KILO_LIBC || "glibc"}` : ""}`,
+        `@parcel/watcher-${process.platform}-${process.arch}${process.platform === "linux" ? `-${libc}` : ""}`,
       )
       return createWrapper(binding) as typeof import("@parcel/watcher")
     } catch (error) {

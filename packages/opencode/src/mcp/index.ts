@@ -28,6 +28,9 @@ import { withTimeout } from "@/util/timeout"
 import { McpOAuthProvider } from "./oauth-provider"
 import { McpOAuthCallback } from "./oauth-callback"
 import { McpAuth } from "./auth"
+import { McpAuthCoordinator } from "./auth-coordinator"
+import type { EnsureResult } from "./auth-coordinator"
+import { McpRefreshManager } from "./refresh-manager"
 import { BusEvent } from "../bus/bus-event"
 import { Bus } from "@/bus"
 import { TuiEvent } from "@/cli/cmd/tui/event"
@@ -127,7 +130,14 @@ export namespace MCP {
   }
 
   // Convert MCP tool definition to AI SDK Tool type
-  async function convertMcpTool(mcpTool: MCPToolDef, client: MCPClient, timeout?: number): Promise<Tool> {
+  async function convertMcpTool(
+    mcpTool: MCPToolDef,
+    client: MCPClient,
+    serverName: string,
+    serverUrl: string,
+    timeout?: number,
+    statusRef?: { status: Record<string, Status> },
+  ): Promise<Tool> {
     const inputSchema = mcpTool.inputSchema
 
     // Spread first, then override type to ensure it's always "object"
@@ -142,17 +152,51 @@ export namespace MCP {
       description: mcpTool.description ?? "",
       inputSchema: jsonSchema(schema),
       execute: async (args: unknown) => {
-        return client.callTool(
-          {
-            name: mcpTool.name,
-            arguments: (args || {}) as Record<string, unknown>,
-          },
-          CallToolResultSchema,
-          {
-            resetTimeoutOnProgress: true,
-            timeout,
-          },
-        )
+        try {
+          return await client.callTool(
+            {
+              name: mcpTool.name,
+              arguments: (args || {}) as Record<string, unknown>,
+            },
+            CallToolResultSchema,
+            {
+              resetTimeoutOnProgress: true,
+              timeout,
+            },
+          )
+        } catch (error) {
+          // Handle 401 with automatic retry once
+          if (error instanceof UnauthorizedError || (error instanceof Error && error.message.includes("401"))) {
+            log.info("received 401, attempting automatic recovery", { server: serverName, tool: mcpTool.name })
+
+            const recovered = await McpAuthCoordinator.handleUnauthorized(serverName, serverUrl)
+            if (recovered.recovered) {
+              log.info("recovery successful, retrying tool call", { server: serverName, tool: mcpTool.name })
+              // Retry the tool call once
+              return await client.callTool(
+                {
+                  name: mcpTool.name,
+                  arguments: (args || {}) as Record<string, unknown>,
+                },
+                CallToolResultSchema,
+                {
+                  resetTimeoutOnProgress: true,
+                  timeout,
+                },
+              )
+            }
+
+            // Recovery failed - check if we need auth or can continue
+            if (recovered.error) {
+              // Mark as needing auth
+              await McpAuthCoordinator.markNeedsAuth(serverName, recovered.error)
+              if (statusRef) {
+                statusRef.status[serverName] = { status: "needs_auth" }
+              }
+            }
+          }
+          throw error
+        }
       },
     })
   }
@@ -408,6 +452,20 @@ export namespace MCP {
         } catch (error) {
           lastError = error instanceof Error ? error : new Error(String(error))
 
+          if (
+            lastError.message.includes("No OAuth state saved") ||
+            lastError.message.includes("No code verifier saved")
+          ) {
+            status = { status: "needs_auth" as const }
+            Bus.publish(TuiEvent.ToastShow, {
+              title: "MCP Authentication Required",
+              message: `Server "${key}" requires authentication. Run: kilo mcp auth ${key}`,
+              variant: "warning",
+              duration: 8000,
+            }).catch((e) => log.debug("failed to show toast", { error: e }))
+            break
+          }
+
           // Handle OAuth-specific errors
           if (error instanceof UnauthorizedError) {
             log.info("mcp server requires authentication", { key, transport: name })
@@ -654,10 +712,19 @@ export namespace MCP {
       const mcpConfig = config[clientName]
       const entry = isMcpConfigured(mcpConfig) ? mcpConfig : undefined
       const timeout = entry?.timeout ?? defaultTimeout
+      // Get serverUrl for 401 retry handling
+      const serverUrl = entry?.type === "remote" ? entry.url : ""
       for (const mcpTool of toolsResult.tools) {
         const sanitizedClientName = clientName.replace(/[^a-zA-Z0-9_-]/g, "_")
         const sanitizedToolName = mcpTool.name.replace(/[^a-zA-Z0-9_-]/g, "_")
-        result[sanitizedClientName + "_" + sanitizedToolName] = await convertMcpTool(mcpTool, client, timeout)
+        result[sanitizedClientName + "_" + sanitizedToolName] = await convertMcpTool(
+          mcpTool,
+          client,
+          clientName,
+          serverUrl,
+          timeout,
+          { status: s.status },
+        )
       }
     }
     return result
@@ -991,5 +1058,14 @@ export namespace MCP {
     if (!hasTokens) return "not_authenticated"
     const expired = await McpAuth.isTokenExpired(mcpName)
     return expired ? "expired" : "authenticated"
+  }
+
+  /**
+   * Ensure all MCP servers are authenticated at session start.
+   * Called before the chat UI renders to verify/refresh auth.
+   */
+  export async function ensureAtSessionStart(): Promise<Record<string, EnsureResult>> {
+    await McpAuthCoordinator.initialize()
+    return McpAuthCoordinator.ensureAtSessionStart()
   }
 }

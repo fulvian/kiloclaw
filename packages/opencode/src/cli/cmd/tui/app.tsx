@@ -7,6 +7,8 @@ import { Switch, Match, createEffect, untrack, ErrorBoundary, createSignal, onMo
 import { win32DisableProcessedInput, win32FlushInputBuffer, win32InstallCtrlCGuard } from "./win32"
 import { Installation } from "@/installation"
 import { Flag } from "@/flag/flag"
+import { ProactiveTaskStore } from "@/kiloclaw/proactive/scheduler.store"
+import { SchedulerControlService } from "@/kiloclaw/proactive/scheduler-control.service"
 import { DialogProvider, useDialog } from "@tui/ui/dialog"
 import { DialogProvider as DialogProviderList } from "@tui/component/dialog-provider"
 import { SDKProvider, useSDK } from "@tui/context/sdk"
@@ -17,6 +19,11 @@ import { DialogMcp } from "@tui/component/dialog-mcp"
 import { DialogStatus } from "@tui/component/dialog-status"
 import { DialogThemeList } from "@tui/component/dialog-theme-list"
 import { DialogHelp } from "./ui/dialog-help"
+import { DialogTaskWizard } from "./ui/dialog-task-wizard"
+import { DialogTaskList } from "./ui/dialog-task-list"
+import { DialogTaskDetail } from "./ui/dialog-task-detail"
+import { DialogTaskRuns } from "./ui/dialog-task-runs"
+import { DialogTaskDLQ } from "./ui/dialog-task-dlq"
 import { CommandProvider, useCommandDialog } from "@tui/component/dialog-command"
 import { DialogAgent } from "@tui/component/dialog-agent"
 import { DialogSessionList } from "@tui/component/dialog-session-list"
@@ -29,7 +36,7 @@ import { PromptHistoryProvider } from "./component/prompt/history"
 import { FrecencyProvider } from "./component/prompt/frecency"
 import { PromptStashProvider } from "./component/prompt/stash"
 import { DialogAlert } from "./ui/dialog-alert"
-import { isKiloError, showKiloErrorToast } from "@/kilocode/kilo-errors" // kilocode_change
+import { isKiloError, showKiloErrorToast } from "@/kilocaw-legacy/kilo-errors" // kilocode_change
 import { ToastProvider, useToast } from "./ui/toast"
 import { ExitProvider, useExit } from "./context/exit"
 import { Session as SessionApi } from "@/session"
@@ -42,10 +49,13 @@ import { ArgsProvider, useArgs, type Args } from "./context/args"
 import open from "open"
 import { writeHeapSnapshot } from "v8"
 import { PromptRefProvider, usePromptRef } from "./context/prompt"
-import { registerKiloCommands } from "@/kilocode/kilo-commands" // kilocode_change
+import { registerKiloCommands } from "@/kilocaw-legacy/kilo-commands" // kilocode_change
 import { initializeTUIDependencies } from "@kilocode/kilo-gateway/tui" // kilocode_change
 import { TuiConfigProvider } from "./context/tui-config"
 import { TuiConfig } from "@/config/tui"
+import { requestSessionFeedback } from "./routes/session/feedback-bar" // kilocode_change
+import { setTaskCommandHandlers } from "./task-command-router"
+import { DialogTaskHelp } from "./ui/dialog-task-help"
 
 async function getTerminalBackgroundColor(): Promise<"dark" | "light"> {
   // can't set raw mode if not a TTY
@@ -390,9 +400,53 @@ function App() {
         aliases: ["resume", "continue"],
       },
       onSelect: () => {
-        dialog.replace(() => <DialogSessionList />)
+        // kilocode_change start - request session feedback before switching sessions
+        const sessionId = route.data.type === "session" ? route.data.sessionID : undefined
+        const showSessionList = () => {
+          dialog.replace(() => <DialogSessionList />)
+        }
+        if (sessionId) {
+          requestSessionFeedback(sessionId, showSessionList)
+        } else {
+          showSessionList()
+        }
+        // kilocode_change end
       },
     },
+    // kilocode_change start - /tasks slash command for scheduled task management
+    {
+      title: "Manage tasks",
+      value: "task.list",
+      keybind: "task_list",
+      category: "Task",
+      suggested: false,
+      slash: {
+        name: "tasks",
+        aliases: ["task"],
+      },
+      onSelect: () => {
+        handleTaskNavigate("list")
+      },
+    },
+    {
+      title: "New task",
+      value: "task.new",
+      category: "Task",
+      hidden: true,
+      onSelect: () => {
+        handleTaskNavigate("new")
+      },
+    },
+    {
+      title: "Task help",
+      value: "task.help",
+      category: "Task",
+      hidden: true,
+      onSelect: () => {
+        dialog.replace(() => <DialogTaskHelp />)
+      },
+    },
+    // kilocode_change end
     ...(Flag.KILO_EXPERIMENTAL_WORKSPACES_TUI
       ? [
           {
@@ -423,11 +477,21 @@ function App() {
         const current = promptRef.current
         // Don't require focus - if there's any text, preserve it
         const currentPrompt = current?.current?.input ? current.current : undefined
-        route.navigate({
-          type: "home",
-          initialPrompt: currentPrompt,
-        })
-        dialog.clear()
+        // kilocode_change start - request session feedback before new session
+        const sessionId = route.data.type === "session" ? route.data.sessionID : undefined
+        const navigateAndClear = () => {
+          route.navigate({
+            type: "home",
+            initialPrompt: currentPrompt,
+          })
+          dialog.clear()
+        }
+        if (sessionId) {
+          requestSessionFeedback(sessionId, navigateAndClear)
+        } else {
+          navigateAndClear()
+        }
+        // kilocode_change end
       },
     },
     {
@@ -608,7 +672,16 @@ function App() {
         name: "exit",
         aliases: ["quit", "q"],
       },
-      onSelect: () => exit(),
+      // kilocode_change start - request session feedback before exit
+      onSelect: () => {
+        const sessionId = route.data.type === "session" ? route.data.sessionID : undefined
+        if (sessionId) {
+          requestSessionFeedback(sessionId, () => exit())
+        } else {
+          exit()
+        }
+      },
+      // kilocode_change end
       category: "System",
     },
     {
@@ -742,6 +815,286 @@ function App() {
       sessionID: evt.properties.sessionID,
     })
   })
+
+  // kilocode_change start - Task navigation handler (direct call, no Bus subscription)
+  const handleTaskNavigate = (
+    action: "new" | "list" | "show" | "edit" | "wizard" | "runs" | "dlq" | "pause" | "resume" | "run" | "delete",
+    taskId?: string,
+  ) => {
+    if (!Flag.KILOCLAW_SCHEDULED_TASKS_ENABLED) return
+
+    if (action === "new") {
+      if (!Flag.KILOCLAW_SCHEDULED_TASKS_WIZARD_ENABLED && Flag.KILOCLAW_SCHEDULED_TASKS_ENABLED) {
+        queueMicrotask(() => toast.show({ variant: "error", message: "Task wizard is disabled", duration: 2000 }))
+        return
+      }
+      dialog.replace(() => (
+        <DialogTaskWizard
+          taskId={taskId}
+          onComplete={() => {
+            queueMicrotask(() =>
+              toast.show({
+                variant: "success",
+                message: taskId ? "Task updated successfully" : "Task created successfully",
+                duration: 3000,
+              }),
+            )
+          }}
+        />
+      ))
+      return
+    }
+
+    if (action === "list") {
+      if (!Flag.KILOCLAW_SCHEDULED_TASKS_VIEWS_ENABLED && Flag.KILOCLAW_SCHEDULED_TASKS_ENABLED) {
+        queueMicrotask(() => toast.show({ variant: "error", message: "Task views are disabled", duration: 2000 }))
+        return
+      }
+      dialog.replace(() => (
+        <DialogTaskList
+          onSelectTask={(id, act) => handleTaskNavigate(act, id)}
+          onCreateNew={() => handleTaskNavigate("new")}
+          onClose={() => dialog.clear()}
+        />
+      ))
+      return
+    }
+
+    if (action === "show") {
+      if (!Flag.KILOCLAW_SCHEDULED_TASKS_VIEWS_ENABLED && Flag.KILOCLAW_SCHEDULED_TASKS_ENABLED) {
+        queueMicrotask(() => toast.show({ variant: "error", message: "Task views are disabled", duration: 2000 }))
+        return
+      }
+      if (!taskId) {
+        handleTaskNavigate("list")
+        return
+      }
+      dialog.replace(() => (
+        <DialogTaskDetail
+          taskId={taskId}
+          onEdit={() => handleTaskNavigate("wizard", taskId)}
+          onRuns={() => handleTaskNavigate("runs", taskId)}
+          onDLQ={() => handleTaskNavigate("dlq", taskId)}
+          onPause={() => {
+            SchedulerControlService.pauseTask(taskId)
+            queueMicrotask(() => toast.show({ variant: "info", message: "Task paused", duration: 2000 }))
+            handleTaskNavigate("show", taskId)
+          }}
+          onResume={() => {
+            const task = SchedulerControlService.resumeTask(taskId)
+            if (!task) {
+              queueMicrotask(() => toast.show({ variant: "error", message: "Task not found", duration: 2000 }))
+              return
+            }
+            queueMicrotask(() => toast.show({ variant: "info", message: "Task resumed", duration: 2000 }))
+            handleTaskNavigate("show", taskId)
+          }}
+          onRunNow={() => {
+            SchedulerControlService.runNow(taskId, "manual").then((out) => {
+              if (out.accepted) {
+                queueMicrotask(() => toast.show({ variant: "success", message: "Task executed", duration: 2000 }))
+              } else {
+                queueMicrotask(() =>
+                  toast.show({ variant: "error", message: `Run blocked: ${out.reasonCode}`, duration: 2000 }),
+                )
+              }
+              handleTaskNavigate("show", taskId)
+            })
+          }}
+          onDelete={() => {
+            // Show confirmation dialog before delete
+            const { ProactiveTaskStore } = require("@/kiloclaw/proactive/scheduler.store")
+            const taskToDelete = ProactiveTaskStore.get(taskId)
+            const taskName = taskToDelete?.name || taskId
+            dialog.replace(() => (
+              <DialogAlert
+                title="Delete Task"
+                message={`Are you sure you want to delete "${taskName}"? This cannot be undone.`}
+                onConfirm={() => {
+                  SchedulerControlService.deleteTask(taskId)
+                  queueMicrotask(() => toast.show({ variant: "info", message: "Task deleted", duration: 2000 }))
+                  dialog.clear()
+                }}
+              />
+            ))
+          }}
+          onClose={() => dialog.clear()}
+        />
+      ))
+      return
+    }
+
+    if (action === "wizard") {
+      // Separate wizard route - opens task wizard for edit
+      if (!Flag.KILOCLAW_SCHEDULED_TASKS_WIZARD_ENABLED && Flag.KILOCLAW_SCHEDULED_TASKS_ENABLED) {
+        queueMicrotask(() => toast.show({ variant: "error", message: "Task wizard is disabled", duration: 2000 }))
+        return
+      }
+      dialog.replace(() => (
+        <DialogTaskWizard
+          taskId={taskId}
+          onComplete={() => {
+            queueMicrotask(() =>
+              toast.show({ variant: "success", message: "Task updated successfully", duration: 3000 }),
+            )
+          }}
+        />
+      ))
+      return
+    }
+
+    if (action === "runs") {
+      if (!Flag.KILOCLAW_SCHEDULED_TASKS_VIEWS_ENABLED && Flag.KILOCLAW_SCHEDULED_TASKS_ENABLED) {
+        queueMicrotask(() => toast.show({ variant: "error", message: "Task views are disabled", duration: 2000 }))
+        return
+      }
+      if (!taskId) {
+        queueMicrotask(() =>
+          toast.show({ variant: "error", message: "Task ID required for runs view", duration: 2000 }),
+        )
+        return
+      }
+      dialog.replace(() => <DialogTaskRuns taskId={taskId} onClose={() => dialog.clear()} />)
+      return
+    }
+
+    if (action === "dlq") {
+      if (!Flag.KILOCLAW_SCHEDULED_TASKS_VIEWS_ENABLED && Flag.KILOCLAW_SCHEDULED_TASKS_ENABLED) {
+        queueMicrotask(() => toast.show({ variant: "error", message: "Task views are disabled", duration: 2000 }))
+        return
+      }
+      dialog.replace(() => (
+        <DialogTaskDLQ
+          taskId={taskId}
+          onReplayEntry={(entryId) => {
+            const replay = SchedulerControlService.replayDlq(entryId)
+            if (!replay.accepted) {
+              queueMicrotask(() =>
+                toast.show({ variant: "error", message: `Replay failed: ${replay.reasonCode}`, duration: 2000 }),
+              )
+              return
+            }
+            queueMicrotask(() => toast.show({ variant: "success", message: "DLQ entry replayed", duration: 2000 }))
+          }}
+          onRemoveEntry={(entryId) => {
+            // Show confirmation dialog before removing DLQ entry
+            dialog.replace(() => (
+              <DialogAlert
+                title="Remove DLQ Entry"
+                message="Are you sure you want to remove this entry from the DLQ? This cannot be undone."
+                onConfirm={() => {
+                  const { ProactiveTaskStore } = require("@/kiloclaw/proactive/scheduler.store")
+                  ProactiveTaskStore.removeFromDLQ(entryId)
+                  queueMicrotask(() => toast.show({ variant: "info", message: "DLQ entry removed", duration: 2000 }))
+                  handleTaskNavigate("dlq", taskId)
+                }}
+              />
+            ))
+          }}
+          onClose={() => dialog.clear()}
+        />
+      ))
+    }
+  }
+
+  setTaskCommandHandlers({
+    list: () => handleTaskNavigate("list"),
+    new: () => handleTaskNavigate("new"),
+    help: () => command.trigger("task.help"),
+    show: (selector) => {
+      const result = SchedulerControlService.resolveTask(selector)
+      if (!result.ok) {
+        const message = result.code === "ambiguous" ? `Ambiguous selector: ${selector}` : `Task not found: ${selector}`
+        queueMicrotask(() => toast.show({ variant: "error", message, duration: 2500 }))
+        return
+      }
+      handleTaskNavigate("show", result.task.id)
+    },
+    edit: (selector) => {
+      const result = SchedulerControlService.resolveTask(selector)
+      if (!result.ok) {
+        const message = result.code === "ambiguous" ? `Ambiguous selector: ${selector}` : `Task not found: ${selector}`
+        queueMicrotask(() => toast.show({ variant: "error", message, duration: 2500 }))
+        return
+      }
+      handleTaskNavigate("wizard", result.task.id)
+    },
+    runs: (selector) => {
+      const result = SchedulerControlService.resolveTask(selector)
+      if (!result.ok) {
+        const message = result.code === "ambiguous" ? `Ambiguous selector: ${selector}` : `Task not found: ${selector}`
+        queueMicrotask(() => toast.show({ variant: "error", message, duration: 2500 }))
+        return
+      }
+      handleTaskNavigate("runs", result.task.id)
+    },
+    dlq: () => handleTaskNavigate("dlq"),
+    pause: (selector) => {
+      const result = SchedulerControlService.resolveTask(selector)
+      if (!result.ok) {
+        const message = result.code === "ambiguous" ? `Ambiguous selector: ${selector}` : `Task not found: ${selector}`
+        queueMicrotask(() => toast.show({ variant: "error", message, duration: 2500 }))
+        return
+      }
+      SchedulerControlService.pauseTask(result.task.id)
+      queueMicrotask(() => toast.show({ variant: "info", message: "Task paused", duration: 2000 }))
+      handleTaskNavigate("show", result.task.id)
+    },
+    resume: (selector) => {
+      const result = SchedulerControlService.resolveTask(selector)
+      if (!result.ok) {
+        const message = result.code === "ambiguous" ? `Ambiguous selector: ${selector}` : `Task not found: ${selector}`
+        queueMicrotask(() => toast.show({ variant: "error", message, duration: 2500 }))
+        return
+      }
+      const task = SchedulerControlService.resumeTask(result.task.id)
+      if (!task) {
+        queueMicrotask(() => toast.show({ variant: "error", message: "Task not found", duration: 2000 }))
+        return
+      }
+      queueMicrotask(() => toast.show({ variant: "info", message: "Task resumed", duration: 2000 }))
+      handleTaskNavigate("show", result.task.id)
+    },
+    run: (selector) => {
+      const result = SchedulerControlService.resolveTask(selector)
+      if (!result.ok) {
+        const message = result.code === "ambiguous" ? `Ambiguous selector: ${selector}` : `Task not found: ${selector}`
+        queueMicrotask(() => toast.show({ variant: "error", message, duration: 2500 }))
+        return
+      }
+      SchedulerControlService.runNow(result.task.id, "manual").then((out) => {
+        if (out.accepted) {
+          queueMicrotask(() => toast.show({ variant: "success", message: "Task executed", duration: 2000 }))
+        } else {
+          queueMicrotask(() =>
+            toast.show({ variant: "error", message: `Run blocked: ${out.reasonCode}`, duration: 2000 }),
+          )
+        }
+        handleTaskNavigate("show", result.task.id)
+      })
+    },
+    delete: (selector) => {
+      const result = SchedulerControlService.resolveTask(selector)
+      if (!result.ok) {
+        const message = result.code === "ambiguous" ? `Ambiguous selector: ${selector}` : `Task not found: ${selector}`
+        queueMicrotask(() => toast.show({ variant: "error", message, duration: 2500 }))
+        return
+      }
+      const label = result.task.name || result.task.ref
+      dialog.replace(() => (
+        <DialogAlert
+          title="Delete Task"
+          message={`Are you sure you want to delete "${label}"? This cannot be undone.`}
+          onConfirm={() => {
+            SchedulerControlService.deleteTask(result.task.id)
+            queueMicrotask(() => toast.show({ variant: "info", message: "Task deleted", duration: 2000 }))
+            dialog.clear()
+          }}
+        />
+      ))
+    },
+  })
+  // kilocode_change end
 
   sdk.event.on(SessionApi.Event.Deleted.type, (evt) => {
     if (route.data.type === "session" && route.data.sessionID === evt.properties.info.id) {

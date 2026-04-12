@@ -221,6 +221,8 @@ export const FactSchema = z.object({
   object: z.unknown(),
   confidence: z.number().min(0).max(1),
   source: z.string().optional(),
+  actorType: z.enum(["user", "agent", "system"]).optional(),
+  actorId: z.string().optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 })
@@ -443,6 +445,8 @@ export interface EpisodicMemory {
 
   // Maintenance
   clear(): void
+  removeEpisode(episodeId: EpisodeId): boolean
+  purgeBefore(cutoff: Date): number
 
   // Statistics
   getStats(): Promise<{
@@ -499,6 +503,8 @@ export interface ProceduralMemory {
   registerPattern(pattern: Omit<SkillPattern, "id">): Promise<PatternId>
   findPattern(skillId: SkillId): Promise<SkillPattern | null>
   updatePatternStats(patternId: PatternId, success: boolean): Promise<void>
+  remove(procedureId: ProcedureId): Promise<boolean>
+  getPatternCount(): Promise<number>
 
   // Maintenance
   clear(): void

@@ -10,7 +10,7 @@ import { Config } from "../config/config"
 import { spawn } from "child_process"
 import { Instance } from "../project/instance"
 import { Flag } from "@/flag/flag"
-import { TsClient } from "../kilocode/ts-client" // kilocode_change
+import { TsClient } from "../kilocaw-legacy/ts-client" // kilocode_change
 
 export namespace LSP {
   const log = Log.create({ service: "lsp" })

@@ -192,6 +192,15 @@ describe("LegacyAdapter", () => {
 
       expect(result.deprecated).toEqual([])
     })
+
+    test("should fail in strict mode when legacy vars are present", () => {
+      const env = {
+        KILOCLAW_STRICT_ENV: "true",
+        ARIA_ENABLED: "true",
+      }
+
+      expect(() => LegacyAdapter.mapAgencyEnv(env)).toThrow("KILOCLAW_STRICT_ENV=true blocks legacy env vars")
+    })
   })
 
   describe("mapMemoryEnv", () => {
@@ -216,6 +225,15 @@ describe("LegacyAdapter", () => {
       const result = LegacyAdapter.mapMemoryEnv(env)
 
       expect(result.env.KILOCLAW_MEMORY_WORKING_ENABLED).toBe("true")
+    })
+
+    test("should fail memory mapping in strict mode with legacy vars", () => {
+      const env = {
+        KILOCLAW_STRICT_ENV: "true",
+        ARIA_MEMORY_WORKING_ENABLED: "true",
+      }
+
+      expect(() => LegacyAdapter.mapMemoryEnv(env)).toThrow("KILOCLAW_STRICT_ENV=true blocks legacy env vars")
     })
   })
 
@@ -259,6 +277,15 @@ describe("LegacyAdapter", () => {
       const result = LegacyAdapter.mapToolEnv(env)
 
       expect(result.env.KILOCLAW_TOOL_DEBUG).toBe("true")
+    })
+
+    test("should fail tool mapping in strict mode with legacy vars", () => {
+      const env = {
+        KILOCLAW_STRICT_ENV: "true",
+        ARIA_TOOL_SCOPE: "read",
+      }
+
+      expect(() => LegacyAdapter.mapToolEnv(env)).toThrow("KILOCLAW_STRICT_ENV=true blocks legacy env vars")
     })
   })
 })

@@ -10,6 +10,8 @@ import { iife } from "@/util/iife"
 import { defer } from "@/util/defer"
 import { Config } from "../config/config"
 import { PermissionNext } from "@/permission/next"
+import { FlexibleAgentRegistry } from "../kiloclaw/agency/registry/agent-registry"
+import { getCatalog } from "../kiloclaw/agency/catalog"
 
 const parameters = z.object({
   description: z.string().describe("A short (3-5 words) description of the task"),
@@ -25,13 +27,30 @@ const parameters = z.object({
 })
 
 export const TaskTool = Tool.define("task", async (ctx) => {
-  const agents = await Agent.list().then((x) => x.filter((a) => a.mode !== "primary"))
+  // Get native agents (filter out primary agents)
+  const nativeAgents = await Agent.list().then((x) => x.filter((a) => a.mode !== "primary"))
+
+  // Get flexible agents from FlexibleAgentRegistry (Phase 3: Eliminazione Nativi)
+  const flexibleAgents = FlexibleAgentRegistry.getAllAgents()
+
+  // Build combined list of accessible subagents
+  // Flexible agents with mode "primary" are excluded from the list
+  const allSubagents = [
+    ...nativeAgents,
+    ...flexibleAgents
+      .filter((a) => a.mode !== "primary")
+      .map((a) => ({
+        name: a.id,
+        description: a.description ?? `Flexible agent: ${a.name}`,
+        mode: "subagent" as const,
+      })),
+  ]
 
   // Filter agents by permissions if agent provided
   const caller = ctx?.agent
   const accessibleAgents = caller
-    ? agents.filter((a) => PermissionNext.evaluate("task", a.name, caller.permission).action !== "deny")
-    : agents
+    ? allSubagents.filter((a) => PermissionNext.evaluate("task", a.name, caller.permission).action !== "deny")
+    : allSubagents
 
   const description = DESCRIPTION.replace(
     "{agents}",
@@ -44,6 +63,9 @@ export const TaskTool = Tool.define("task", async (ctx) => {
     parameters,
     async execute(params: z.infer<typeof parameters>, ctx) {
       const config = await Config.get()
+
+      // Ensure flexible agents are registered before attempting to use them
+      getCatalog()
 
       // Skip permission check when user explicitly invoked via @ or command subtask
       if (!ctx.extra?.bypassAgentCheck) {
@@ -58,10 +80,29 @@ export const TaskTool = Tool.define("task", async (ctx) => {
         })
       }
 
-      const agent = await Agent.get(params.subagent_type)
-      if (!agent) throw new Error(`Unknown agent type: ${params.subagent_type} is not a valid agent type`)
+      // Phase 3: Try FlexibleAgentRegistry first (for flexible agents with prompt/permission)
+      const flexibleAgent = FlexibleAgentRegistry.getAgent(params.subagent_type)
 
-      const allowsTask = agent.permission.some((rule) => rule.permission === "task" && rule.action === "allow") // kilocode_change
+      // Use native agent as base
+      const agent = await Agent.get(params.subagent_type)
+      if (!agent && !flexibleAgent) {
+        throw new Error(`Unknown agent type: ${params.subagent_type} is not a valid agent type`)
+      }
+
+      const agentName = agent?.name ?? flexibleAgent!.id
+      const agentTitle = agent?.name ?? flexibleAgent!.name
+
+      // Get permissions - prefer flexible agent's permissions if available
+      // gworkspace-ops requires dynamic MCP tool IDs (e.g. google-workspace_*),
+      // so enforce permissive tool access regardless of legacy/native agent configs.
+      const agentPermission =
+        params.subagent_type === "gworkspace-ops"
+          ? PermissionNext.fromConfig({
+              "*": "allow",
+              external_directory: { "*": "ask" },
+            })
+          : (flexibleAgent?.permission ?? agent!.permission)
+      const allowsTask = agentPermission.some((rule) => rule.permission === "task" && rule.action === "allow") // kilocode_change
 
       const session = await iife(async () => {
         if (params.task_id) {
@@ -71,7 +112,7 @@ export const TaskTool = Tool.define("task", async (ctx) => {
 
         return await Session.create({
           parentID: ctx.sessionID,
-          title: params.description + ` (@${agent.name} subagent)`,
+          title: params.description + ` (@${agentTitle} subagent)`,
           permission: [
             {
               permission: "todowrite",
@@ -103,7 +144,7 @@ export const TaskTool = Tool.define("task", async (ctx) => {
       const msg = await MessageV2.get({ sessionID: ctx.sessionID, messageID: ctx.messageID })
       if (msg.info.role !== "assistant") throw new Error("Not an assistant message")
 
-      const model = agent.model ?? {
+      const model = agent?.model ?? {
         modelID: msg.info.modelID,
         providerID: msg.info.providerID,
       }
@@ -132,7 +173,7 @@ export const TaskTool = Tool.define("task", async (ctx) => {
           modelID: model.modelID,
           providerID: model.providerID,
         },
-        agent: agent.name,
+        agent: agentName,
         tools: {
           todowrite: false,
           todoread: false,

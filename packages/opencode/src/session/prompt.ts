@@ -46,8 +46,11 @@ import { LLM } from "./llm"
 import { iife } from "@/util/iife"
 import { Shell } from "@/shell/shell"
 import { Truncate } from "@/tool/truncation"
-import { PlanFollowup } from "@/kilocode/plan-followup" // kilocode_change
-import { environmentDetails } from "@/kilocode/editor-context" // kilocode_change
+import { PlanFollowup } from "@/kilocaw-legacy/plan-followup" // kilocode_change
+import { environmentDetails } from "@/kilocaw-legacy/editor-context" // kilocode_change
+import { CoreOrchestrator } from "../kiloclaw/orchestrator" // kilocode_change - agency routing
+import { RoutingPipeline, type PipelineResult } from "@/kiloclaw/agency/routing/pipeline"
+import { resolveAgencyAllowedTools } from "./tool-policy"
 
 // @ts-ignore
 globalThis.AI_SDK_LOG_WARNINGS = false
@@ -63,6 +66,16 @@ IMPORTANT:
 const STRUCTURED_OUTPUT_SYSTEM_PROMPT = `IMPORTANT: The user has requested structured output. You MUST use the StructuredOutput tool to provide your final response. Do NOT respond with plain text - you MUST call the StructuredOutput tool with your answer formatted according to the schema.`
 
 export namespace SessionPrompt {
+  type AgencyContext = {
+    agencyId: string
+    confidence: number
+    reason: string
+    routeSource: "pipeline" | "orchestrator"
+    fallbackUsed?: boolean
+    fallbackReason?: string
+    layers?: PipelineResult["layers"]
+  }
+
   // kilocode_change start - share follow-up trigger logic with tests
   export function shouldAskPlanFollowup(input: { messages: MessageV2.WithParts[]; abort: AbortSignal }) {
     if (input.abort.aborted) return false
@@ -399,6 +412,130 @@ export namespace SessionPrompt {
       })
       const task = tasks.pop()
 
+      // kilocode_change start - Agency routing for knowledge agency
+      // Extract user message text for intent classification
+      let agencyContext: AgencyContext | null = null
+      if (!task && Flag.KILO_ROUTING_AGENCY_CONTEXT_ENABLED) {
+        // Only route if not handling a subtask
+        try {
+          // Find last user message with parts from msgs array (lastUser is just info, need full message)
+          const lastUserMsg = msgs.findLast((m) => m.info.role === "user")
+          const userText =
+            lastUserMsg?.parts
+              .filter((p): p is MessageV2.TextPart => p.type === "text" && !p.ignored && !p.synthetic)
+              .map((p) => p.text)
+              .join(" ")
+              .trim() ?? ""
+
+          if (userText.length > 0) {
+            // Create intent and route to agency
+            const intent = {
+              id: lastUser.id,
+              type: "chat",
+              description: userText,
+              risk: "low" as const,
+            }
+
+            const assignment = await RoutingPipeline.route(intent)
+            agencyContext = {
+              agencyId: assignment.agencyId,
+              confidence: assignment.confidence,
+              reason: assignment.reason ?? "routed",
+              routeSource: "pipeline",
+              fallbackUsed: assignment.fallbackUsed,
+              fallbackReason: assignment.fallbackReason,
+              layers: assignment.layers,
+            }
+
+            log.debug("agency routed", {
+              sessionID,
+              agencyId: agencyContext.agencyId,
+              confidence: agencyContext.confidence,
+              routeSource: agencyContext.routeSource,
+              fallbackUsed: agencyContext.fallbackUsed,
+              hasL1: Boolean(agencyContext.layers?.L1),
+              hasL2: Boolean(agencyContext.layers?.L2),
+              hasL3: Boolean(agencyContext.layers?.L3),
+              textLength: userText.length,
+            })
+
+            log.info("agency routing audit trail", {
+              sessionID,
+              agencyId: agencyContext.agencyId,
+              confidence: agencyContext.confidence,
+              routeSource: agencyContext.routeSource,
+              fallbackUsed: agencyContext.fallbackUsed,
+              fallbackReason: agencyContext.fallbackReason,
+              L0: agencyContext.layers?.L0
+                ? {
+                    domain: agencyContext.layers.L0.domain,
+                    reasoning: agencyContext.layers.L0.reasoning,
+                    latencyMs: agencyContext.layers.L0.latencyMs,
+                  }
+                : undefined,
+              L1: agencyContext.layers?.L1
+                ? {
+                    capabilities: agencyContext.layers.L1.capabilities,
+                    routeType: agencyContext.layers.L1.routeResult?.type,
+                    routeReason: agencyContext.layers.L1.routeResult?.reason,
+                  }
+                : undefined,
+              L2: agencyContext.layers?.L2
+                ? {
+                    agentId: agencyContext.layers.L2.agentId,
+                    agentScore: agencyContext.layers.L2.agentScore,
+                    agentHealth: agencyContext.layers.L2.agentHealth,
+                  }
+                : undefined,
+              L3: agencyContext.layers?.L3
+                ? {
+                    toolsResolved: agencyContext.layers.L3.toolsResolved,
+                    blockedTools: agencyContext.layers.L3.blockedTools,
+                    fallbackUsed: agencyContext.layers.L3.fallbackUsed,
+                  }
+                : undefined,
+            })
+          }
+        } catch (err) {
+          try {
+            const lastUserMsg = msgs.findLast((m) => m.info.role === "user")
+            const userText =
+              lastUserMsg?.parts
+                .filter((p): p is MessageV2.TextPart => p.type === "text" && !p.ignored && !p.synthetic)
+                .map((p) => p.text)
+                .join(" ")
+                .trim() ?? ""
+            if (!userText.length) throw err
+            const intent = {
+              id: lastUser.id,
+              type: "chat",
+              description: userText,
+              risk: "low" as const,
+            }
+            const orchestrator = CoreOrchestrator.create({})
+            const fallback = await orchestrator.routeIntent(intent)
+            agencyContext = {
+              agencyId: fallback.agencyId,
+              confidence: fallback.confidence,
+              reason: fallback.reason ?? "routed",
+              routeSource: "orchestrator",
+            }
+            log.warn("agency pipeline routing failed; using orchestrator fallback", {
+              sessionID,
+              agencyId: agencyContext.agencyId,
+              confidence: agencyContext.confidence,
+              error: err instanceof Error ? err.message : String(err),
+            })
+          } catch (fallbackErr) {
+            log.warn("agency routing failed, continuing without agency context", {
+              sessionID,
+              error: fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr),
+            })
+          }
+        }
+      }
+      // kilocode_change end
+
       // pending subtask
       // TODO: centralize "invoke tool" logic
       if (task?.type === "subtask") {
@@ -661,6 +798,7 @@ export namespace SessionPrompt {
         processor,
         bypassAgentCheck,
         messages: msgs,
+        agencyContext,
       })
 
       // Inject StructuredOutput tool if JSON schema mode enabled
@@ -734,6 +872,146 @@ export namespace SessionPrompt {
       if (format.type === "json_schema") {
         system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
       }
+
+      // kilocode_change start - Inject agency context into system prompt for knowledge agency
+      if (Flag.KILO_ROUTING_AGENCY_CONTEXT_ENABLED && agencyContext) {
+        let agencyBlock = ""
+
+        if (agencyContext.agencyId === "agency-knowledge") {
+          agencyBlock = [
+            "",
+            "<!-- Agency Context: Knowledge Agency -->",
+            "This conversation has been routed to the Knowledge Agency.",
+            `Routing confidence: ${Math.round(agencyContext.confidence * 100)}%`,
+            `Routing reason: ${agencyContext.reason}`,
+            `Routing source: ${agencyContext.routeSource}`,
+            ...(agencyContext.fallbackUsed ? [`Routing fallback: ${agencyContext.fallbackReason ?? "none"}`] : []),
+            ...(agencyContext.layers?.L1
+              ? [
+                  `L1 capabilities: ${agencyContext.layers.L1.capabilities.join(", ") || "none"}`,
+                  `L1 route type: ${agencyContext.layers.L1.routeResult?.type ?? "fallback"}`,
+                ]
+              : []),
+            ...(agencyContext.layers?.L2
+              ? [
+                  `L2 agent: ${agencyContext.layers.L2.agentId ?? "none"}`,
+                  `L2 health: ${agencyContext.layers.L2.agentHealth}`,
+                ]
+              : []),
+            ...(agencyContext.layers?.L3
+              ? [
+                  `L3 tools denied: ${agencyContext.layers.L3.toolsDenied}`,
+                  `L3 fallback used: ${agencyContext.layers.L3.fallbackUsed}`,
+                ]
+              : []),
+            "",
+            "CRITICAL TOOL INSTRUCTIONS:",
+            "- For web search, research, and information gathering: use ONLY the 'websearch' tool",
+            "- 'websearch' routes to Tavily/Firecrawl/Brave Search providers via the agency catalog",
+            "- DO NOT use 'codesearch', 'exa_search', 'get_code_context_exa', or any other search tool",
+            "- DO NOT use any MCP-based search tools (like mcp.exa.ai)",
+            "- The only authorized search tool is 'websearch'",
+            "",
+            "Knowledge Agency provides: web search, academic research, fact-checking, synthesis, and critical analysis.",
+            "Available tools: websearch (REQUIRED for search), webfetch, skill (for loading knowledge skills).",
+            "",
+          ].join("\n")
+        } else if (agencyContext.agencyId === "agency-development") {
+          agencyBlock = [
+            "",
+            "<!-- Agency Context: Development Agency -->",
+            "This conversation has been routed to the Development Agency.",
+            `Routing confidence: ${Math.round(agencyContext.confidence * 100)}%`,
+            `Routing reason: ${agencyContext.reason}`,
+            `Routing source: ${agencyContext.routeSource}`,
+            ...(agencyContext.fallbackUsed ? [`Routing fallback: ${agencyContext.fallbackReason ?? "none"}`] : []),
+            ...(agencyContext.layers?.L1
+              ? [
+                  `L1 capabilities: ${agencyContext.layers.L1.capabilities.join(", ") || "none"}`,
+                  `L1 route type: ${agencyContext.layers.L1.routeResult?.type ?? "fallback"}`,
+                ]
+              : []),
+            ...(agencyContext.layers?.L2
+              ? [
+                  `L2 agent: ${agencyContext.layers.L2.agentId ?? "none"}`,
+                  `L2 health: ${agencyContext.layers.L2.agentHealth}`,
+                ]
+              : []),
+            ...(agencyContext.layers?.L3
+              ? [
+                  `L3 tools denied: ${agencyContext.layers.L3.toolsDenied}`,
+                  `L3 fallback used: ${agencyContext.layers.L3.fallbackUsed}`,
+                ]
+              : []),
+            "",
+            "CRITICAL TOOL INSTRUCTIONS:",
+            "- Use native development tools first: read, glob, grep, apply_patch, and bash for build/test/git",
+            "- Keep deny-by-default behavior: if a capability is denied, do not route to MCP fallback",
+            "- Use deterministic fallback only for allowed capability gaps or exhausted native retries",
+            "- Never execute destructive git operations or secret exfiltration flows",
+            "",
+            "SKILL USAGE HINTS:",
+            "- For debugging and incidents: systematic-debugging + verification-before-completion",
+            "- For feature delivery: spec-driven-development + test-driven-development",
+            "- For review cycles: code-review-discipline + receiving-code-review/requesting-code-review",
+            "",
+            "DOMAIN GUARDRAILS:",
+            "- Validate patches with targeted tests before concluding",
+            "- Keep edits scoped to requested files and approved workspace boundaries",
+            "- Block fallback on denied policy paths, destructive actions, and secret-sensitive operations",
+            "",
+          ].join("\n")
+        } else if (agencyContext.agencyId === "agency-nba") {
+          agencyBlock = [
+            "",
+            "<!-- Agency Context: NBA Betting Agency -->",
+            "This conversation has been routed to the NBA Betting Agency.",
+            `Routing confidence: ${Math.round(agencyContext.confidence * 100)}%`,
+            `Routing reason: ${agencyContext.reason}`,
+            `Routing source: ${agencyContext.routeSource}`,
+            ...(agencyContext.fallbackUsed ? [`Routing fallback: ${agencyContext.fallbackReason ?? "none"}`] : []),
+            ...(agencyContext.layers?.L1
+              ? [
+                  `L1 capabilities: ${agencyContext.layers.L1.capabilities.join(", ") || "none"}`,
+                  `L1 route type: ${agencyContext.layers.L1.routeResult?.type ?? "fallback"}`,
+                ]
+              : []),
+            ...(agencyContext.layers?.L2
+              ? [
+                  `L2 agent: ${agencyContext.layers.L2.agentId ?? "none"}`,
+                  `L2 health: ${agencyContext.layers.L2.agentHealth}`,
+                ]
+              : []),
+            ...(agencyContext.layers?.L3
+              ? [
+                  `L3 tools denied: ${agencyContext.layers.L3.toolsDenied}`,
+                  `L3 fallback used: ${agencyContext.layers.L3.fallbackUsed}`,
+                ]
+              : []),
+            "",
+            "CRITICAL TOOL INSTRUCTIONS:",
+            "- Invoke the NBA skill through the 'skill' tool first for every NBA request",
+            '- Exact tool call format: tool=\'skill\' with JSON args {"name":"nba-analysis"}',
+            "- 'nba-analysis' is a skill name, NOT a tool id",
+            "- Do NOT emit pseudo tool markup blocks like [TOOL_CALL]...[/TOOL_CALL]",
+            "- Only the 'skill' tool is authorized in NBA Agency sessions",
+            "- Do NOT use 'webfetch' or 'websearch' in NBA Agency sessions",
+            "- DO NOT use generic web search for NBA queries",
+            "- DO NOT make up NBA statistics or odds - use the NBA Agency data providers",
+            "- All betting recommendations require human approval (HITL) before execution",
+            "",
+            "NBA Agency provides: NBA game analysis, betting odds, injury reports, value betting detection, and guarded recommendations.",
+            "Available tools: nba-analysis skill (REQUIRED for NBA queries).",
+            "IMPORTANT: Never suggest actual bets without clear odds comparison and value assessment.",
+            "",
+          ].join("\n")
+        }
+
+        if (agencyBlock) {
+          system.push(agencyBlock)
+        }
+      }
+      // kilocode_change end
 
       const result = await processor.process({
         user: lastUser,
@@ -832,9 +1110,24 @@ export namespace SessionPrompt {
     processor: SessionProcessor.Info
     bypassAgentCheck: boolean
     messages: MessageV2.WithParts[]
+    agencyContext?: AgencyContext | null
   }) {
     using _ = log.time("resolveTools")
     const tools: Record<string, AITool> = {}
+
+    const enabledAgency = input.agencyContext?.agencyId
+    const agencyCapabilities = await import("@/kiloclaw/agency/registry/agency-registry")
+      .then((x) =>
+        enabledAgency ? (x.AgencyRegistry.getAgency(enabledAgency)?.policies.allowedCapabilities ?? []) : [],
+      )
+      .catch(() => [])
+    const agencyTools = resolveAgencyAllowedTools({
+      agencyId: enabledAgency,
+      enabled: Flag.KILO_ROUTING_AGENCY_CONTEXT_ENABLED,
+      capabilities: agencyCapabilities,
+    })
+    const blockedTools: string[] = []
+    const allowedTools: string[] = []
 
     const context = (args: any, options: ToolCallOptions): Tool.Context => ({
       sessionID: input.session.id,
@@ -875,6 +1168,12 @@ export namespace SessionPrompt {
       { modelID: input.model.api.id, providerID: input.model.providerID },
       input.agent,
     )) {
+      if (agencyTools.enabled && !agencyTools.allowedTools.includes(item.id)) {
+        blockedTools.push(item.id)
+        continue
+      }
+      allowedTools.push(item.id)
+
       const schema = ProviderTransform.schema(input.model, z.toJSONSchema(item.parameters))
       tools[item.id] = tool({
         id: item.id as any,
@@ -921,6 +1220,11 @@ export namespace SessionPrompt {
     for (const [key, item] of Object.entries(await MCP.tools())) {
       const execute = item.execute
       if (!execute) continue
+      if (agencyTools.enabled && !agencyTools.allowedTools.includes(key)) {
+        blockedTools.push(key)
+        continue
+      }
+      allowedTools.push(key)
 
       const transformed = ProviderTransform.schema(input.model, asSchema(item.inputSchema).jsonSchema)
       item.inputSchema = jsonSchema(transformed)
@@ -1009,6 +1313,15 @@ export namespace SessionPrompt {
         }
       }
       tools[key] = item
+    }
+
+    if (enabledAgency) {
+      log.debug("agency tool policy applied", {
+        agencyId: enabledAgency,
+        policyEnforced: agencyTools.enabled,
+        allowedTools,
+        blockedTools,
+      })
     }
 
     return tools

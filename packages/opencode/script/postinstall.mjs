@@ -76,7 +76,7 @@ function isMusl() {
 
 function getPackageNames() {
   const { platform, arch } = detectPlatformAndArch()
-  const base = `@kilocode/cli-${platform}-${arch}`
+  const base = `@kiloclaw/cli-${platform}-${arch}`
   const avx2 = supportsAvx2()
   const baseline = arch === "x64" && !avx2
 
@@ -105,7 +105,7 @@ function getPackageNames() {
 
 function findBinary() {
   const { platform } = detectPlatformAndArch()
-  const binaryName = platform === "windows" ? "kilo.exe" : "kilo"
+  const binaryName = platform === "windows" ? "kiloclaw.exe" : "kiloclaw"
   const names = getPackageNames()
 
   for (const packageName of names) {
@@ -134,7 +134,7 @@ function main() {
   }
 
   const { binaryPath } = findBinary()
-  const target = path.join(__dirname, "bin", ".kilo") // kilocode_change
+  const target = path.join(__dirname, "bin", ".kiloclaw")
   if (fs.existsSync(target)) fs.unlinkSync(target)
   try {
     fs.linkSync(binaryPath, target)
@@ -147,6 +147,6 @@ function main() {
 try {
   main()
 } catch (error) {
-  console.error("Failed to setup kilo binary:", error.message)
+  console.error("Failed to setup kiloclaw binary:", error.message)
   process.exit(1)
 }

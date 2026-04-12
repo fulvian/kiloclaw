@@ -38,6 +38,9 @@ jobs:
       - name: Run unit tests
         run: bun turbo test
 
+      - name: Run kiloclaw strict-env regression tests
+        run: bun run --cwd packages/opencode test test/kiloclaw/config-legacy-adapter.test.ts test/kiloclaw/config-strict-env.test.ts test/kiloclaw/service-health.test.ts
+
   e2e:
     # kilocode_change - disabled: packages/app is not actively maintained
     if: false

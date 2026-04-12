@@ -1,0 +1,28 @@
+# ===========================================
+# KiloClaw API Keys - Tavily (8 accounts)
+# ===========================================
+# Supported formats:
+#   TAVILY_API_KEY_1, TAVILY_API_KEY_2, ... (indexed, up to 100)
+#   TAVILY_API_KEYS=key1,key2,key3,... (comma-separated)
+#   TAVILY_API_KEY=xxx (single key, legacy)
+#
+# Each key should be from a different account for maximum quota capacity.
+#
+export TAVILY_API_KEY_1="tvly-dev-XXXX"  # Account 1
+export TAVILY_API_KEY_2="tvly-dev-XXXX"  # Account 2
+export TAVILY_API_KEY_3="tvly-dev-XXXX"  # Account 3
+export TAVILY_API_KEY_4="tvly-dev-XXXX"  # Account 4
+export TAVILY_API_KEY_5="tvly-dev-XXXX"  # Account 5
+export TAVILY_API_KEY_6="tvly-dev-XXXX"  # Account 6
+export TAVILY_API_KEY_7="tvly-dev-XXXX"  # Account 7
+export TAVILY_API_KEY_8="tvly-dev-XXXX"  # Account 8
+
+# ===========================================
+# KiloClaw API Keys - Firecrawl (6 accounts)
+# ===========================================
+export FIRECRAWL_API_KEY_1="fc-XXXX"  # Account 1
+export FIRECRAWL_API_KEY_2="fc-XXXX"  # Account 2
+export FIRECRAWL_API_KEY_3="fc-XXXX"  # Account 3
+export FIRECRAWL_API_KEY_4="fc-XXXX"  # Account 4
+export FIRECRAWL_API_KEY_5="fc-XXXX"  # Account 5
+export FIRECRAWL_API_KEY_6="fc-XXXX"  # Account 6

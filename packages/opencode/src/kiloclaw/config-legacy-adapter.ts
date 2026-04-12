@@ -99,6 +99,7 @@ const AGENCY_ENV_MAPPINGS: Record<string, { kiloclaw: string; transform: (v: str
   ARIA_AGENCIES_KNOWLEDGE_ENABLED: { kiloclaw: "KILOCLAW_AGENCY_KNOWLEDGE_ENABLED", transform: (v) => v === "true" },
   ARIA_AGENCIES_NUTRITION_ENABLED: { kiloclaw: "KILOCLAW_AGENCY_NUTRITION_ENABLED", transform: (v) => v === "true" },
   ARIA_AGENCIES_WEATHER_ENABLED: { kiloclaw: "KILOCLAW_AGENCY_WEATHER_ENABLED", transform: (v) => v === "true" },
+  ARIA_AGENCIES_NBA_ENABLED: { kiloclaw: "KILOCLAW_AGENCY_NBA_ENABLED", transform: (v) => v === "true" },
 }
 
 const SCHEDULER_ENV_MAPPINGS: Record<
@@ -117,7 +118,7 @@ const SCHEDULER_ENV_MAPPINGS: Record<
     kiloclaw: "KILOCLAW_SCHED_DISPATCH_MS",
     transform: (v) => Math.max(100, parseInt(v, 10)),
   },
-  ARIA_SCHEDRAIL_RECOVERY_POLICY: { kiloclaw: "KILOCLAW_SCHED_RECOVERY_POLICY", transform: (v) => v },
+  ARIA_SCHEDULER_RECOVERY_POLICY: { kiloclaw: "KILOCLAW_SCHED_RECOVERY_POLICY", transform: (v) => v },
 }
 
 const GUARDRAIL_ENV_MAPPINGS: Record<
@@ -296,6 +297,15 @@ function stripPrefix(key: string, prefix: string): string {
 export namespace LegacyAdapter {
   const log = Log.create({ service: "kiloclaw.config-legacy-adapter" })
 
+  function strictGuard(env: Record<string, string>): void {
+    if (env["KILOCLAW_STRICT_ENV"] !== "true") return
+    const legacy = Object.keys(env).filter(
+      (key) => key.startsWith("ARIA_") || key.startsWith("KILO_") || key.startsWith("OPENCODE_"),
+    )
+    if (legacy.length === 0) return
+    throw new Error(`KILOCLAW_STRICT_ENV=true blocks legacy env vars: ${legacy.join(", ")}`)
+  }
+
   /**
    * Transform ARIA config section to Kiloclaw format
    */
@@ -405,6 +415,7 @@ export namespace LegacyAdapter {
    * - KILOCLAW_* vars take precedence if both present
    */
   export function mapAgencyEnv(env: Record<string, string>): DualReadResult {
+    strictGuard(env)
     const result: Record<string, string> = {}
     const deprecated: string[] = []
     const warnings: string[] = []
@@ -441,6 +452,7 @@ export namespace LegacyAdapter {
    * Map ARIA_MEMORY_* env vars to KILOCLAW_MEMORY_* format
    */
   export function mapMemoryEnv(env: Record<string, string>): DualReadResult {
+    strictGuard(env)
     const result: Record<string, string> = {}
     const deprecated: string[] = []
     const warnings: string[] = []
@@ -480,6 +492,7 @@ export namespace LegacyAdapter {
    * Map ARIA_TOOL_* env vars to KILOCLAW_TOOL_* format with validation
    */
   export function mapToolEnv(env: Record<string, string>): DualReadResult {
+    strictGuard(env)
     const result: Record<string, string> = {}
     const deprecated: string[] = []
     const warnings: string[] = []

@@ -25,7 +25,7 @@ export const Duration = z.number().int().nonnegative()
 export type Duration = z.infer<typeof Duration>
 
 // Domain types
-export const Domain = z.enum(["development", "knowledge", "nutrition", "weather", "custom"])
+export const Domain = z.enum(["development", "knowledge", "nutrition", "weather", "nba", "custom"])
 export type Domain = z.infer<typeof Domain>
 
 // Status types
@@ -99,6 +99,7 @@ export const PolicyContext = z.object({
   agentId: AgentId.optional(),
   intent: Intent.optional(),
   action: Action.optional(),
+  userApproved: z.boolean().optional(),
   correlationId: CorrelationId,
 })
 export type PolicyContext = z.infer<typeof PolicyContext>
@@ -117,3 +118,26 @@ export const AgencyAssignment = z.object({
   reason: z.string().optional(),
 })
 export type AgencyAssignment = z.infer<typeof AgencyAssignment>
+
+// Re-export flexible agency types from agency module
+export type { TaskIntent, RouteResult } from "./agency/routing/types"
+export { TaskIntentSchema, RouteResultSchema, migrateLegacyTaskType } from "./agency/routing/types"
+
+export type {
+  SkillDefinition,
+  SkillChain,
+  SkillChainStep,
+  AgencyDefinition,
+  AgencyPolicies,
+  FlexibleAgentDefinition,
+  AgentConstraints,
+} from "./agency/registry/types"
+export {
+  SkillDefinitionSchema,
+  SkillChainSchema,
+  SkillChainStepSchema,
+  AgencyDefinitionSchema,
+  AgencyPoliciesSchema,
+  FlexibleAgentDefinitionSchema,
+  AgentConstraintsSchema,
+} from "./agency/registry/types"

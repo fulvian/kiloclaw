@@ -1,7 +1,8 @@
 # Kiloclaw Isolation Plan
 
-> **Status**: Draft  
+> **Status**: Implemented  
 > **Date**: 2026-04-02  
+> **Last Updated**: 2026-04-03
 > **Scope**: Complete isolation from KiloCode runtime, config, and telemetry
 
 ## Overview
@@ -12,12 +13,12 @@ Kiloclaw must operate as a fully autonomous system with zero dependencies on or 
 
 ### 1. Namespace Isolation
 
-| Aspect            | KiloCode                | Kiloclaw     | Action Required           |
-| ----------------- | ----------------------- | ------------ | ------------------------- |
-| Package namespace | `@kilocode/*`           | `@kilocaw/*` | Rename packages (Phase 2) |
-| Runtime namespace | `kilocode` / `opencode` | `kiloclaw`   | Code refactoring          |
-| Binary name       | `kilo`, `kilocode`      | `kiloclaw`   | Create new binary entry   |
-| Config prefix     | `KILO_*`, `OPENCODE_*`  | `KILOCLAW_*` | Config loader update      |
+| Aspect            | KiloCode                | Kiloclaw        | Status  |
+| ----------------- | ----------------------- | --------------- | ------- |
+| Package namespace | `@kilocode/*`           | `@kiloclaw/cli` | ✅ Done |
+| Runtime namespace | `kilocode` / `opencode` | `kiloclaw`      | ✅ Done |
+| Binary name       | `kilo`, `kilocode`      | `kiloclaw`      | ✅ Done |
+| Config prefix     | `KILO_*`, `OPENCODE_*`  | `KILOCLAW_*`    | ✅ Done |
 
 ### 2. Environment Variables
 
@@ -173,21 +174,21 @@ const ISOLATION_INVARIANTS = {
 
 ## Implementation Checklist
 
-### Phase 1: Foundation (Current)
+### Phase 1: Foundation
 
-- [ ] **DONE** Create isolated directory structure under `~/.kiloclaw/`
-- [ ] **DONE** Define blocked environment variable prefixes
-- [ ] **DONE** Document telemetry isolation requirements
-- [ ] **DONE** Document provider key isolation requirements
-- [ ] **DONE** Document plugin isolation requirements
+- [x] **DONE** Create isolated directory structure under `~/.kiloclaw/`
+- [x] **DONE** Define blocked environment variable prefixes
+- [x] **DONE** Document telemetry isolation requirements
+- [x] **DONE** Document provider key isolation requirements
+- [x] **DONE** Document plugin isolation requirements
 
 ### Phase 2: Core Runtime
 
-- [ ] Implement config loader with prefix filtering
-- [ ] Implement path validation to block KiloCode directories
-- [ ] Implement telemetry endpoint validation
-- [ ] Implement secret namespace isolation
-- [ ] Add integration tests for isolation invariants
+- [x] **DONE** Implement config loader with prefix filtering
+- [x] **DONE** Implement path validation to block KiloCode directories
+- [x] **DONE** Implement telemetry endpoint validation
+- [x] **DONE** Implement secret namespace isolation
+- [x] **DONE** Add integration tests for isolation invariants
 
 ### Phase 3: Memory
 

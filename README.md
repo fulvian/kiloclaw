@@ -2,6 +2,14 @@
 
 > AI Assistant with 4-layer memory, multi-agency orchestration, and policy-first execution.
 
+## CLI Branding
+
+The CLI displays a green gradient ASCII art logo "KILOCLAW" on startup:
+
+- **Location**: `packages/opencode/src/cli/logo.ts` (ASCII art definition)
+- **Rendering**: `packages/opencode/src/cli/ui.ts` (gradient color application)
+- **Colors**: Green gradient from dark (`#164a16`) to bright (`#82ff82`)
+
 ## Credits
 
 **Kiloclaw** is a fork of **[KiloCode](https://github.com/Kilo-Org/kilocode)** (formerly OpenCode). The base code and architecture draws heavily from KiloCode's agent/tool system, session management, and CLI infrastructure.
@@ -16,9 +24,12 @@ Kiloclaw extends the foundation with:
 ## Status
 
 **Foundation Phase**: ✅ Complete  
-**Core Runtime**: ✅ Implemented  
-**Memory 4-Layer**: In Progress  
-**Agency Migration**: Pending
+**Core Runtime**: ✅ Complete  
+**Memory 4-Layer**: ✅ Complete  
+**Agency Migration**: ✅ Complete  
+**Flexible Agents**: ✅ Complete (13 agents with prompt/permission)
+
+See [docs/plans/KILOCLAW_FOUNDATION_PLAN.md](docs/plans/KILOCLAW_FOUNDATION_PLAN.md) for the full roadmap.
 
 See [docs/plans/KILOCLAW_FOUNDATION_PLAN.md](docs/plans/KILOCLAW_FOUNDATION_PLAN.md) for the full roadmap.
 
@@ -33,12 +44,13 @@ See [docs/plans/KILOCLAW_FOUNDATION_PLAN.md](docs/plans/KILOCLAW_FOUNDATION_PLAN
                +----------------+----------------+
                |                |                |
        +-------v------+  +------v-------+  +-----v-------+
-       |  Agency Dev  |  | Agency Know. |  | Agency Nutri|
-       +------+-------+  +------+-------+  +------+------+
-              |                 |                 |
-       +------v------+   +------v------+   +------v------+
-       | Agents      |   | Agents      |   | Agents      |
-       +------+------+   +------+------+   +------+------+
+       |  Agency Dev  |  | Agency Know. |  | Agency Nutri|  +-----v-------+
+       +------+-------+  +------+-------+  +------+------+  | Agency Wea.|
+       +------+-------+  +------+-------+  +------+------+  +------+------+
+              |                 |                 |                 |
+       +------v------+   +------v------+   +------v------+   +------v------+
+       | Agents      |   | Agents      |   | Agents      |   | Agents      |
+       +------+------+   +------+------+   +------+------+   +------+------+
               |
        +------v----------------------------------------------+
        | Skills layer (planning, review, retrieval, etc.)       |
@@ -49,6 +61,34 @@ See [docs/plans/KILOCLAW_FOUNDATION_PLAN.md](docs/plans/KILOCLAW_FOUNDATION_PLAN
        +-----------------------------------------------------+
 ```
 
+### Flexible Agents
+
+Kiloclaw uses capability-based flexible agents. The **router** agent is the main entry point that automatically delegates to specialized agents based on user intent. Users can also select specific agents directly.
+
+**Primary Agent (Entry Point):**
+| Agent | Description |
+|--------|-------------|
+| router | Automatically routes tasks to specialized agents based on intent classification |
+
+**Subagents (invoked by router or directly via Task tool):**
+| Agent | Agency | Capabilities |
+| --------------- | ----------- | ---------------------------------------------- |
+| coder | development | code-generation, code-modification, bug-fixing |
+| debugger | development | debugging, root-cause-analysis |
+| planner | development | task-planning, code-planning |
+| code-reviewer | development | code-review, quality-assurance |
+| researcher | knowledge | web-search, academic-research, fact-checking |
+| analyst | knowledge | data-analysis, comparison, evaluation |
+| educator | knowledge | explanation, summarization, teaching |
+| nutritionist | nutrition | nutrition-analysis, food-analysis |
+| recipe-searcher | nutrition | recipe-search, meal-ideas |
+| diet-planner | nutrition | meal-planning, diet-generation |
+| weather-current | weather | weather-query, current-weather |
+| forecaster | weather | weather-forecast, prediction |
+| alerter | weather | weather-alerts, notifications |
+
+Run `kiloclaw agent list` to see all available agents.
+
 ## Key Documents
 
 | Document                                                                                                        | Description                                      |
@@ -56,6 +96,7 @@ See [docs/plans/KILOCLAW_FOUNDATION_PLAN.md](docs/plans/KILOCLAW_FOUNDATION_PLAN
 | [BLUEPRINT](docs/foundation/KILOCLAW_BLUEPRINT.md)                                                              | Vision, principles, architecture target          |
 | [AGENCY_AGENT_SKILL_TOOL_GUIDE](docs/guide/KILOCLAW_AGENCY_AGENT_SKILL_TOOL_IMPLEMENTATION_GUIDE_2026-04-07.md) | Canonical implementation guide for agency stack  |
 | [FOUNDATION_PLAN](docs/plans/KILOCLAW_FOUNDATION_PLAN.md)                                                       | 16-week implementation roadmap                   |
+| [ELIMINATE_NATIVE_AGENTS](docs/plans/ELIMINATE_NATIVE_AGENTS_PLAN.md)                                           | Migrating to flexible agents                     |
 | [ADR-001](docs/adr/ADR-001_Runtime_Hierarchy.md)                                                                | Runtime hierarchy (Core→Agency→Agent→Skill→Tool) |
 | [ADR-002](docs/adr/ADR-002_Memory_4_Layer.md)                                                                   | 4-layer memory architecture                      |
 | [ADR-003](docs/adr/ADR-003_Safety_Guardrails_Proactivity.md)                                                    | Safety, guardrails, proactivity policy           |
@@ -76,6 +117,25 @@ bun run typecheck
 
 # Run tests
 bun test
+```
+
+### Task Commands
+
+Use `kiloclaw task` in CLI or `/tasks` in TUI for the same task control flow.
+
+- Supported selectors: short task ref `tsk_...`, exact task name, or `#<index>` from task list
+- Quote `#<index>` in shell commands to avoid comment parsing
+
+```bash
+# CLI: run task now with different selectors
+kiloclaw task run-now tsk_01hzy8jv7w
+kiloclaw task run-now "Daily summary"
+kiloclaw task run-now "#2"
+
+# TUI slash commands
+/tasks show tsk_01hzy8jv7w
+/tasks run #2
+/tasks pause "Daily summary"
 ```
 
 ## License

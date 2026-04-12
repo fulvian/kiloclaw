@@ -1,7 +1,7 @@
 # Kiloclaw Release Cutover Runbook
 
 > **Version:** 1.0.0  
-> **Date:** 2026-04-02  
+> **Date:** 2026-04-06  
 > **Status:** Ready for Phase 7 Execution  
 > **Owner:** Orchestrator + DevOps
 
@@ -58,10 +58,29 @@ cd packages/opencode && npx tsc --noEmit
 # Run kiloclaw-specific tests
 cd packages/opencode && bun test test/kiloclaw/
 
-# Expected output: 364 pass, 0 fail
+# Expected verification snapshot: 690 pass, 3 skip, 0 fail
+
+# Run CI hardening regression subset locally
+cd packages/opencode && bun test \
+  test/kiloclaw/config-legacy-adapter.test.ts \
+  test/kiloclaw/config-strict-env.test.ts \
+  test/kiloclaw/service-health.test.ts
 ```
 
-### 1.4 Artifact Inventory
+### 1.4 Hardening Verification Commands
+
+```bash
+# Strict env gating: legacy prefixes must be blocked in runtime/config path
+cd packages/opencode && KILOCLAW_STRICT_ENV=true KILO_TEST_LEGACY_FLAG=1 bun test test/kiloclaw/config-strict-env.test.ts
+
+# Legacy adapter strict mode enforcement
+cd packages/opencode && KILOCLAW_STRICT_ENV=true bun test test/kiloclaw/config-legacy-adapter.test.ts
+
+# Policy audit observability must include health item
+cd packages/opencode && bun test test/kiloclaw/service-health.test.ts
+```
+
+### 1.5 Artifact Inventory
 
 | Artifact          | Location                         | Size   | SHA256 |
 | ----------------- | -------------------------------- | ------ | ------ |

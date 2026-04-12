@@ -6,7 +6,7 @@ import type { Provider } from "./provider"
 import type { ModelsDev } from "./models"
 import { iife } from "@/util/iife"
 import { Flag } from "@/flag/flag"
-import { kiloProviderOptions } from "@/kilocode/provider-options"
+import { kiloProviderOptions } from "@/kilocaw-legacy/provider-options"
 
 type Modality = NonNullable<ModelsDev.Model["modalities"]>["input"][number]
 

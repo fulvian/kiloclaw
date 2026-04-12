@@ -18,6 +18,7 @@ import { DialogStash } from "../dialog-stash"
 import { type AutocompleteRef, Autocomplete } from "./autocomplete"
 import { useCommandDialog } from "../dialog-command"
 import { useRenderer } from "@opentui/solid"
+import { requestSessionFeedback } from "../../routes/session/feedback-bar" // kilocode_change
 import { Editor } from "@tui/util/editor"
 import { useExit } from "../../context/exit"
 import { Clipboard } from "../../util/clipboard"
@@ -34,7 +35,8 @@ import { useToast } from "../../ui/toast"
 import { useKV } from "../../context/kv"
 import { useTextareaKeybindings } from "../textarea-keybindings"
 import { DialogSkill } from "../dialog-skill"
-import { shouldSummarize as shouldPasteSummary } from "@/kilocode/paste-summary"
+import { shouldSummarize as shouldPasteSummary } from "@/kilocaw-legacy/paste-summary"
+import { dispatchTaskCommand, parseTasksCommand } from "../../task-command-router"
 
 export type PromptProps = {
   sessionID?: string
@@ -532,7 +534,15 @@ export function Prompt(props: PromptProps) {
     if (!store.prompt.input) return
     const trimmed = store.prompt.input.trim()
     if (trimmed === "exit" || trimmed === "quit" || trimmed === ":q") {
-      exit()
+      // kilocode_change start - request session feedback before exit
+      const sessionId = props.sessionID
+      const doExit = () => exit()
+      if (sessionId) {
+        requestSessionFeedback(sessionId, doExit)
+      } else {
+        doExit()
+      }
+      // kilocode_change end
       return
     }
     const selectedModel = local.model.current()
@@ -613,6 +623,24 @@ export function Prompt(props: PromptProps) {
             ...x,
           })),
       })
+    } else if (/^\/tasks\b/i.test(inputText.trim())) {
+      const parsed = parseTasksCommand(inputText)
+      if (!parsed.ok) {
+        toast.show({
+          variant: "warning",
+          message: `${parsed.error}. Supported: /tasks, /tasks list, /tasks new, /tasks help, /tasks <show|edit|runs|pause|resume|run|delete> <selector>, /tasks dlq`,
+          duration: 3000,
+        })
+      } else {
+        dispatchTaskCommand(parsed.intent)
+      }
+      // Clear the prompt after handling
+      input.extmarks.clear()
+      setStore("prompt", { input: "", parts: [] })
+      setStore("extmarkToPartIndex", new Map())
+      props.onSubmit?.()
+      input.clear()
+      return
     } else {
       sdk.client.session
         .prompt({
@@ -872,22 +900,36 @@ export function Prompt(props: PromptProps) {
                 if (keybind.match("app_exit", e)) {
                   if (store.prompt.input === "") {
                     // kilocode_change start - double ctrl+c to exit, single ctrl+d exits immediately
+                    const doExit = () => {
+                      exit()
+                      e.preventDefault()
+                    }
                     if (e.ctrl && e.name === "c") {
                       setStore("exitPress", store.exitPress + 1)
                       setTimeout(() => {
                         setStore("exitPress", 0)
                       }, 1000)
                       if (store.exitPress >= 2) {
-                        await exit()
-                        e.preventDefault()
+                        // Request session feedback before exit
+                        const sessionId = props.sessionID
+                        if (sessionId) {
+                          requestSessionFeedback(sessionId, doExit)
+                        } else {
+                          doExit()
+                        }
                         return
                       }
                       e.preventDefault()
                       return
                     }
                     // kilocode_change end
-                    await exit()
-                    // Don't preventDefault - let textarea potentially handle the event
+                    // Request session feedback before exit
+                    const sessionId = props.sessionID
+                    if (sessionId) {
+                      requestSessionFeedback(sessionId, doExit)
+                    } else {
+                      doExit()
+                    }
                     e.preventDefault()
                     return
                   }
@@ -941,7 +983,35 @@ export function Prompt(props: PromptProps) {
                 // Normalize line endings at the boundary
                 // Windows ConPTY/Terminal often sends CR-only newlines in bracketed paste
                 // Replace CRLF first, then any remaining CR
-                const normalizedText = event.text.replace(/\r\n/g, "\n").replace(/\r/g, "\n")
+                let normalizedText = event.text.replace(/\r\n/g, "\n").replace(/\r/g, "\n")
+
+                // Force word-wrap on very long lines (terminal overflow fix)
+                // Split lines longer than terminal width to prevent horizontal overflow
+                const maxLineLength = 120
+                const wrappedLines: string[] = []
+                for (const line of normalizedText.split("\n")) {
+                  if (line.length > maxLineLength) {
+                    // Insert newlines at word boundaries to wrap long lines
+                    let remaining = line
+                    while (remaining.length > maxLineLength) {
+                      // Find last space before maxLineLength
+                      const breakPoint = remaining.lastIndexOf(" ", maxLineLength)
+                      if (breakPoint <= 0) {
+                        // No space found, force break at maxLineLength
+                        wrappedLines.push(remaining.slice(0, maxLineLength))
+                        remaining = remaining.slice(maxLineLength)
+                      } else {
+                        wrappedLines.push(remaining.slice(0, breakPoint))
+                        remaining = remaining.slice(breakPoint + 1)
+                      }
+                    }
+                    if (remaining) wrappedLines.push(remaining)
+                  } else {
+                    wrappedLines.push(line)
+                  }
+                }
+                normalizedText = wrappedLines.join("\n")
+
                 const pastedContent = normalizedText.trim()
                 if (!pastedContent) {
                   command.trigger("prompt.paste")

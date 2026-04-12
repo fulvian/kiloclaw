@@ -141,9 +141,10 @@ export namespace ToolRegistry {
     const result = await Promise.all(
       tools
         .filter((t) => {
-          // Enable websearch/codesearch for zen/kilo users OR via enable flag
           // kilocode_change start
-          if (t.id === "codesearch" || t.id === "websearch") {
+          // websearch/codesearch always enabled in Kiloclaw - uses internal provider catalog
+          // Codesearch may still be gated by KILO_ENABLE_EXA flag
+          if (t.id === "codesearch") {
             return model.providerID === "opencode" || model.providerID === "kilo" || Flag.KILO_ENABLE_EXA
           }
           // kilocode_change end

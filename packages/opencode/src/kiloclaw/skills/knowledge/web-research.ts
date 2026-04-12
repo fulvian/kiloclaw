@@ -2,6 +2,8 @@ import { Log } from "@/util/log"
 import { Skill } from "../../skill"
 import type { SkillContext } from "../../skill"
 import { SkillId } from "../../types"
+import { WebSearchProvider } from "./providers"
+import { Evidence, type Citation } from "./evidence"
 
 // Search result item
 export interface Result {
@@ -24,59 +26,8 @@ export interface WebResearchOutput {
   summary: string
   query: string
   sourcesCount: number
-}
-
-// Extract domain from URL
-function extractDomain(url: string): string {
-  try {
-    const u = new URL(url)
-    return u.hostname.replace(/^www\./, "")
-  } catch {
-    return "unknown"
-  }
-}
-
-// Mock web search results (in production, this would integrate with Tavily/Firecrawl)
-function performWebSearch(query: string, maxResults: number): Result[] {
-  // This is a mock implementation that returns placeholder results
-  // In production, this would call actual web search APIs
-
-  const mockResults: Result[] = [
-    {
-      title: `Results for: ${query}`,
-      url: "https://example.com/result-1",
-      snippet: `This is a mock search result for "${query}". In production, this would contain actual search results from web search APIs.`,
-      domain: "example.com",
-      publishedDate: new Date().toISOString().split("T")[0],
-    },
-    {
-      title: `Information about ${query}`,
-      url: "https://example.org/result-2",
-      snippet: `Another mock result providing information about "${query}". Real implementation would include actual web content.`,
-      domain: "example.org",
-      publishedDate: new Date().toISOString().split("T")[0],
-    },
-    {
-      title: `${query} - Wikipedia`,
-      url: "https://en.wikipedia.org/wiki/Topic",
-      snippet: `Wikipedia article about ${query}. Production implementation would scrape actual Wikipedia content.`,
-      domain: "wikipedia.org",
-    },
-    {
-      title: `Developer Documentation for ${query}`,
-      url: "https://docs.example.dev/api-reference",
-      snippet: `Technical documentation and API reference for ${query}. Would be fetched from actual developer docs in production.`,
-      domain: "docs.example.dev",
-    },
-    {
-      title: `Community Discussion on ${query}`,
-      url: "https://stackoverflow.com/questions/example",
-      snippet: `Stack Overflow discussion about ${query}. Production would include actual Q&A content.`,
-      domain: "stackoverflow.com",
-    },
-  ]
-
-  return mockResults.slice(0, maxResults)
+  citations: Citation[]
+  evidence: string[]
 }
 
 // Generate summary from results
@@ -87,10 +38,11 @@ function generateSummary(results: Result[], query: string): string {
 
   const domains = [...new Set(results.map((r) => r.domain))]
   const domainsStr = domains.slice(0, 3).join(", ")
+  const first = results.at(0)?.domain ?? "unknown"
 
   return (
     `Found ${results.length} sources for "${query}" from ${domains.length} unique domains (${domainsStr}${domains.length > 3 ? ", and more" : ""}). ` +
-    `Results cover ${results[0].domain} and other authoritative sources.`
+    `Results include ${first} and additional external references.`
   )
 }
 
@@ -125,6 +77,19 @@ export const WebResearchSkill: Skill = {
       summary: { type: "string", description: "Synthesis summary of results" },
       query: { type: "string", description: "Original query" },
       sourcesCount: { type: "number", description: "Number of sources returned" },
+      citations: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            title: { type: "string" },
+            url: { type: "string" },
+            source: { type: "string" },
+            snippet: { type: "string" },
+          },
+        },
+      },
+      evidence: { type: "array", items: { type: "string" } },
     },
   },
   capabilities: ["search", "synthesis", "web_scraping", "information_gathering"],
@@ -143,12 +108,28 @@ export const WebResearchSkill: Skill = {
         summary: "No query provided",
         query: "",
         sourcesCount: 0,
+        citations: [],
+        evidence: [],
       }
     }
 
     const maxSources = Math.min(Math.max(sources || 5, 1), 20)
-    const results = performWebSearch(query, maxSources)
+    const hits = await WebSearchProvider.search(query, maxSources)
+    const results = hits.map((hit) => ({
+      title: hit.title,
+      url: hit.url,
+      snippet: hit.snippet,
+      domain: hit.source,
+    }))
     const summary = generateSummary(results, query)
+    const citations = Evidence.pack(
+      results.map((r) => ({
+        title: r.title,
+        url: r.url,
+        source: r.domain,
+        snippet: r.snippet,
+      })),
+    )
 
     log.info("web research completed", {
       correlationId: context.correlationId,
@@ -158,9 +139,11 @@ export const WebResearchSkill: Skill = {
 
     return {
       results,
-      summary,
+      summary: `${summary} ${Evidence.summarize(query, citations.citations)}`,
       query,
       sourcesCount: results.length,
+      citations: citations.citations,
+      evidence: citations.references,
     }
   },
 }

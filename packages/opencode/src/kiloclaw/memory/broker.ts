@@ -1,5 +1,7 @@
 import { Log } from "@/util/log"
 import { fn } from "@/util/fn"
+import { join } from "node:path"
+import { tmpdir } from "node:os"
 import z from "zod"
 import type {
   MemoryEntry,
@@ -11,6 +13,9 @@ import type {
   RankedResult,
   Layer,
   MemoryId,
+  EpisodeId,
+  FactId,
+  ProcedureId,
   WorkingMemory,
   EpisodicMemory,
   SemanticMemory,
@@ -29,8 +34,12 @@ import { workingMemory } from "./working.js"
 import { episodicMemory } from "./episodic.js"
 import { semanticMemory } from "./semantic.js"
 import { proceduralMemory } from "./procedural.js"
+import { AuditStore } from "../audit/store"
 
 const log = Log.create({ service: "kiloclaw.memory.broker" })
+const audit = AuditStore.create({ path: join(tmpdir(), "kiloclaw", "audit", "memory.jsonl") })
+const retention = new Map<MemoryId, RetentionPolicy>()
+const index = new Map<MemoryId, { layer: Layer; key: string }>()
 
 // Retention policies by layer (defaults)
 const DEFAULT_RETENTION: Record<Layer, RetentionPolicy> = {
@@ -94,6 +103,7 @@ export namespace MemoryBroker {
    */
   export async function write(entry: MemoryEntry): Promise<void> {
     const validated = MemoryEntrySchema.parse(entry)
+    index.set(validated.id, { layer: validated.layer, key: validated.key })
 
     switch (validated.layer) {
       case "working":
@@ -282,9 +292,20 @@ export namespace MemoryBroker {
    */
   export function retain(entry: MemoryEntry, policy: RetentionPolicy): void {
     const validated = RetentionPolicySchema.parse(policy)
+    retention.set(entry.id, validated)
 
-    // Store policy for later enforcement
-    // In production, would track policies in persistent storage
+    const overLimit =
+      validated.layer === "working" &&
+      validated.maxEntries !== undefined &&
+      workingMemory.stats().size > validated.maxEntries
+    if (overLimit) {
+      const keys = workingMemory.stats().keys
+      const target = keys[0]
+      if (target) {
+        workingMemory.remove(target)
+      }
+    }
+
     log.debug("retention policy applied", {
       layer: entry.layer,
       key: entry.key,
@@ -296,10 +317,46 @@ export namespace MemoryBroker {
    * Purge a memory entry
    */
   export async function purge(entryId: MemoryId, reason: PurgeReason): Promise<void> {
-    log.info("purging memory entry", { entryId, reason })
+    const hit = index.get(entryId)
+    const removed: string[] = []
 
-    // In production, would remove from persistent storage
-    // and add to audit log
+    if (hit?.layer === "working") {
+      workingMemory.remove(hit.key)
+      removed.push(`working:${hit.key}`)
+    }
+
+    const rawId = String(entryId)
+    if (rawId.startsWith("ep_")) {
+      const done = episodicMemory.removeEpisode(rawId as unknown as EpisodeId)
+      if (done) {
+        removed.push(`episodic:${rawId}`)
+      }
+    }
+
+    if (rawId.startsWith("fact_")) {
+      await semanticMemory.retract(rawId as unknown as FactId)
+      removed.push(`semantic:${rawId}`)
+    }
+
+    if (rawId.startsWith("proc_")) {
+      const done = await proceduralMemory.remove(rawId as unknown as ProcedureId)
+      if (done) {
+        removed.push(`procedural:${rawId}`)
+      }
+    }
+
+    retention.delete(entryId)
+    index.delete(entryId)
+    audit.append({
+      correlationId: `memory-purge:${rawId}`,
+      event: "memory.purge",
+      payload: {
+        entryId: rawId,
+        reason,
+        removed,
+      },
+    })
+    log.info("purging memory entry", { entryId, reason })
   }
 
   /**

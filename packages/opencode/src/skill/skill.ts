@@ -15,8 +15,8 @@ import { Session } from "@/session"
 import { Discovery } from "./discovery"
 import { Glob } from "../util/glob"
 
-import { KilocodePaths } from "../kilocode/paths" // kilocode_change
-import { BUILTIN_SKILLS } from "../kilocode/skills/builtin" // kilocode_change
+import { KiloclawPaths } from "../kilocaw-legacy/paths" // kilocode_change
+import { BUILTIN_SKILLS } from "../kilocaw-legacy/skills/builtin" // kilocode_change
 
 export namespace Skill {
   const log = Log.create({ service: "skill" })
@@ -138,7 +138,7 @@ export namespace Skill {
 
     // kilocode_change start - Scan Kilocode skill directories
     // Scanned before OpenCode so that OpenCode skills take precedence (last one wins)
-    const kilocodeSkillDirs = await KilocodePaths.skillDirectories({
+    const kilocodeSkillDirs = await KiloclawPaths.skillDirectories({
       projectDir: Instance.directory,
       worktreeRoot: Instance.worktree,
     })

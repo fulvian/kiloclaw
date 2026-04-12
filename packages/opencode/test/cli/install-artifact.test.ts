@@ -6,14 +6,14 @@ import os from "os"
 import path from "path"
 
 const root = path.join(import.meta.dir, "..", "..")
-const wrapper = path.join(root, "bin", "kilo")
+const wrapper = path.join(root, "bin", "kiloclaw")
 
 describe("npm install artifact behavior", () => {
   test("keeps the CLI wrapper contract", async () => {
     const text = await fs.readFile(wrapper, "utf8")
     expect(text.startsWith("#!/usr/bin/env node")).toBe(true)
     expect(text).toContain("const envPath = process.env.KILO_BIN_PATH")
-    expect(text).toContain('const base = "@kilocode/cli-" + platform + "-" + arch')
+    expect(text).toContain('const base = "@kiloclaw/cli-" + platform + "-" + arch')
     expect(text).toContain("function findBinary(startDir)")
   })
 
@@ -31,16 +31,15 @@ describe("npm install artifact behavior", () => {
       const prefix = path.join(tmp, "prefix")
       await fs.mkdir(bin, { recursive: true })
       await fs.mkdir(prefix, { recursive: true })
-      await fs.copyFile(wrapper, path.join(bin, "kilo"))
+      await fs.copyFile(wrapper, path.join(bin, "kiloclaw"))
       await Bun.write(
         path.join(pkg, "package.json"),
         JSON.stringify(
           {
-            name: "kilo-install-artifact-repro",
+            name: "kiloclaw-install-artifact-repro",
             version: "1.0.0",
             bin: {
-              kilo: "./bin/kilo",
-              kilocode: "./bin/kilo",
+              kiloclaw: "./bin/kiloclaw",
             },
           },
           null,
@@ -50,14 +49,14 @@ describe("npm install artifact behavior", () => {
 
       await $`npm install --prefix ${prefix} ${pkg} --no-package-lock --ignore-scripts --no-audit --no-fund`.quiet()
 
-      const commands = ["kilo", "kilocode"]
+      const commands = ["kiloclaw"]
       for (const name of commands) {
         const link = path.join(prefix, "node_modules", ".bin", name)
         const stat = await fs.lstat(link)
         expect(stat.isSymbolicLink() || stat.isFile()).toBe(true)
       }
 
-      const hidden = path.join(prefix, "node_modules", ".bin", ".kilo")
+      const hidden = path.join(prefix, "node_modules", ".bin", ".kiloclaw")
       const exists = await fs
         .access(hidden)
         .then(() => true)

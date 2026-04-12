@@ -13,7 +13,14 @@
       "packages/opencode/migration/*": "deny",
     },
   },
-  "mcp": {},
+  "mcp": {
+    "google-workspace": {
+      "type": "remote",
+      "url": "http://localhost:8000/mcp",
+      "enabled": true,
+      "oauth": {},
+    },
+  },
   "tools": {
     "github-triage": false,
     "github-pr-search": false,

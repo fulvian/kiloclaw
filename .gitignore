@@ -4,6 +4,7 @@ node_modules
 .worktrees
 .sst
 .env
+.envrc
 .idea
 .vscode/*
 !.vscode/extensions.json
@@ -39,3 +40,6 @@ logs/
 # Telemetry ID
 telemetry-id
 tsconfig.tsbuildinfo
+
+# Kiloclaw runtime data
+.kiloclaw-runtime/

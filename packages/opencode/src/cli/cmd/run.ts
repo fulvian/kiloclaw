@@ -28,7 +28,7 @@ import { SkillTool } from "../../tool/skill"
 import { BashTool } from "../../tool/bash"
 import { TodoWriteTool } from "../../tool/todo"
 import { Locale } from "../../util/locale"
-import { importCloudSession, validateCloudFork } from "@/kilocode/cloud-session" // kilocode_change
+import { importCloudSession, validateCloudFork } from "@/kilocaw-legacy/cloud-session" // kilocode_change
 
 type ToolProps<T extends Tool.Info> = {
   input: Tool.InferParameters<T>
@@ -165,7 +165,7 @@ function codesearch(info: ToolProps<typeof CodeSearchTool>) {
 function websearch(info: ToolProps<typeof WebSearchTool>) {
   inline({
     icon: "◈",
-    title: `Exa Web Search "${info.input.query}"`,
+    title: `Web Search "${info.input.query}"`,
   })
 }
 
@@ -317,7 +317,7 @@ export const RunCommand = cmd({
           describe: "auto-approve all permissions (for autonomous/pipeline usage)",
           default: false,
         })
-        // kilocode_change end
+      // kilocode_change end
     )
   },
   handler: async (args) => {

@@ -25,6 +25,18 @@ export const TuiEvent = {
           "prompt.clear",
           "prompt.submit",
           "agent.cycle",
+          "task.list",
+          "task.new",
+          "task.show",
+          "task.edit",
+          "task.pause",
+          "task.resume",
+          "task.run",
+          "task.delete",
+          "task.runs",
+          "task.dlq",
+          "task.replay",
+          "task.help",
         ]),
         z.string(),
       ]),
@@ -43,6 +55,34 @@ export const TuiEvent = {
     "tui.session.select",
     z.object({
       sessionID: z.string().regex(/^ses/).describe("Session ID to navigate to"),
+    }),
+  ),
+  TaskNavigate: BusEvent.define(
+    "tui.task.navigate",
+    z.object({
+      action: z.enum(["list", "new", "show", "edit", "runs", "dlq"]),
+      taskId: z.string().optional(),
+      dlqId: z.string().optional(),
+      advanced: z.boolean().optional(),
+    }),
+  ),
+  TaskDraftSave: BusEvent.define(
+    "tui.task.draft.save",
+    z.object({
+      draftId: z.string(),
+      data: z.record(z.string(), z.unknown()),
+    }),
+  ),
+  TaskDraftLoad: BusEvent.define(
+    "tui.task.draft.load",
+    z.object({
+      draftId: z.string(),
+    }),
+  ),
+  TaskDraftDelete: BusEvent.define(
+    "tui.task.draft.delete",
+    z.object({
+      draftId: z.string(),
     }),
   ),
 }

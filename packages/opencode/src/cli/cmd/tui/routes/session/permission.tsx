@@ -16,7 +16,7 @@ import { Locale } from "@/util/locale"
 import { Global } from "@/global"
 import { useDialog } from "../../ui/dialog"
 import { useTuiConfig } from "../../context/tui-config"
-import { ConfigProtection } from "@/kilocode/permission/config-paths" // kilocode_change
+import { ConfigProtection } from "@/kilocaw-legacy/permission/config-paths" // kilocode_change
 
 type PermissionStage = "permission" | "always" | "reject"
 
@@ -335,7 +335,7 @@ export function PermissionPrompt(props: { request: PermissionRequest }) {
               const query = typeof data.query === "string" ? data.query : ""
               return {
                 icon: "◈",
-                title: `Exa Web Search "${query}"`,
+                title: `Web Search "${query}"`,
                 body: (
                   <Show when={query}>
                     <box paddingLeft={1}>
