@@ -129,7 +129,13 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
     parameters,
     async execute(params: z.infer<typeof parameters>, ctx) {
       // kilocode_change start - check for agency skills first
-      const allKiloclawSkills = [...knowledgeSkills, ...developmentSkills]
+      const allKiloclawSkills = [
+        ...knowledgeSkills,
+        ...developmentSkills,
+        ...nutritionSkills,
+        ...weatherSkills,
+        ...nbaSkills,
+      ]
       const agencySkill = allKiloclawSkills.find((s) => s.id === params.name)
 
       if (agencySkill) {
@@ -146,7 +152,15 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
             ? `Agency Skill: ${agencySkill.id}\nName: ${agencySkill.name}\nCapabilities: ${agencySkill.capabilities.join(", ")}\nTags: ${agencySkill.tags.join(", ")}`
             : `Agency Skill: ${agencySkill.id}`
 
-        const agencyType = knowledgeSkills.some((s) => s.id === agencySkill.id) ? "knowledge" : "development"
+        const agencyType = knowledgeSkills.some((s) => s.id === agencySkill.id)
+          ? "knowledge"
+          : developmentSkills.some((s) => s.id === agencySkill.id)
+            ? "development"
+            : nutritionSkills.some((s) => s.id === agencySkill.id)
+              ? "nutrition"
+              : weatherSkills.some((s) => s.id === agencySkill.id)
+                ? "weather"
+                : "nba"
         const skillName = agencySkill.id as string // Cast branded SkillId to string
 
         return {
@@ -157,8 +171,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
             "",
             content,
             "",
-            `This is a ${agencyType === "knowledge" ? "Knowledge" : "Development"} Agency skill.`,
-            "For web search and research tasks, use the websearch tool which routes to Tavily/Firecrawl/Brave providers.",
+            `This is a ${agencyType === "knowledge" ? "Knowledge" : agencyType === "development" ? "Development" : agencyType === "nutrition" ? "Nutrition" : agencyType === "weather" ? "Weather" : "NBA"} Agency skill.`,
             "</skill_content>",
           ].join("\n"),
           metadata: {
