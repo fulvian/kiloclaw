@@ -176,6 +176,12 @@ export namespace Flag {
   // Enable NativeFactory for capability-gated operations (default: false)
   export const KILO_NATIVE_FACTORY_ENABLED = truthy("KILO_NATIVE_FACTORY_ENABLED")
 
+  // Shadow mode for native factory (logs only, no user impact)
+  export const KILO_NATIVE_FACTORY_SHADOW = truthy("KILO_NATIVE_FACTORY_SHADOW")
+
+  // Canary percentage for gradual rollout (0-100, default: 0)
+  export const KILO_NATIVE_FACTORY_CANARY_PERCENT = number("KILO_NATIVE_FACTORY_CANARY_PERCENT") ?? 0
+
   // =============================================================================
   // LLM Wiki - CONDITIONAL-GO, default OFF until guardrails and parity gates
   // KILOCLAW_DEVELOPMENT_AGENCY_REFOUNDATION_PLAN_2026-04-12.md

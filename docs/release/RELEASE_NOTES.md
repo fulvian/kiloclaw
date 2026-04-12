@@ -7,6 +7,49 @@
 
 ---
 
+## Deployment: Development Agency Shadow Mode (2026-04-12)
+
+**Status**: 🟡 **ACTIVE** (Shadow mode, no user impact)  
+**Commit**: `bdc14f5` (Development Agency Refoundation)
+
+### What's Deployed
+
+| Component                | Details                                                                                        | Tests             |
+| ------------------------ | ---------------------------------------------------------------------------------------------- | ----------------- |
+| **Native-first factory** | 9 native adapters (File, Git, Build, Research, Browser, GitHub, Memory, Visual, Orchestration) | 1037/1040 pass ✅ |
+| **KPI Enforcer**         | Native >= 90%, Fallback <= 10% ratio tracking                                                  | Verified ✅       |
+| **16 skill files**       | Development, Knowledge, Meta agencies                                                          | All tests pass ✅ |
+| **5 development agents** | general-manager, system-analyst, architect, coder, qa                                          | Registered ✅     |
+| **Feature flags**        | `KILO_NATIVE_FACTORY_ENABLED=true`, `KILO_NATIVE_FACTORY_SHADOW=true`                          | Active ✅         |
+
+### Shadow Mode Characteristics
+
+- ✅ Runs native adapter factory in parallel with MCP
+- ✅ Collects KPI metrics and telemetry (logs only)
+- 🔇 No user-visible changes
+- 🔇 Automatic fallback to MCP if issues detected
+- 🔇 Zero-risk rollback: set `KILO_NATIVE_FACTORY_ENABLED=false`
+
+### Metrics to Monitor
+
+| Metric                  | Target          | Gate                   |
+| ----------------------- | --------------- | ---------------------- |
+| Native adapter ratio    | >= 90%          | Must hit before canary |
+| Fallback adapter ratio  | <= 10%          | Must hit before canary |
+| Auto-repair strikes     | < 3 per session | Must be met            |
+| Native execution errors | < 1%            | Must be met            |
+
+**See**: [DEPLOYMENT_STATUS_2026-04-12.md](../../DEPLOYMENT_STATUS_2026-04-12.md) for full details.
+
+### Next Steps
+
+1. **24-48h shadow validation** — Monitor metrics and telemetry
+2. **Gate review** — All metrics green → proceed to canary (5% users)
+3. **Canary phase** — 1-7 days at 5% → 20% → 50% → 100%
+4. **GA** — General availability after 7 days stable
+
+---
+
 ## Hotfix: CLI Runtime Stability (2026-04-12)
 
 | Issue                         | Root Cause                                                                                        | Fix                                                                    | Impact                                                                            |
@@ -22,8 +65,6 @@
 - `packages/opencode/src/tool/skill.ts` - NBA skill output instructions
 
 **See Also:** [CLI_HANG_INVESTIGATION_REPORT.md](../../CLI_HANG_INVESTIGATION_REPORT.md) for detailed analysis.
-
----
 
 ## Corrective Update (2026-04-09)
 

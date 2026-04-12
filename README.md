@@ -28,9 +28,20 @@ Kiloclaw extends the foundation with:
 **Memory 4-Layer**: ✅ Complete  
 **Agency Migration**: ✅ Complete  
 **Flexible Agents**: ✅ Complete (13 agents with prompt/permission)  
-**Runtime Stability**: ✅ Enhanced (CLI hang fixes, logging optimization)
+**Runtime Stability**: ✅ Enhanced (CLI hang fixes, logging optimization)  
+**Development Agency Refoundation**: ✅ Complete (Native-first factory, 1037 tests pass)  
+**Development Agency Shadow Mode**: 🟡 ACTIVE (2026-04-12 14:56 UTC+2)
 
-See [docs/plans/KILOCLAW_FOUNDATION_PLAN.md](docs/plans/KILOCLAW_FOUNDATION_PLAN.md) for the full roadmap.
+### Feature Flags (Active)
+
+```bash
+KILO_NATIVE_FACTORY_ENABLED=true          # Native-first adapter factory active
+KILO_NATIVE_FACTORY_SHADOW=true           # Shadow mode (logs only, no user impact)
+KILO_NATIVE_FACTORY_CANARY_PERCENT=0      # Canary disabled during shadow phase
+```
+
+See [docs/plans/KILOCLAW_FOUNDATION_PLAN.md](docs/plans/KILOCLAW_FOUNDATION_PLAN.md) for the full roadmap.  
+See [docs/agencies/plans/](docs/agencies/plans/) for Development Agency refactoring documentation.
 
 ## Recent Fixes (2026-04-12)
 
@@ -108,6 +119,9 @@ Run `kiloclaw agent list` to see all available agents.
 | [ADR-002](docs/adr/ADR-002_Memory_4_Layer.md)                                                                   | 4-layer memory architecture                      |
 | [ADR-003](docs/adr/ADR-003_Safety_Guardrails_Proactivity.md)                                                    | Safety, guardrails, proactivity policy           |
 | [ADR-004](docs/adr/ADR-004_Isolation_from_KiloCode.md)                                                          | Isolation from KiloCode runtime                  |
+| [DEPLOYMENT_STATUS](DEPLOYMENT_STATUS_2026-04-12.md)                                                            | Development Agency Shadow Mode deployment status |
+| [ROLLOUT_PLAN](docs/agencies/plans/KILOCLAW_DEVELOPMENT_AGENCY_ROLLOUT_PLAN_V1_2026-04-12.md)                   | Phased rollout (shadow → canary → GA)            |
+| [GO_NO_GO_REVIEW](docs/agencies/plans/KILOCLAW_DEVELOPMENT_AGENCY_GO_NO_GO_REVIEW_V1_2026-04-12.md)             | Development Agency verification & gate review    |
 
 ## Getting Started
 
