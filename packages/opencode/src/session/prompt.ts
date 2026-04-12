@@ -1065,15 +1065,15 @@ export namespace SessionPrompt {
     using _ = log.time("resolveTools")
     const tools: Record<string, AITool> = {}
 
+    const enabledAgency = input.agencyContext?.agencyId
     const agencyCapabilities = await import("@/kiloclaw/agency/registry/agency-registry")
-      .then((x) => x.AgencyRegistry.getAgency("agency-knowledge")?.policies.allowedCapabilities ?? [])
+      .then((x) => (enabledAgency ? x.AgencyRegistry.getAgency(enabledAgency)?.policies.allowedCapabilities ?? [] : []))
       .catch(() => [])
     const agencyTools = resolveAgencyAllowedTools({
-      agencyId: input.agencyContext?.agencyId,
+      agencyId: enabledAgency,
       enabled: Flag.KILO_ROUTING_AGENCY_CONTEXT_ENABLED,
       capabilities: agencyCapabilities,
     })
-    const enabledAgency = input.agencyContext?.agencyId
     const blockedTools: string[] = []
     const allowedTools: string[] = []
 
