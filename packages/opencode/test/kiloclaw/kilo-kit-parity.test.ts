@@ -4,6 +4,12 @@ import { NativeFileAdapter } from "@/kiloclaw/tooling/native/file-adapter"
 import { NativeGitAdapter } from "@/kiloclaw/tooling/native/git-adapter"
 import { NativeBuildAdapter } from "@/kiloclaw/tooling/native/build-adapter"
 import { NativeResearchAdapter } from "@/kiloclaw/tooling/native/research-adapter"
+import { NativeBrowserAdapter } from "@/kiloclaw/tooling/native/browser-adapter"
+import { NativeGithubAdapter } from "@/kiloclaw/tooling/native/github-adapter"
+import { NativeMemoryAdapter } from "@/kiloclaw/tooling/native/memory-adapter"
+import { NativeVisualAdapter } from "@/kiloclaw/tooling/native/visual-adapter"
+import { NativeOrchestrationAdapter } from "@/kiloclaw/tooling/native/orchestration-adapter"
+import { KpiEnforcer } from "@/kiloclaw/tooling/native/kpi-enforcer"
 import { FallbackMetrics } from "@/kiloclaw/telemetry/fallback.metrics"
 import { ParityMetrics } from "@/kiloclaw/telemetry/parity.metrics"
 import { SkillRegistry } from "@/kiloclaw/agency/registry/skill-registry"
@@ -875,5 +881,436 @@ describe("Onda 3 Migration", () => {
         expect(Array.isArray(skill.capabilities)).toBe(true)
       }
     })
+  })
+})
+
+// =============================================================================
+// Onda 5: Parity Hardening
+// KILOCLAW_DEVELOPMENT_AGENCY_REFOUNDATION_PLAN_2026-04-12.md
+// Targets: native >= 90%, fallback <= 10%, parity >= 99%
+// =============================================================================
+
+describe("Onda 5: All 9 Native Adapters Parity", () => {
+  it("file_ops adapter responds correctly", async () => {
+    const fx = NativeFactory.create({
+      adapters: [
+        NativeFileAdapter.create({
+          probe: async () => ({ healthy: true, latency_ms: 1, reason: "ok" }),
+          run: async () => ({ ok: true, data: { source: "native" } }),
+        }),
+      ],
+    })
+    const out = await fx.execute({ capability: "file_ops", payload: { path: "test.ts" } })
+    expect(out.ok).toBe(true)
+    expect(out.route.adapter_id).toBe("native.file")
+    expect(out.route.route_reason).toBe("native_primary")
+    expect(out.route.fallback_flag).toBe(false)
+  })
+
+  it("git_ops adapter responds correctly", async () => {
+    const fx = NativeFactory.create({
+      adapters: [
+        NativeGitAdapter.create({
+          probe: async () => ({ healthy: true, latency_ms: 1, reason: "ok" }),
+          run: async () => ({ ok: true, data: { source: "native" } }),
+        }),
+      ],
+    })
+    const out = await fx.execute({ capability: "git_ops", payload: { operation: "status" } })
+    expect(out.ok).toBe(true)
+    expect(out.route.adapter_id).toBe("native.git")
+    expect(out.route.route_reason).toBe("native_primary")
+    expect(out.route.fallback_flag).toBe(false)
+  })
+
+  it("build_test_ops adapter responds correctly", async () => {
+    const fx = NativeFactory.create({
+      adapters: [
+        NativeBuildAdapter.create({
+          probe: async () => ({ healthy: true, latency_ms: 1, reason: "ok" }),
+          run: async () => ({ ok: true, data: { source: "native" } }),
+        }),
+      ],
+    })
+    const out = await fx.execute({ capability: "build_test_ops", payload: { command: "test" } })
+    expect(out.ok).toBe(true)
+    expect(out.route.adapter_id).toBe("native.build")
+    expect(out.route.route_reason).toBe("native_primary")
+    expect(out.route.fallback_flag).toBe(false)
+  })
+
+  it("web_research_ops adapter responds correctly", async () => {
+    const fx = NativeFactory.create({
+      adapters: [
+        NativeResearchAdapter.create({
+          probe: async () => ({ healthy: true, latency_ms: 1, reason: "ok" }),
+          run: async () => ({ ok: true, data: { source: "native" } }),
+        }),
+      ],
+    })
+    const out = await fx.execute({ capability: "web_research_ops", payload: { query: "test" } })
+    expect(out.ok).toBe(true)
+    expect(out.route.adapter_id).toBe("native.research")
+    expect(out.route.route_reason).toBe("native_primary")
+    expect(out.route.fallback_flag).toBe(false)
+  })
+
+  it("browser_ops adapter responds correctly", async () => {
+    const fx = NativeFactory.create({
+      adapters: [
+        NativeBrowserAdapter.create({
+          probe: async () => ({ healthy: true, latency_ms: 1, reason: "ok" }),
+          run: async () => ({ ok: true, data: { source: "native" } }),
+        }),
+      ],
+    })
+    const out = await fx.execute({ capability: "browser_ops", payload: { url: "https://example.com" } })
+    expect(out.ok).toBe(true)
+    expect(out.route.adapter_id).toBe("native.browser")
+    expect(out.route.route_reason).toBe("native_primary")
+    expect(out.route.fallback_flag).toBe(false)
+  })
+
+  it("github_ops adapter responds correctly", async () => {
+    const fx = NativeFactory.create({
+      adapters: [
+        NativeGithubAdapter.create({
+          probe: async () => ({ healthy: true, latency_ms: 1, reason: "ok" }),
+          run: async () => ({ ok: true, data: { source: "native" } }),
+        }),
+      ],
+    })
+    const out = await fx.execute({ capability: "github_ops", payload: { action: "get-repo" } })
+    expect(out.ok).toBe(true)
+    expect(out.route.adapter_id).toBe("native.github")
+    expect(out.route.route_reason).toBe("native_primary")
+    expect(out.route.fallback_flag).toBe(false)
+  })
+
+  it("memory_ops adapter responds correctly", async () => {
+    const fx = NativeFactory.create({
+      adapters: [
+        NativeMemoryAdapter.create({
+          probe: async () => ({ healthy: true, latency_ms: 1, reason: "ok" }),
+          run: async () => ({ ok: true, data: { source: "native" } }),
+        }),
+      ],
+    })
+    const out = await fx.execute({ capability: "memory_ops", payload: { action: "store" } })
+    expect(out.ok).toBe(true)
+    expect(out.route.adapter_id).toBe("native.memory")
+    expect(out.route.route_reason).toBe("native_primary")
+    expect(out.route.fallback_flag).toBe(false)
+  })
+
+  it("visual_ops adapter responds correctly", async () => {
+    const fx = NativeFactory.create({
+      adapters: [
+        NativeVisualAdapter.create({
+          probe: async () => ({ healthy: true, latency_ms: 1, reason: "ok" }),
+          run: async () => ({ ok: true, data: { source: "native" } }),
+        }),
+      ],
+    })
+    const out = await fx.execute({ capability: "visual_ops", payload: { action: "render" } })
+    expect(out.ok).toBe(true)
+    expect(out.route.adapter_id).toBe("native.visual")
+    expect(out.route.route_reason).toBe("native_primary")
+    expect(out.route.fallback_flag).toBe(false)
+  })
+
+  it("orchestration_ops adapter responds correctly", async () => {
+    const fx = NativeFactory.create({
+      adapters: [
+        NativeOrchestrationAdapter.create({
+          probe: async () => ({ healthy: true, latency_ms: 1, reason: "ok" }),
+          run: async () => ({ ok: true, data: { source: "native" } }),
+        }),
+      ],
+    })
+    const out = await fx.execute({ capability: "orchestration_ops", payload: { action: "dispatch" } })
+    expect(out.ok).toBe(true)
+    expect(out.route.adapter_id).toBe("native.orchestration")
+    expect(out.route.route_reason).toBe("native_primary")
+    expect(out.route.fallback_flag).toBe(false)
+  })
+})
+
+describe("Onda 5: KPI Ratio Enforcement", () => {
+  beforeEach(() => {
+    KpiEnforcer.init({ nativeMinRatio: 0.9, fallbackMaxRatio: 0.1 })
+  })
+
+  it("factory kpi() method returns snapshot", async () => {
+    const fx = NativeFactory.create({ kpiEnabled: true })
+    const snap = fx.kpi()
+    expect(snap).toBeDefined()
+    expect(snap.totalCalls).toBe(0)
+  })
+
+  it("native success increments nativeCalls in KPI", async () => {
+    const fx = NativeFactory.create({
+      kpiEnabled: true,
+      adapters: [
+        NativeFileAdapter.create({
+          probe: async () => ({ healthy: true, latency_ms: 1, reason: "ok" }),
+          run: async () => ({ ok: true, data: {} }),
+        }),
+      ],
+    })
+    await fx.execute({ capability: "file_ops", payload: {} })
+    const snap = fx.kpi()
+    expect(snap.nativeCalls).toBe(1)
+    expect(snap.totalCalls).toBe(1)
+    expect(snap.nativeRatio).toBe(1.0)
+  })
+
+  it("fallback increments fallbackCalls in KPI", async () => {
+    const fx = NativeFactory.create({
+      kpiEnabled: true,
+      adapters: [
+        NativeFileAdapter.create({
+          probe: async () => ({ healthy: false, latency_ms: 0, reason: "unhealthy" }),
+          run: async () => ({ ok: false, error: "unhealthy" }),
+        }),
+      ],
+    })
+    await fx.execute({ capability: "file_ops", payload: {} }, async () => ({ ok: true, data: { source: "mcp" } }))
+    const snap = fx.kpi()
+    expect(snap.fallbackCalls).toBe(1)
+    expect(snap.totalCalls).toBe(1)
+    expect(snap.fallbackRatio).toBe(1.0)
+  })
+
+  it("achieves 90/10 ratio with correct call distribution", async () => {
+    // Reset and re-init with explicit thresholds before recording
+    KpiEnforcer.init({ nativeMinRatio: 0.9, fallbackMaxRatio: 0.1 })
+    const fx = NativeFactory.create({
+      kpiEnabled: true,
+      adapters: [
+        NativeFileAdapter.create({
+          probe: async () => ({ healthy: true, latency_ms: 1, reason: "ok" }),
+          run: async () => ({ ok: true, data: {} }),
+        }),
+      ],
+    })
+    // 9 native calls, 1 fallback — need native unhealthy to trigger fallback
+    for (let i = 0; i < 9; i++) {
+      await fx.execute({ capability: "file_ops", payload: {} })
+    }
+    // For the fallback, we need native to fail — use retry_exhausted scenario
+    const fxFallback = NativeFactory.create({
+      kpiEnabled: true,
+      adapters: [
+        NativeFileAdapter.create({
+          probe: async () => ({ healthy: true, latency_ms: 1, reason: "ok" }),
+          run: async () => ({ ok: false, error: "permanent", transient: false, timeout: false }),
+        }),
+      ],
+    })
+    await fxFallback.execute({ capability: "file_ops", payload: {}, retry_max: 1 }, async () => ({
+      ok: true,
+      data: { source: "mcp" },
+    }))
+    // Combined: 9 native from fx + 1 fallback from fxFallback = 9/10
+    const snap = KpiEnforcer.getSnapshot()
+    expect(snap.nativeRatio).toBe(0.9)
+    expect(snap.fallbackRatio).toBe(0.1)
+    expect(snap.status).toBe("ok")
+  })
+
+  it("kpiEnabled=false skips KPI tracking", async () => {
+    const fxNoKpi = NativeFactory.create({
+      kpiEnabled: false,
+      adapters: [
+        NativeFileAdapter.create({
+          probe: async () => ({ healthy: true, latency_ms: 1, reason: "ok" }),
+          run: async () => ({ ok: true, data: {} }),
+        }),
+      ],
+    })
+    await fxNoKpi.execute({ capability: "file_ops", payload: {} })
+    // KPI snapshot should be zeroed (not initialized)
+    const snap = fxNoKpi.kpi()
+    expect(snap.totalCalls).toBe(0)
+  })
+})
+
+describe("Onda 5: C1-C7 Concrete Parity Tests", () => {
+  // C1: Behavioral parity - schema validation for all capabilities
+  it("C1: all adapters produce stable output schema", async () => {
+    const adapters = [
+      ["file_ops", NativeFileAdapter],
+      ["git_ops", NativeGitAdapter],
+      ["build_test_ops", NativeBuildAdapter],
+      ["web_research_ops", NativeResearchAdapter],
+    ] as const
+
+    for (const [cap, Adapter] of adapters) {
+      const fx = NativeFactory.create({
+        adapters: [
+          Adapter.create({
+            probe: async () => ({ healthy: true, latency_ms: 1, reason: "ok" }),
+            run: async () => ({ ok: true, data: { source: "native" } }),
+          }),
+        ],
+      })
+      const out = await fx.execute({ capability: cap, payload: {} })
+      expect(out.ok).toBe(true)
+      expect(out.route).toBeDefined()
+      expect(out.route.route_reason).toBe("native_primary")
+    }
+  })
+
+  // C2: Tool-call parity - all adapters return correct adapter_id
+  it("C2: each capability maps to correct adapter_id", async () => {
+    const mapping: [string, string][] = [
+      ["file_ops", "native.file"],
+      ["git_ops", "native.git"],
+      ["build_test_ops", "native.build"],
+      ["web_research_ops", "native.research"],
+      ["browser_ops", "native.browser"],
+      ["github_ops", "native.github"],
+      ["memory_ops", "native.memory"],
+      ["visual_ops", "native.visual"],
+      ["orchestration_ops", "native.orchestration"],
+    ]
+    for (const [cap, expectedId] of mapping) {
+      const fx = NativeFactory.create()
+      const out = await fx.execute({ capability: cap as any, payload: {} }, async () => ({ ok: true, data: {} }))
+      expect(out.route.adapter_id).toBe(expectedId)
+    }
+  })
+
+  // C3: Safety parity - deny always blocks regardless of adapter health
+  it("C3: deny=true always blocks even with healthy adapter", async () => {
+    const fx = NativeFactory.create({
+      adapters: [
+        NativeGitAdapter.create({
+          probe: async () => ({ healthy: true, latency_ms: 1, reason: "ok" }),
+          run: async () => ({ ok: true, data: {} }),
+        }),
+      ],
+    })
+    const out = await fx.execute({ capability: "git_ops", payload: {}, deny: true }, async () => ({
+      ok: true,
+      data: { source: "mcp" },
+    }))
+    expect(out.ok).toBe(false)
+    expect(out.route.policy_decision).toBe("deny")
+    expect(out.route.route_reason).toBe("policy_denied")
+  })
+
+  // C4: Error parity - transient errors retry, permanent errors fallback
+  it("C4: transient error triggers retry then success", async () => {
+    let attempts = 0
+    const fx = NativeFactory.create({
+      adapters: [
+        NativeBuildAdapter.create({
+          probe: async () => ({ healthy: true, latency_ms: 1, reason: "ok" }),
+          run: async () => {
+            attempts++
+            if (attempts === 1) return { ok: false, transient: true, error: "ci flaky" }
+            return { ok: true, data: { source: "native" } }
+          },
+        }),
+      ],
+    })
+    const out = await fx.execute({ capability: "build_test_ops", payload: {}, retry_max: 3 })
+    expect(out.ok).toBe(true)
+    expect(attempts).toBe(2)
+    expect(out.route.route_reason).toBe("native_retry")
+  })
+
+  it("C4: permanent error exhausts retries then fallback", async () => {
+    let attempts = 0
+    const fx = NativeFactory.create({
+      adapters: [
+        NativeBuildAdapter.create({
+          probe: async () => ({ healthy: true, latency_ms: 1, reason: "ok" }),
+          run: async () => {
+            attempts++
+            return { ok: false, error: "permanent fail", transient: false, timeout: false }
+          },
+        }),
+      ],
+    })
+    const out = await fx.execute({ capability: "build_test_ops", payload: {}, retry_max: 2 }, async () => ({
+      ok: true,
+      data: { source: "mcp" },
+    }))
+    expect(out.ok).toBe(true)
+    expect(out.route.fallback_flag).toBe(true)
+    expect(out.route.route_reason).toBe("native_retry_exhausted")
+  })
+
+  // C5: Output parity - all outputs have required fields
+  it("C5: all factory outputs have required fields", async () => {
+    const fx = NativeFactory.create({
+      adapters: [
+        NativeFileAdapter.create({
+          probe: async () => ({ healthy: true, latency_ms: 1, reason: "ok" }),
+          run: async () => ({ ok: true, data: { files: [] } }),
+        }),
+      ],
+    })
+    const out = await fx.execute({ capability: "file_ops", payload: {} })
+    expect(typeof out.ok).toBe("boolean")
+    expect(out.route).toBeDefined()
+    expect(out.route.route_reason).toBeDefined()
+    expect(out.route.adapter_id).toBeDefined()
+    expect(typeof out.route.fallback_flag).toBe("boolean")
+    expect(out.route.policy_decision).toBeDefined()
+    expect(out.ok ? out.data !== undefined : out.error !== undefined).toBe(true)
+  })
+
+  // C6: Latency budget - native adapters respond within SLO
+  it("C6: native adapter responds within 500ms SLO", async () => {
+    const fx = NativeFactory.create({
+      adapters: [
+        NativeResearchAdapter.create({
+          probe: async () => ({ healthy: true, latency_ms: 1, reason: "ok" }),
+          run: async () => {
+            await new Promise((r) => setTimeout(r, 5))
+            return { ok: true, data: { source: "native" } }
+          },
+        }),
+      ],
+    })
+    const start = Date.now()
+    const out = await fx.execute({ capability: "web_research_ops", payload: { query: "test" } })
+    const elapsed = Date.now() - start
+    expect(out.ok).toBe(true)
+    expect(elapsed).toBeLessThan(500)
+  })
+
+  // C7: Audit parity - telemetry events have required fields
+  it("C7: fallback emits telemetry with required fields", async () => {
+    const fx = NativeFactory.create({
+      adapters: [
+        NativeGitAdapter.create({
+          probe: async () => ({ healthy: false, latency_ms: 0, reason: "unavailable" }),
+          run: async () => ({ ok: false, error: "unavailable" }),
+        }),
+      ],
+    })
+    const out = await fx.execute({ capability: "git_ops", payload: {} }, async () => ({
+      ok: true,
+      data: { source: "mcp" },
+    }))
+    expect(out.route.fallback_flag).toBe(true)
+    const event = FallbackMetrics.build({
+      correlation_id: "test-onda5-c7",
+      capability: "git_ops",
+      adapter_id: out.route.adapter_id,
+      route_reason: out.route.route_reason,
+      fallback_flag: out.route.fallback_flag,
+      policy_decision: out.route.policy_decision,
+      retry_count: 0,
+    })
+    expect(event.event).toBe("native_fallback")
+    expect(event.capability).toBe("git_ops")
+    expect(event.route_reason).toBeDefined()
+    expect(event.policy_decision).toBeDefined()
   })
 })

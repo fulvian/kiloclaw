@@ -1,10 +1,15 @@
-// Load API keys from .env file before any other imports that may use process.env
 import { config } from "dotenv"
+import { existsSync } from "fs"
+import { homedir } from "os"
 import { join } from "path"
 const dotenvPath = process.env.XDG_DATA_HOME
   ? join(process.env.XDG_DATA_HOME, "kiloclaw", ".env")
-  : join(process.env.HOME || "", ".local", "share", "kiloclaw", ".env")
+  : join(homedir(), ".local", "share", "kiloclaw", ".env")
+const fallbackDotenvPath = join(homedir(), ".local", "share", "kiloclaw", ".env")
 config({ path: dotenvPath })
+if (dotenvPath !== fallbackDotenvPath && existsSync(fallbackDotenvPath)) {
+  config({ path: fallbackDotenvPath, override: false })
+}
 import yargs from "yargs"
 import { hideBin } from "yargs/helpers"
 import { RunCommand } from "./cli/cmd/run"

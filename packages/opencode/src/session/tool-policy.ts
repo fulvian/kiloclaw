@@ -1,5 +1,5 @@
 export const KNOWLEDGE_TOOL_ALLOWLIST = ["websearch", "webfetch", "skill"] as const
-export const NBA_TOOL_ALLOWLIST = ["webfetch", "skill"] as const
+export const NBA_TOOL_ALLOWLIST = ["skill"] as const
 
 export function mapKnowledgeCapabilitiesToTools(capabilities: string[]) {
   const tools = capabilities.flatMap((cap) => {
@@ -13,10 +13,22 @@ export function mapKnowledgeCapabilitiesToTools(capabilities: string[]) {
 
 export function mapNbaCapabilitiesToTools(capabilities: string[]) {
   const tools = capabilities.flatMap((cap) => {
-    if (["schedule_live", "team_player_stats", "injury_status", "odds_markets", "game_preview"].includes(cap)) {
-      return ["webfetch"]
-    }
-    if (["probability_estimation", "vig_removal", "edge_detection", "calibration_monitoring", "value_watchlist", "recommendation_report", "stake_sizing"].includes(cap)) {
+    if (
+      [
+        "schedule_live",
+        "team_player_stats",
+        "injury_status",
+        "odds_markets",
+        "game_preview",
+        "probability_estimation",
+        "vig_removal",
+        "edge_detection",
+        "calibration_monitoring",
+        "value_watchlist",
+        "recommendation_report",
+        "stake_sizing",
+      ].includes(cap)
+    ) {
       return ["skill"]
     }
     return []

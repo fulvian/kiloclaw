@@ -8,6 +8,7 @@ import {
   type RouteReason,
 } from "./capability-registry"
 import { NativeFallbackPolicy, type NativeErrorKind } from "./fallback-policy"
+import { KpiEnforcer, type KpiSnapshot } from "./kpi-enforcer"
 import { NativeFileAdapter } from "./file-adapter"
 import { NativeGitAdapter } from "./git-adapter"
 import { NativeBuildAdapter } from "./build-adapter"
@@ -25,6 +26,7 @@ export const FactoryInputSchema = z.object({
   destructive: z.boolean().default(false),
   secret: z.boolean().default(false),
   retry_max: z.number().int().nonnegative().default(2),
+  kpiEnabled: z.boolean().default(true),
 })
 export type FactoryInput = z.input<typeof FactoryInputSchema>
 
@@ -71,9 +73,14 @@ export namespace NativeFactory {
       mcp?: (payload: Record<string, unknown>) => Promise<AdapterOutput>,
     ) => Promise<FactoryOutput>
     registry: CapabilityRegistry.Registry
+    kpi: () => KpiSnapshot
   }
 
-  export function create(input?: { adapters?: NativeAdapter[] }): Runtime {
+  export function create(input?: { adapters?: NativeAdapter[]; kpiEnabled?: boolean }): Runtime {
+    const kpiEnabled = input?.kpiEnabled !== false
+    if (kpiEnabled) {
+      KpiEnforcer.init()
+    }
     const registry = CapabilityRegistry.create({
       adapters: input?.adapters ?? [
         NativeFileAdapter.create(),
@@ -123,7 +130,10 @@ export namespace NativeFactory {
             return { ok: false, route: audit, error: "fallback unavailable" }
           }
           const out = AdapterOutput.parse(await mcp(input.payload))
-          if (out.ok) return { ok: true, route: audit, data: out.data }
+          if (out.ok) {
+            if (input.kpiEnabled !== false) KpiEnforcer.recordFallback()
+            return { ok: true, route: audit, data: out.data }
+          }
           return { ok: false, route: audit, error: out.error ?? "fallback failure" }
         }
 
@@ -141,7 +151,10 @@ export namespace NativeFactory {
           })
         })
 
-        if (native.ok) return { ok: true, route: audit, data: native.data }
+        if (native.ok) {
+          if (input.kpiEnabled !== false) KpiEnforcer.recordNative()
+          return { ok: true, route: audit, data: native.data }
+        }
 
         const nextKind: NativeErrorKind = native.timeout ? "timeout" : native.transient ? "transient" : "permanent"
         return runNative(retry + 1, nextKind)
@@ -150,9 +163,25 @@ export namespace NativeFactory {
       return runNative(0, "none")
     }
 
+    const kpi = () => {
+      if (!kpiEnabled) {
+        return {
+          nativeCalls: 0,
+          fallbackCalls: 0,
+          totalCalls: 0,
+          nativeRatio: 0,
+          fallbackRatio: 0,
+          status: "ok" as const,
+          ts: Date.now(),
+        }
+      }
+      return KpiEnforcer.getSnapshot()
+    }
+
     return {
       execute,
       registry,
+      kpi,
     }
   }
 }

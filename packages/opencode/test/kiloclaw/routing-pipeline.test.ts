@@ -95,7 +95,7 @@ describe("kiloclaw.routing.pipeline", () => {
     expect(l3.deniedTools).not.toContain("websearch")
   })
 
-  it("enforces nba L3 allowlist and blocks websearch", async () => {
+  it("enforces nba L3 allowlist and allows only skill", async () => {
     AgencyRegistry.registerAgency({
       id: "agency-nba",
       name: "NBA Agency",
@@ -117,8 +117,10 @@ describe("kiloclaw.routing.pipeline", () => {
       "websearch",
     ])
     expect(l3.toolsRequested).toBe(3)
-    expect(l3.toolsResolved).toBe(2)
-    expect(l3.toolsDenied).toBe(1)
+    expect(l3.toolsResolved).toBe(1)
+    expect(l3.toolsDenied).toBe(2)
+    expect(l3.deniedTools).toContain("webfetch")
+    expect(l3.blockedTools).toContain("webfetch")
     expect(l3.deniedTools).toContain("websearch")
     expect(l3.blockedTools).toContain("websearch")
     expect(l3.fallbackUsed).toBe(false)
