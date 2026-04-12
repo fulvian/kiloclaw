@@ -426,6 +426,168 @@ function doBootstrap(): void {
     }
   }
 
+  // Onda 2: Security/Ops/Review skills
+  // Maps refoundation plan skill IDs -> existing skill implementations
+  const onda2SkillAliases: SkillDefinition[] = [
+    {
+      id: "security-audit",
+      name: "Security Audit",
+      version: "1.0.0",
+      description: "Comprehensive security review and vulnerability assessment",
+      inputSchema: {
+        type: "object",
+        properties: { code: { type: "string" }, scope: { type: "string" } },
+        required: ["code"],
+      },
+      outputSchema: {
+        type: "object",
+        properties: {
+          vulnerabilities: { type: "array" },
+          riskLevel: { type: "string" },
+          recommendations: { type: "array" },
+        },
+      },
+      capabilities: ["security-analysis", "vulnerability-assessment", "risk-evaluation"],
+      tags: ["security", "audit", "review"],
+    },
+    {
+      id: "code-review-discipline",
+      name: "Code Review Discipline",
+      version: "1.0.0",
+      description: "Systematic code review methodology for consistent quality",
+      inputSchema: {
+        type: "object",
+        properties: { code: { type: "string" }, language: { type: "string" } },
+        required: ["code"],
+      },
+      outputSchema: {
+        type: "object",
+        properties: { issues: { type: "array" }, score: { type: "number" }, summary: { type: "string" } },
+      },
+      capabilities: ["code-review", "quality-assessment", "best-practices"],
+      tags: ["code-review", "quality", "development"],
+    },
+    {
+      id: "requesting-code-review",
+      name: "Requesting Code Review",
+      version: "1.0.0",
+      description: "Process of requesting and preparing code for peer review",
+      inputSchema: {
+        type: "object",
+        properties: { branchName: { type: "string" }, changes: { type: "string" } },
+        required: ["branchName"],
+      },
+      outputSchema: {
+        type: "object",
+        properties: { reviewRequest: { type: "object" }, checklist: { type: "array" } },
+      },
+      capabilities: ["code-review-preparation", "change-documentation"],
+      tags: ["code-review", "workflow", "development"],
+    },
+    {
+      id: "receiving-code-review",
+      name: "Receiving Code Review",
+      version: "1.0.0",
+      description: "Process of receiving and responding to code review feedback",
+      inputSchema: {
+        type: "object",
+        properties: { feedback: { type: "string" }, changes: { type: "array" } },
+        required: ["feedback"],
+      },
+      outputSchema: {
+        type: "object",
+        properties: { addressed: { type: "array" }, remaining: { type: "array" } },
+      },
+      capabilities: ["feedback-integration", "revision-management"],
+      tags: ["code-review", "feedback", "development"],
+    },
+    {
+      id: "finishing-a-development-branch",
+      name: "Finishing a Development Branch",
+      version: "1.0.0",
+      description: "Validate branch readiness for merge: tests, clean state, commit history",
+      inputSchema: {
+        type: "object",
+        properties: {
+          branchName: { type: "string" },
+          targetBranch: { type: "string" },
+          requireTests: { type: "boolean" },
+        },
+        required: ["branchName"],
+      },
+      outputSchema: {
+        type: "object",
+        properties: { status: { type: "string" }, checks: { type: "array" }, summary: { type: "string" } },
+      },
+      capabilities: ["branch-validation", "git-workflow", "merge-readiness"],
+      tags: ["git", "workflow", "development"],
+    },
+    {
+      id: "using-git-worktrees",
+      name: "Using Git Worktrees",
+      version: "1.0.0",
+      description: "Manage isolated workspaces with git worktrees for parallel development",
+      inputSchema: {
+        type: "object",
+        properties: { action: { type: "string" }, worktreePath: { type: "string" }, branchName: { type: "string" } },
+        required: ["action"],
+      },
+      outputSchema: {
+        type: "object",
+        properties: { success: { type: "boolean" }, worktrees: { type: "array" }, message: { type: "string" } },
+      },
+      capabilities: ["git-worktree-management", "parallel-development", "branch-isolation"],
+      tags: ["git", "worktree", "development"],
+    },
+    {
+      id: "anti-patterns",
+      name: "Anti-Patterns Detection",
+      version: "1.0.0",
+      description: "Detect common anti-patterns and code smells",
+      inputSchema: {
+        type: "object",
+        properties: { code: { type: "string" }, language: { type: "string" }, strictness: { type: "string" } },
+        required: ["code"],
+      },
+      outputSchema: {
+        type: "object",
+        properties: { patternsFound: { type: "array" }, overallScore: { type: "number" }, summary: { type: "string" } },
+      },
+      capabilities: ["code-quality-analysis", "anti-pattern-detection", "refactoring-suggestions"],
+      tags: ["quality", "refactoring", "code-review"],
+    },
+    {
+      id: "yagni-enforcement",
+      name: "YAGNI Enforcement",
+      version: "1.0.0",
+      description: "Enforce YAGNI (You Aren't Gonna Need It) principle - avoid speculative code",
+      inputSchema: {
+        type: "object",
+        properties: { proposedCode: { type: "string" }, context: { type: "string" } },
+        required: ["proposedCode"],
+      },
+      outputSchema: {
+        type: "object",
+        properties: { verdict: { type: "string" }, analysis: { type: "array" }, summary: { type: "string" } },
+      },
+      capabilities: ["yagni-enforcement", "simplicity-analysis", "refactoring-suggestions"],
+      tags: ["yagni", "simplicity", "quality", "refactoring"],
+    },
+  ]
+
+  for (const skill of onda2SkillAliases) {
+    try {
+      SkillRegistry.registerSkill(skill)
+      log.debug("skill alias registered", { skillId: skill.id })
+    } catch (error: any) {
+      if (error?.message?.includes("already registered")) {
+        log.debug("skill alias already registered", { skillId: skill.id })
+      } else {
+        log.error("failed to register skill alias", { skillId: skill.id, error: error?.message })
+      }
+    }
+  }
+
   // 3. Register flexible agents
   try {
     registerFlexibleAgents()

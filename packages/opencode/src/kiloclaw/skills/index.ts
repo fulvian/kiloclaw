@@ -34,6 +34,29 @@ export {
   type SimplificationOutput,
 } from "./development/simplification"
 
+export {
+  FinishingBranchSkill,
+  type FinishingBranchInput,
+  type FinishingBranchOutput,
+  type BranchCheck,
+} from "./development/finishing-branch"
+
+export {
+  GitWorktreeSkill,
+  type GitWorktreeInput,
+  type GitWorktreeOutput,
+  type WorktreeInfo,
+} from "./development/git-worktree"
+
+export {
+  AntiPatternsSkill,
+  type AntiPatternsInput,
+  type AntiPatternsOutput,
+  type AntiPatternIssue,
+} from "./development/anti-patterns"
+
+export { YagniSkill, type YagniInput, type YagniOutput, type YagniFinding } from "./development/yagni"
+
 // Knowledge Agency Skills
 export {
   WebResearchSkill,
@@ -107,6 +130,10 @@ import { TddSkill } from "./development/tdd"
 import { ComparisonSkill } from "./development/comparison"
 import { DocumentAnalysisSkill } from "./development/document-analysis"
 import { SimplificationSkill } from "./development/simplification"
+import { FinishingBranchSkill } from "./development/finishing-branch"
+import { GitWorktreeSkill } from "./development/git-worktree"
+import { AntiPatternsSkill } from "./development/anti-patterns"
+import { YagniSkill } from "./development/yagni"
 import { WebResearchSkill } from "./knowledge/web-research"
 import { LiteratureReviewSkill } from "./knowledge/literature-review"
 import { FactCheckSkill } from "./knowledge/fact-check"
@@ -130,6 +157,10 @@ export const developmentSkills: Skill[] = [
   ComparisonSkill,
   DocumentAnalysisSkill,
   SimplificationSkill,
+  FinishingBranchSkill,
+  GitWorktreeSkill,
+  AntiPatternsSkill,
+  YagniSkill,
 ]
 
 // Knowledge agency skills

@@ -666,9 +666,9 @@ describe("WP4.3 Wave 1: Knowledge Agency Skills", () => {
 
 // Aggregate exports tests
 describe("WP4.3 Wave 1: Skill Registry Integration", () => {
-  it("should export 6 development skills", () => {
-    expect(DEVELOPMENT_SKILL_COUNT).toBe(6)
-    expect(developmentSkills).toHaveLength(6)
+  it("should export 10 development skills", () => {
+    expect(DEVELOPMENT_SKILL_COUNT).toBe(10)
+    expect(developmentSkills).toHaveLength(10)
   })
 
   it("should export 5 knowledge skills", () => {
@@ -676,9 +676,9 @@ describe("WP4.3 Wave 1: Skill Registry Integration", () => {
     expect(knowledgeSkills).toHaveLength(5)
   })
 
-  it("should export 11 total wave 1 skills", () => {
-    expect(TOTAL_WAVE1_SKILL_COUNT).toBe(11)
-    expect(allWave1Skills).toHaveLength(11)
+  it("should export 15 total wave 1 skills", () => {
+    expect(TOTAL_WAVE1_SKILL_COUNT).toBe(15)
+    expect(allWave1Skills).toHaveLength(15)
   })
 
   it("should have unique skill IDs", () => {

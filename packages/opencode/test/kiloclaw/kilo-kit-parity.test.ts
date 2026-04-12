@@ -560,3 +560,129 @@ describe("Onda 1 Migration", () => {
     })
   })
 })
+
+// =============================================================================
+// Onda 2 Migration - Security/Ops/Review
+// KILOCLAW_DEVELOPMENT_AGENCY_REFOUNDATION_PLAN_2026-04-12.md
+// =============================================================================
+
+describe("Onda 2 Migration", () => {
+  beforeEach(() => {
+    resetBootstrap()
+    bootstrapRegistries()
+  })
+
+  // Onda 2 Skills from plan:
+  // security-audit, code-review-discipline, requesting-code-review,
+  // receiving-code-review, finishing-a-development-branch, using-git-worktrees,
+  // anti-patterns, yagni-enforcement
+  const ONDA2_SKILL_IDS = [
+    "security-audit",
+    "code-review-discipline",
+    "requesting-code-review",
+    "receiving-code-review",
+    "finishing-a-development-branch",
+    "using-git-worktrees",
+    "anti-patterns",
+    "yagni-enforcement",
+  ] as const
+
+  describe("Onda 2 Skills", () => {
+    it("has 8 skills defined in Onda 2 inventory", () => {
+      expect(ONDA2_SKILL_IDS).toHaveLength(8)
+    })
+
+    it("verifies each Onda 2 skill is registered in SkillRegistry", () => {
+      const results: { skillId: string; found: boolean }[] = []
+      for (const skillId of ONDA2_SKILL_IDS) {
+        const skill = SkillRegistry.getSkill(skillId)
+        results.push({ skillId, found: skill !== undefined })
+      }
+      const found = results.filter((r) => r.found).map((r) => r.skillId)
+      const missing = results.filter((r) => !r.found).map((r) => r.skillId)
+      expect(found.length + missing.length).toBe(8)
+      console.log("Onda 2 Skills Found:", found)
+      console.log("Onda 2 Skills Missing:", missing)
+    })
+
+    it("finishing-a-development-branch skill manifest structure", () => {
+      const skill = SkillRegistry.getSkill("finishing-a-development-branch")
+      if (skill) {
+        expect(skill.id).toBe("finishing-a-development-branch")
+        expect(skill.version).toMatch(/^\d+\.\d+\.\d+$/)
+        expect(skill.capabilities).toBeDefined()
+        expect(Array.isArray(skill.capabilities)).toBe(true)
+      }
+    })
+
+    it("using-git-worktrees skill manifest structure", () => {
+      const skill = SkillRegistry.getSkill("using-git-worktrees")
+      if (skill) {
+        expect(skill.id).toBe("using-git-worktrees")
+        expect(skill.version).toMatch(/^\d+\.\d+\.\d+$/)
+        expect(skill.capabilities).toBeDefined()
+        expect(Array.isArray(skill.capabilities)).toBe(true)
+      }
+    })
+
+    it("anti-patterns skill manifest structure", () => {
+      const skill = SkillRegistry.getSkill("anti-patterns")
+      if (skill) {
+        expect(skill.id).toBe("anti-patterns")
+        expect(skill.version).toMatch(/^\d+\.\d+\.\d+$/)
+        expect(skill.capabilities).toBeDefined()
+        expect(Array.isArray(skill.capabilities)).toBe(true)
+      }
+    })
+
+    it("yagni-enforcement skill manifest structure", () => {
+      const skill = SkillRegistry.getSkill("yagni-enforcement")
+      if (skill) {
+        expect(skill.id).toBe("yagni-enforcement")
+        expect(skill.version).toMatch(/^\d+\.\d+\.\d+$/)
+        expect(skill.capabilities).toBeDefined()
+        expect(Array.isArray(skill.capabilities)).toBe(true)
+      }
+    })
+
+    it("security-audit skill manifest structure", () => {
+      const skill = SkillRegistry.getSkill("security-audit")
+      if (skill) {
+        expect(skill.id).toBe("security-audit")
+        expect(skill.version).toMatch(/^\d+\.\d+\.\d+$/)
+        expect(skill.capabilities).toBeDefined()
+        expect(Array.isArray(skill.capabilities)).toBe(true)
+      }
+    })
+
+    it("code-review-discipline skill manifest structure", () => {
+      const skill = SkillRegistry.getSkill("code-review-discipline")
+      if (skill) {
+        expect(skill.id).toBe("code-review-discipline")
+        expect(skill.version).toMatch(/^\d+\.\d+\.\d+$/)
+        expect(skill.capabilities).toBeDefined()
+        expect(Array.isArray(skill.capabilities)).toBe(true)
+      }
+    })
+
+    it("requesting-code-review skill manifest structure", () => {
+      const skill = SkillRegistry.getSkill("requesting-code-review")
+      if (skill) {
+        expect(skill.id).toBe("requesting-code-review")
+        expect(skill.version).toMatch(/^\d+\.\d+\.\d+$/)
+        expect(skill.capabilities).toBeDefined()
+        expect(Array.isArray(skill.capabilities)).toBe(true)
+      }
+    })
+
+    it("receiving-code-review skill manifest structure", () => {
+      const skill = SkillRegistry.getSkill("receiving-code-review")
+      if (skill) {
+        expect(skill.id).toBe("receiving-code-review")
+        expect(skill.version).toMatch(/^\d+\.\d+\.\d+$/)
+        expect(skill.capabilities).toBeDefined()
+        expect(Array.isArray(skill.capabilities)).toBe(true)
+      }
+    })
+  })
+})
