@@ -80,7 +80,7 @@ export const SkillName = z.enum([
 export type SkillName = z.infer<typeof SkillName>
 
 // AgencyName: valid agency identifiers
-export const AgencyName = z.enum(["development", "knowledge", "nutrition", "weather"])
+export const AgencyName = z.enum(["development", "knowledge", "nutrition", "weather", "nba", "finance"])
 export type AgencyName = z.infer<typeof AgencyName>
 
 // AgentDefinition: formal definition of an agent as per HANDOVER doc
