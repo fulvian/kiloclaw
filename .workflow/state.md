@@ -4,54 +4,65 @@
 
 ## Started: 2026-04-02T12:21:02+02:00
 
-## Last Updated: 2026-04-12T09:46:00+02:00
+## Last Updated: 2026-04-12T10:15:00+02:00
 
 ## Current Track: Development Agency Refoundation (2026-04-12)
 
 ### Wave Progress
 
-| Deliverable                                                                           | Status    | Evidence                                 |
-| ------------------------------------------------------------------------------------- | --------- | ---------------------------------------- |
-| Onda 0: Native-first factory scaffold + 9 adapters                                    | ✅ Done   | `tooling/native/*`                       |
-| Onda 0: Auto-repair 3-strike runtime                                                  | ✅ Done   | `runtime/*`                              |
-| Onda 0: Telemetry contracts (runtime_repair, parity, fallback)                        | ✅ Done   | `telemetry/*.metrics.ts`                 |
-| Onda 0: Agency context block (knowledge, development, nba)                            | ✅ Done   | `prompt.ts`                              |
-| Onda 0: `NativeRuntime` wired + `KILO_NATIVE_FACTORY_ENABLED`                         | ✅ Done   | `orchestrator.ts`                        |
-| Onda 0: Wiki flags (default OFF)                                                      | ✅ Done   | `flag.ts`                                |
-| Onda 0: Base parity harness C1..C7                                                    | ✅ Done   | `kilo-kit-parity.test.ts`                |
-| Onda 0: G4 Gate                                                                       | ✅ PASSED | commits ccbf8a8, 6a336568                |
-| Onda 1: Parity harness C1..C7 + ratio tracking                                        | ✅ Done   | `kilo-kit-parity.test.ts`                |
-| Onda 1: Skill alias bootstrap + 9/9 skills registered                                 | ✅ Done   | `bootstrap.ts` (onda1SkillAliases array) |
-| Onda 1: 9 skill aliases verified in registry (systematic-debugging, tdd, etc.)        | ✅ Done   | parity test: 9/9 found                   |
-| Onda 1: Skill loading in orchestration-adapter                                        | ✅ Done   | `orchestration-adapter.ts`               |
-| Onda 1: 5/5 agents registered (general-manager, system-analyst, architect, coder, qa) | ✅ Done   | `agency-definitions.ts`                  |
-| Onda 1: `resetBootstrap()` utility for test isolation                                 | ✅ Done   | `bootstrap.ts` + test updated            |
-| Onda 1: G4 Gate re-verified                                                           | ✅ PASSED | 971 pass, 0 fail, 3 skip                 |
+| Deliverable                                                                              | Status    | Evidence                                 |
+| ---------------------------------------------------------------------------------------- | --------- | ---------------------------------------- |
+| Onda 0: Native-first factory scaffold + 9 adapters                                       | ✅ Done   | `tooling/native/*`                       |
+| Onda 0: Auto-repair 3-strike runtime                                                     | ✅ Done   | `runtime/*`                              |
+| Onda 0: Telemetry contracts (runtime_repair, parity, fallback)                           | ✅ Done   | `telemetry/*.metrics.ts`                 |
+| Onda 0: Agency context block (knowledge, development, nba)                               | ✅ Done   | `prompt.ts`                              |
+| Onda 0: `NativeRuntime` wired + `KILO_NATIVE_FACTORY_ENABLED`                            | ✅ Done   | `orchestrator.ts`                        |
+| Onda 0: Wiki flags (default OFF)                                                         | ✅ Done   | `flag.ts`                                |
+| Onda 0: Base parity harness C1..C7                                                       | ✅ Done   | `kilo-kit-parity.test.ts`                |
+| Onda 0: G4 Gate                                                                          | ✅ PASSED | commits ccbf8a8, 6a336568                |
+| Onda 1: Parity harness C1..C7 + ratio tracking                                           | ✅ Done   | `kilo-kit-parity.test.ts`                |
+| Onda 1: Skill alias bootstrap + 9/9 skills registered                                    | ✅ Done   | `bootstrap.ts` (onda1SkillAliases array) |
+| Onda 1: 9 skill aliases verified in registry                                             | ✅ Done   | parity test: 9/9 found                   |
+| Onda 1: Skill loading in orchestration-adapter                                           | ✅ Done   | `orchestration-adapter.ts`               |
+| Onda 1: 5/5 agents registered (general-manager, system-analyst, architect, coder, qa)    | ✅ Done   | `agency-definitions.ts`                  |
+| Onda 1: `resetBootstrap()` utility for test isolation                                    | ✅ Done   | `bootstrap.ts` + test updated            |
+| Onda 2: 4 new skill files created (finishing-branch, git-worktree, anti-patterns, yagni) | ✅ Done   | `skills/development/*`                   |
+| Onda 2: 8 skill aliases registered (security-audit, code-review-discipline, etc.)        | ✅ Done   | `bootstrap.ts` (onda2SkillAliases array) |
+| Onda 2: 8/8 Onda 2 skills verified in registry                                           | ✅ Done   | parity test: 8/8 found                   |
+| Onda 2: Wave1 skill count updated (DEVELOPMENT=10, TOTAL_WAVE1=15)                       | ✅ Done   | `skills/index.ts` + wave1.test.ts        |
 
 ### G4 Gate — PASSED ✅
 
-- All 37 Onda 1 + base tests pass (kilo-kit-parity 37 pass)
-- Full kiloclaw suite: **971 pass, 0 fail, 3 skip** across 73 test files
+- All 47 Onda 1+2 + base tests pass (kilo-kit-parity 47 pass)
+- Full kiloclaw suite: **981 pass, 0 fail, 3 skip** across 73 test files
 - `resetBootstrap()` enables proper test isolation for registry tests
 
 ### Onda 1 Status — COMPLETE ✅
 
 Onda 1 skills (9/9): `systematic-debugging`, `test-driven-development`, `verification-before-completion`,
 `planning-with-files`, `executing-plans`, `writing-plans`, `subagent-driven-development`,
-`multi-agent-orchestration`, `dispatching-parallel-agents` — all registered via `bootstrapRegistries()`
+`multi-agent-orchestration`, `dispatching-parallel-agents`
 
-Onda 1 agents (5/5): `general-manager`, `system-analyst`, `architect`, `coder`, `qa` — all registered in `agency-definitions.ts`
+Onda 1 agents (5/5): `general-manager`, `system-analyst`, `architect`, `coder`, `qa`
 
-### Next: Onda 2 / G5 / G6
+### Onda 2 Status — COMPLETE ✅
 
-- Onda 2: Security/Ops/Review (security-audit, code-review-discipline, requesting-code-review, receiving-code-review, finishing-a-development-branch, using-git-worktrees, anti-patterns, yagni-enforcement)
-- G5: Dual-run harness vs kilo_kit baseline (Onda 1-5 parity hardening)
-- G6: Shadow (100% mirror) → Canary (5-10%) → Graduale (25→50→100%) + rollback drill
+Onda 2 skills (8/8): `security-audit`, `code-review-discipline`, `requesting-code-review`,
+`receiving-code-review`, `finishing-a-development-branch`, `using-git-worktrees`,
+`anti-patterns`, `yagni-enforcement`
 
-**Verification evidence (fresh 2026-04-12T09:46):**
+### Next: Onda 3 / G5 / G6
 
-- `bun test test/kiloclaw/kilo-kit-parity.test.ts` -> **37 pass, 0 fail** (9/9 skills, 5/5 agents)
-- `bun test test/kiloclaw/` (full suite) -> **971 pass, 0 fail, 3 skip**
+- Onda 3: Frontend/Data/ML (performance-optimization, database-design, api-development, visual-companion, spec-driven-development)
+- Onda 4: Research/Memory (deep-research, tavily-research, context-engineering, knowledge-graph-memory)
+- Onda 5: Parity hardening
+- G5: Dual-run harness vs kilo_kit baseline
+- G6: Shadow → Canary → Graduale rollout
+
+**Verification evidence (fresh 2026-04-12T10:15):**
+
+- `bun test test/kiloclaw/kilo-kit-parity.test.ts` -> **47 pass, 0 fail** (9/9 Onda1 + 8/8 Onda2)
+- `bun test test/kiloclaw/` (full suite) -> **981 pass, 0 fail, 3 skip**
 - `bun run typecheck` -> **pass**
 
 ## Corrective Track: Task Scheduling (2026-04-09)
