@@ -146,11 +146,32 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
           metadata: {},
         })
 
-        // Agency skills return content via their execute method
-        const content =
+        const genericContent =
           typeof agencySkill.execute === "function"
             ? `Agency Skill: ${agencySkill.id}\nName: ${agencySkill.name}\nCapabilities: ${agencySkill.capabilities.join(", ")}\nTags: ${agencySkill.tags.join(", ")}`
             : `Agency Skill: ${agencySkill.id}`
+
+        const nbaContent = [
+          `Agency Skill: ${agencySkill.id}`,
+          `Name: ${agencySkill.name}`,
+          `Capabilities: ${agencySkill.capabilities.join(", ")}`,
+          `Tags: ${agencySkill.tags.join(", ")}`,
+          "",
+          "Execution requirements for NBA requests:",
+          "- After loading this skill, produce the requested NBA output directly in the same turn.",
+          "- Do not ask generic follow-up questions if the user asked for analysis/recommendations.",
+          "- Use a best-effort shortlist with explicit assumptions when some inputs are missing.",
+          "- If live markets are unavailable, return an empty shortlist with clear blocking reasons.",
+          "- Mark every recommendation as HITL-required before any stake action.",
+          "",
+          "Preferred output shape:",
+          "1) Shortlist (max 3): game, market, edge %, confidence, concise rationale",
+          "2) Excluded candidates: why they were filtered out",
+          "3) Risk notes: data freshness, injury uncertainty, market drift",
+          "4) HITL note: no automatic execution",
+        ].join("\n")
+
+        const content = agencySkill.id === "nba-analysis" ? nbaContent : genericContent
 
         const agencyType = knowledgeSkills.some((s) => s.id === agencySkill.id)
           ? "knowledge"
