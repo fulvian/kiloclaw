@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach } from "bun:test"
+import { describe, expect, it, beforeEach, beforeAll } from "bun:test"
 import { NativeFactory } from "@/kiloclaw/tooling/native/factory"
 import { NativeFileAdapter } from "@/kiloclaw/tooling/native/file-adapter"
 import { NativeGitAdapter } from "@/kiloclaw/tooling/native/git-adapter"
@@ -10,6 +10,7 @@ import { SkillRegistry } from "@/kiloclaw/agency/registry/skill-registry"
 import { FlexibleAgentRegistry } from "@/kiloclaw/agency/registry/agent-registry"
 import type { SkillDefinition } from "@/kiloclaw/agency/registry/types"
 import { registerFlexibleAgents } from "@/kiloclaw/agency/agency-definitions"
+import { bootstrapRegistries, resetBootstrap } from "@/kiloclaw/agency/bootstrap"
 
 // =============================================================================
 // Parity Harness - C1..C7 Contracts + Native/Fallback Ratio Tracking
@@ -344,9 +345,13 @@ describe("Native execution ratio", () => {
 // =============================================================================
 
 describe("Onda 1 Migration", () => {
+  beforeAll(() => {
+    bootstrapRegistries()
+  })
+
   beforeEach(() => {
-    SkillRegistry.clear()
-    FlexibleAgentRegistry.clear()
+    resetBootstrap()
+    bootstrapRegistries()
   })
 
   // Onda 1 Skills from plan:

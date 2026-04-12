@@ -4,37 +4,54 @@
 
 ## Started: 2026-04-02T12:21:02+02:00
 
-## Last Updated: 2026-04-12T07:40:00+02:00
+## Last Updated: 2026-04-12T09:46:00+02:00
 
 ## Current Track: Development Agency Refoundation (2026-04-12)
 
-### Wave Progress (Onda 0 — Baseline Freeze + Wave 1 Core)
+### Wave Progress
 
-| Deliverable                                                                                     | Status      | Evidence                                             |
-| ----------------------------------------------------------------------------------------------- | ----------- | ---------------------------------------------------- |
-| Native-first factory scaffold (`capability-registry`, `fallback-policy`, `factory`, 9 adapters) | ✅ Done     | `tooling/native/*`                                   |
-| Auto-repair 3-strike runtime (`error-taxonomy`, `auto-repair`)                                  | ✅ Done     | `runtime/*`                                          |
-| Telemetry contracts (`runtime_repair`, `parity_check`, `native_fallback`)                       | ✅ Done     | `telemetry/*.metrics.ts`                             |
-| Agency context block for development routing                                                    | ✅ Done     | `prompt.ts`                                          |
-| `NativeRuntime` wired in `CoreOrchestrator` + flag `KILO_NATIVE_FACTORY_ENABLED`                | ✅ Done     | `orchestrator.ts`                                    |
-| Wiki capability guardrail test + flags (`KILO_WIKI_ENABLED` default OFF)                        | ✅ Done     | `test/kiloclaw/wiki-capabilities.test.ts`, `flag.ts` |
-| Deterministic routing + deny/no-fallback tests                                                  | ✅ Verified | 4 test files                                         |
-| Parity harness C1..C7 + ratio tracking                                                          | ✅ Done     | `kilo-kit-parity.test.ts`                            |
+| Deliverable                                                                           | Status    | Evidence                                 |
+| ------------------------------------------------------------------------------------- | --------- | ---------------------------------------- |
+| Onda 0: Native-first factory scaffold + 9 adapters                                    | ✅ Done   | `tooling/native/*`                       |
+| Onda 0: Auto-repair 3-strike runtime                                                  | ✅ Done   | `runtime/*`                              |
+| Onda 0: Telemetry contracts (runtime_repair, parity, fallback)                        | ✅ Done   | `telemetry/*.metrics.ts`                 |
+| Onda 0: Agency context block (knowledge, development, nba)                            | ✅ Done   | `prompt.ts`                              |
+| Onda 0: `NativeRuntime` wired + `KILO_NATIVE_FACTORY_ENABLED`                         | ✅ Done   | `orchestrator.ts`                        |
+| Onda 0: Wiki flags (default OFF)                                                      | ✅ Done   | `flag.ts`                                |
+| Onda 0: Base parity harness C1..C7                                                    | ✅ Done   | `kilo-kit-parity.test.ts`                |
+| Onda 0: G4 Gate                                                                       | ✅ PASSED | commits ccbf8a8, 6a336568                |
+| Onda 1: Parity harness C1..C7 + ratio tracking                                        | ✅ Done   | `kilo-kit-parity.test.ts`                |
+| Onda 1: Skill alias bootstrap + 9/9 skills registered                                 | ✅ Done   | `bootstrap.ts` (onda1SkillAliases array) |
+| Onda 1: 9 skill aliases verified in registry (systematic-debugging, tdd, etc.)        | ✅ Done   | parity test: 9/9 found                   |
+| Onda 1: Skill loading in orchestration-adapter                                        | ✅ Done   | `orchestration-adapter.ts`               |
+| Onda 1: 5/5 agents registered (general-manager, system-analyst, architect, coder, qa) | ✅ Done   | `agency-definitions.ts`                  |
+| Onda 1: `resetBootstrap()` utility for test isolation                                 | ✅ Done   | `bootstrap.ts` + test updated            |
+| Onda 1: G4 Gate re-verified                                                           | ✅ PASSED | 971 pass, 0 fail, 3 skip                 |
 
 ### G4 Gate — PASSED ✅
 
-- All 36 new tests pass (auto-repair, native-factory, security-mcp-fallback, kilo-kit-parity, wiki-capabilities, routing-pipeline)
-- Full kiloclaw suite: **953 pass, 0 fail, 3 skip** across 73 test files — no regressions
+- All 37 Onda 1 + base tests pass (kilo-kit-parity 37 pass)
+- Full kiloclaw suite: **971 pass, 0 fail, 3 skip** across 73 test files
+- `resetBootstrap()` enables proper test isolation for registry tests
 
-### Next: G5 Verification / G6 Rollout
+### Onda 1 Status — COMPLETE ✅
 
-- G5: Full dual-run harness vs kilo_kit baseline (Onda 1-5 parity hardening)
-- G6: Shadow/canary rollout + rollback drill
+Onda 1 skills (9/9): `systematic-debugging`, `test-driven-development`, `verification-before-completion`,
+`planning-with-files`, `executing-plans`, `writing-plans`, `subagent-driven-development`,
+`multi-agent-orchestration`, `dispatching-parallel-agents` — all registered via `bootstrapRegistries()`
 
-**Verification evidence (fresh 2026-04-12T07:35):**
+Onda 1 agents (5/5): `general-manager`, `system-analyst`, `architect`, `coder`, `qa` — all registered in `agency-definitions.ts`
 
-- `bun test test/kiloclaw/auto-repair.test.ts test/kiloclaw/native-factory.test.ts test/kiloclaw/security-mcp-fallback.test.ts test/kiloclaw/kilo-kit-parity.test.ts test/kiloclaw/wiki-capabilities.test.ts test/kiloclaw/routing-pipeline.test.ts` -> **36 pass, 0 fail**
-- `bun test test/kiloclaw/` (full suite) -> **953 pass, 0 fail, 3 skip**
+### Next: Onda 2 / G5 / G6
+
+- Onda 2: Security/Ops/Review (security-audit, code-review-discipline, requesting-code-review, receiving-code-review, finishing-a-development-branch, using-git-worktrees, anti-patterns, yagni-enforcement)
+- G5: Dual-run harness vs kilo_kit baseline (Onda 1-5 parity hardening)
+- G6: Shadow (100% mirror) → Canary (5-10%) → Graduale (25→50→100%) + rollback drill
+
+**Verification evidence (fresh 2026-04-12T09:46):**
+
+- `bun test test/kiloclaw/kilo-kit-parity.test.ts` -> **37 pass, 0 fail** (9/9 skills, 5/5 agents)
+- `bun test test/kiloclaw/` (full suite) -> **971 pass, 0 fail, 3 skip**
 - `bun run typecheck` -> **pass**
 
 ## Corrective Track: Task Scheduling (2026-04-09)

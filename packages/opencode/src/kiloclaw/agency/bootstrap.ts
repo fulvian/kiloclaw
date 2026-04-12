@@ -307,6 +307,125 @@ function doBootstrap(): void {
     }
   }
 
+  // Onda 1: Skill aliases for kilo_kit naming convention
+  // Maps refoundation plan skill IDs -> existing skill implementations
+  const onda1SkillAliases: SkillDefinition[] = [
+    {
+      id: "systematic-debugging",
+      name: "Systematic Debugging",
+      version: "1.0.0",
+      description: "Four-phase systematic debugging: Observe, Hypothesize, Investigate, Resolve",
+      inputSchema: {
+        type: "object",
+        properties: { code: { type: "string" }, error: { type: "string" } },
+        required: ["code"],
+      },
+      outputSchema: { type: "object", properties: { diagnosis: { type: "string" }, steps: { type: "array" } } },
+      capabilities: ["debugging", "root-cause-analysis", "troubleshooting"],
+      tags: ["development", "debugging"],
+    },
+    {
+      id: "test-driven-development",
+      name: "Test-Driven Development",
+      version: "1.0.0",
+      description: "TDD workflow: write failing test first, then implement to make it pass",
+      inputSchema: {
+        type: "object",
+        properties: { code: { type: "string" }, framework: { type: "string" } },
+        required: ["code"],
+      },
+      outputSchema: { type: "object", properties: { tests: { type: "array" }, passed: { type: "boolean" } } },
+      capabilities: ["test_generation", "test_execution", "tdd_workflow"],
+      tags: ["development", "testing", "tdd"],
+    },
+    {
+      id: "verification-before-completion",
+      name: "Verification Before Completion",
+      version: "1.0.0",
+      description: "Verify all requirements met and tests pass before concluding a task",
+      inputSchema: { type: "object", properties: { taskId: { type: "string" }, criteria: { type: "array" } } },
+      outputSchema: { type: "object", properties: { verified: { type: "boolean" }, issues: { type: "array" } } },
+      capabilities: ["verification", "quality-assurance", "task-completion"],
+      tags: ["development", "quality", "verification"],
+    },
+    {
+      id: "planning-with-files",
+      name: "Planning with Files",
+      version: "1.0.0",
+      description: "Use persistent markdown files to track multi-step project plans",
+      inputSchema: { type: "object", properties: { goal: { type: "string" }, phases: { type: "array" } } },
+      outputSchema: { type: "object", properties: { planFile: { type: "string" }, steps: { type: "array" } } },
+      capabilities: ["task-planning", "file-based-tracking", "roadmapping"],
+      tags: ["development", "planning"],
+    },
+    {
+      id: "executing-plans",
+      name: "Executing Plans",
+      version: "1.0.0",
+      description: "Execute multi-step plans with phase gates and verification",
+      inputSchema: { type: "object", properties: { planId: { type: "string" }, currentPhase: { type: "number" } } },
+      outputSchema: {
+        type: "object",
+        properties: { phaseComplete: { type: "boolean" }, nextPhase: { type: "number" } },
+      },
+      capabilities: ["plan-execution", "phase-management", "gate-verification"],
+      tags: ["development", "execution"],
+    },
+    {
+      id: "writing-plans",
+      name: "Writing Plans",
+      version: "1.0.0",
+      description: "Create structured implementation plans with DOT diagrams",
+      inputSchema: { type: "object", properties: { objective: { type: "string" }, constraints: { type: "array" } } },
+      outputSchema: { type: "object", properties: { plan: { type: "string" }, phases: { type: "array" } } },
+      capabilities: ["plan-writing", "documentation", "structuring"],
+      tags: ["development", "planning", "documentation"],
+    },
+    {
+      id: "subagent-driven-development",
+      name: "Subagent-Driven Development",
+      version: "1.0.0",
+      description: "Coordinate specialized subagents to complete complex tasks",
+      inputSchema: { type: "object", properties: { task: { type: "string" }, agents: { type: "array" } } },
+      outputSchema: { type: "object", properties: { results: { type: "array" }, status: { type: "string" } } },
+      capabilities: ["task-decomposition", "agent-coordination", "result-aggregation"],
+      tags: ["development", "orchestration", "multi-agent"],
+    },
+    {
+      id: "multi-agent-orchestration",
+      name: "Multi-Agent Orchestration",
+      version: "1.0.0",
+      description: "Orchestrate multiple agents with handoff protocols and state management",
+      inputSchema: { type: "object", properties: { workflow: { type: "array" }, context: { type: "object" } } },
+      outputSchema: { type: "object", properties: { outcomes: { type: "array" }, finalState: { type: "object" } } },
+      capabilities: ["workflow-orchestration", "state-management", "agent-handoffs"],
+      tags: ["development", "orchestration", "workflow"],
+    },
+    {
+      id: "dispatching-parallel-agents",
+      name: "Dispatching Parallel Agents",
+      version: "1.0.0",
+      description: "Fan out independent tasks to multiple agents executing in parallel",
+      inputSchema: { type: "object", properties: { tasks: { type: "array" }, parallelism: { type: "number" } } },
+      outputSchema: { type: "object", properties: { results: { type: "array" }, elapsedMs: { type: "number" } } },
+      capabilities: ["parallel-dispatch", "fan-out", "concurrent-execution"],
+      tags: ["development", "parallel", "dispatch"],
+    },
+  ]
+
+  for (const skill of onda1SkillAliases) {
+    try {
+      SkillRegistry.registerSkill(skill)
+      log.debug("skill alias registered", { skillId: skill.id })
+    } catch (error: any) {
+      if (error?.message?.includes("already registered")) {
+        log.debug("skill alias already registered", { skillId: skill.id })
+      } else {
+        log.error("failed to register skill alias", { skillId: skill.id, error: error?.message })
+      }
+    }
+  }
+
   // 3. Register flexible agents
   try {
     registerFlexibleAgents()
@@ -364,6 +483,17 @@ export function lazyBootstrapRegistries(): void {
 // Check if bootstrapped
 export function isBootstrapped(): boolean {
   return bootstrapped
+}
+
+// Reset bootstrap state - for testing only
+// Clears all registries and resets the bootstrapped flag so bootstrapRegistries() can run again
+export function resetBootstrap(): void {
+  bootstrapped = false
+  SkillRegistry.clear()
+  FlexibleAgentRegistry.clear()
+  AgencyRegistry.clear()
+  ChainRegistry.clear()
+  log.debug("bootstrap state reset")
 }
 
 // Get bootstrap stats
