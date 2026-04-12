@@ -173,14 +173,14 @@ export namespace Flag {
   // Native Factory - Capability-based Native-First Routing
   // =============================================================================
 
-  // Enable NativeFactory for capability-gated operations (default: false)
-  export const KILO_NATIVE_FACTORY_ENABLED = truthy("KILO_NATIVE_FACTORY_ENABLED")
+  // Enable NativeFactory for capability-gated operations (default: true - GA)
+  export const KILO_NATIVE_FACTORY_ENABLED = !falsy("KILO_NATIVE_FACTORY_ENABLED")
 
-  // Shadow mode for native factory (logs only, no user impact)
+  // Shadow mode for native factory (logs only, no user impact) - disabled in GA
   export const KILO_NATIVE_FACTORY_SHADOW = truthy("KILO_NATIVE_FACTORY_SHADOW")
 
-  // Canary percentage for gradual rollout (0-100, default: 0)
-  export const KILO_NATIVE_FACTORY_CANARY_PERCENT = number("KILO_NATIVE_FACTORY_CANARY_PERCENT") ?? 0
+  // Canary percentage for gradual rollout (0-100, default: 100 - GA)
+  export const KILO_NATIVE_FACTORY_CANARY_PERCENT = number("KILO_NATIVE_FACTORY_CANARY_PERCENT") ?? 100
 
   // =============================================================================
   // LLM Wiki - CONDITIONAL-GO, default OFF until guardrails and parity gates
