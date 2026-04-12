@@ -71,12 +71,20 @@ export const FinanceTechnicalAnalysisSkill: Skill = {
         type: "array",
         items: {
           type: "object",
-          properties: { indicator: { type: "string" }, value: { type: "number" }, signal: { type: "string" }, strength: { type: "number" } },
+          properties: {
+            indicator: { type: "string" },
+            value: { type: "number" },
+            signal: { type: "string" },
+            strength: { type: "number" },
+          },
         },
       },
       patterns: {
         type: "array",
-        items: { type: "object", properties: { type: { type: "string" }, confidence: { type: "number" }, description: { type: "string" } } },
+        items: {
+          type: "object",
+          properties: { type: { type: "string" }, confidence: { type: "number" }, description: { type: "string" } },
+        },
       },
       summary: { type: "string" },
     },
@@ -120,7 +128,10 @@ export const FinanceTechnicalAnalysisSkill: Skill = {
   },
 }
 
-function calculateIndicator(indicator: string, prices: { close: number }[]): Signal {
+function calculateIndicator(
+  indicator: string,
+  prices: { timestamp: string; open: number; high: number; low: number; close: number; volume: number }[],
+): Signal {
   const closes = prices.map((p) => p.close)
   const lastPrice = closes[closes.length - 1]
 
@@ -153,11 +164,21 @@ function calculateIndicator(indicator: string, prices: { close: number }[]): Sig
     }
     case "sma": {
       const sma = closes.slice(-20).reduce((a, b) => a + b, 0) / Math.min(20, closes.length)
-      return { indicator: "sma", value: sma, signal: lastPrice > sma ? "bullish" : "bearish", strength: Math.abs(lastPrice - sma) / sma }
+      return {
+        indicator: "sma",
+        value: sma,
+        signal: lastPrice > sma ? "bullish" : "bearish",
+        strength: Math.abs(lastPrice - sma) / sma,
+      }
     }
     case "ema": {
       const ema = calculateEMA(closes, 12)
-      return { indicator: "ema", value: ema, signal: lastPrice > ema ? "bullish" : "bearish", strength: Math.abs(lastPrice - ema) / ema }
+      return {
+        indicator: "ema",
+        value: ema,
+        signal: lastPrice > ema ? "bullish" : "bearish",
+        strength: Math.abs(lastPrice - ema) / ema,
+      }
     }
     case "bb": {
       const sma = closes.slice(-20).reduce((a, b) => a + b, 0) / Math.min(20, closes.length)
@@ -175,7 +196,11 @@ function calculateIndicator(indicator: string, prices: { close: number }[]): Sig
     case "atr": {
       const trs = []
       for (let i = 1; i < prices.length; i++) {
-        const tr = Math.max(prices[i].high - prices[i].low, Math.abs(prices[i].high - closes[i - 1]), Math.abs(prices[i].low - closes[i - 1]))
+        const tr = Math.max(
+          prices[i].high - prices[i].low,
+          Math.abs(prices[i].high - closes[i - 1]),
+          Math.abs(prices[i].low - closes[i - 1]),
+        )
         trs.push(tr)
       }
       const atr = trs.slice(-14).reduce((a, b) => a + b, 0) / 14

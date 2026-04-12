@@ -416,6 +416,7 @@ export class SemanticRouter {
       nutrition: "nutrition-analysis",
       weather: "weather-forecast",
       nba: "nba-analysis",
+      finance: "finance-market-data",
       custom: "web-search",
     }
     return defaults[domain as Domain] || "web-search"
