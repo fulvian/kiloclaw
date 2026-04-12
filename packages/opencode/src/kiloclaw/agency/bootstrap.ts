@@ -210,7 +210,7 @@ const agencyDefinitions: AgencyDefinition[] = [
       requiresApproval: true,
       dataClassification: "confidential",
     },
-    providers: ["coingecko", "binance", "yahooquery", "finnhub", "fred", "sec_edgar", "alpaca", "hyperliquid"],
+    providers: ["twelve_data", "polygon", "alpha_vantage", "fred", "finnhub", "fmp", "nasdaq"],
     metadata: { wave: 4, description: "Multi-asset financial analysis, trading signals, and risk assessment" },
   },
 ]
