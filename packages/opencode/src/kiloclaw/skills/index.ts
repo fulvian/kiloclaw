@@ -217,6 +217,35 @@ export { WeatherCurrentSkill, type Current } from "./weather/weather-current"
 // NBA Betting Agency Skills
 export { NbaAnalysisSkill, type NbaAnalysisInput, type NbaAnalysisOutput } from "./nba"
 
+// Finance Agency Skills
+export {
+  FinanceMarketDataSkill,
+  type MarketDataInput,
+  type MarketDataOutput,
+  type PriceData,
+  type HistoricalData,
+  type OrderbookData,
+  type FundamentalsData,
+  type NewsData,
+} from "./finance/market-data"
+
+export {
+  FinanceTechnicalAnalysisSkill,
+  type TechnicalAnalysisInput,
+  type TechnicalAnalysisOutput,
+  type Signal as FinanceSignal,
+  type Pattern as FinancePattern,
+} from "./finance/technical-analysis"
+
+export {
+  FinanceRiskEngineSkill,
+  type RiskEngineInput,
+  type RiskEngineOutput,
+  type Position,
+  type RiskLimits,
+  type Violation,
+} from "./finance/risk-engine"
+
 // Aggregate exports for agency registration
 import { CodeReviewSkill } from "./development/code-review"
 import { DebuggingSkill } from "./development/debugging"
@@ -253,6 +282,9 @@ import { WeatherForecastSkill } from "./weather/weather-forecast"
 import { WeatherAlertsSkill } from "./weather/weather-alerts"
 import { WeatherCurrentSkill } from "./weather/weather-current"
 import { NbaAnalysisSkill } from "./nba"
+import { FinanceMarketDataSkill } from "./finance/market-data"
+import { FinanceTechnicalAnalysisSkill } from "./finance/technical-analysis"
+import { FinanceRiskEngineSkill } from "./finance/risk-engine"
 import type { Skill } from "../skill"
 
 // Development agency skills
@@ -305,8 +337,11 @@ export const allWave2Skills: Skill[] = [...nutritionSkills, ...weatherSkills]
 // Wave 3: NBA Betting Agency skills
 export const nbaSkills: Skill[] = [NbaAnalysisSkill]
 
+// Wave 4: Finance Agency skills
+export const financeSkills: Skill[] = [FinanceMarketDataSkill, FinanceTechnicalAnalysisSkill, FinanceRiskEngineSkill]
+
 // All skills combined (including Onda 4 meta skills)
-export const allSkills: Skill[] = [...allWave1Skills, ...allWave2Skills, ...nbaSkills, ...metaSkills]
+export const allSkills: Skill[] = [...allWave1Skills, ...allWave2Skills, ...nbaSkills, ...financeSkills, ...metaSkills]
 
 // Skill count constants
 export const DEVELOPMENT_SKILL_COUNT = developmentSkills.length
@@ -315,6 +350,7 @@ export const META_SKILL_COUNT = metaSkills.length
 export const NUTRITION_SKILL_COUNT = nutritionSkills.length
 export const WEATHER_SKILL_COUNT = weatherSkills.length
 export const NBA_SKILL_COUNT = nbaSkills.length
+export const FINANCE_SKILL_COUNT = financeSkills.length
 export const TOTAL_WAVE1_SKILL_COUNT = allWave1Skills.length
 export const TOTAL_WAVE2_SKILL_COUNT = allWave2Skills.length
 export const TOTAL_SKILL_COUNT = allSkills.length

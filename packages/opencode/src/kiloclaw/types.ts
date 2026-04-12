@@ -28,6 +28,14 @@ export type Duration = z.infer<typeof Duration>
 export const Domain = z.enum(["development", "knowledge", "nutrition", "weather", "nba", "finance", "custom"])
 export type Domain = z.infer<typeof Domain>
 
+// Finance asset types
+export const AssetType = z.enum(["stock", "etf", "crypto", "forex", "commodity"])
+export type AssetType = z.infer<typeof AssetType>
+
+// Finance data types
+export const DataType = z.enum(["price", "historical", "orderbook", "fundamentals", "news"])
+export type DataType = z.infer<typeof DataType>
+
 // Status types
 export const AgencyStatus = z.enum(["idle", "running", "paused", "stopped", "error"])
 export type AgencyStatus = z.infer<typeof AgencyStatus>
