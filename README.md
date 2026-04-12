@@ -27,11 +27,18 @@ Kiloclaw extends the foundation with:
 **Core Runtime**: ✅ Complete  
 **Memory 4-Layer**: ✅ Complete  
 **Agency Migration**: ✅ Complete  
-**Flexible Agents**: ✅ Complete (13 agents with prompt/permission)
+**Flexible Agents**: ✅ Complete (13 agents with prompt/permission)  
+**Runtime Stability**: ✅ Enhanced (CLI hang fixes, logging optimization)
 
 See [docs/plans/KILOCLAW_FOUNDATION_PLAN.md](docs/plans/KILOCLAW_FOUNDATION_PLAN.md) for the full roadmap.
 
-See [docs/plans/KILOCLAW_FOUNDATION_PLAN.md](docs/plans/KILOCLAW_FOUNDATION_PLAN.md) for the full roadmap.
+## Recent Fixes (2026-04-12)
+
+| Fix                                 | Impact                 | Details                                                                                                                                                                                           |
+| ----------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Permission logging optimization** | 60-75% log reduction   | Downgraded permission ruleset logging from INFO to DEBUG level, reducing log bloat from 600KB+ to 150-300KB per session. See [CLI_HANG_INVESTIGATION_REPORT.md](CLI_HANG_INVESTIGATION_REPORT.md) |
+| **Pseudo tool call recovery**       | NBA runtime stability  | Implemented detection and recovery for LLM-emitted pseudo `[TOOL_CALL]...[/TOOL_CALL]` markup that bypasses proper tool invocation                                                                |
+| **NBA skill output instructions**   | Better recommendations | Added explicit output formatting requirements to prevent generic follow-ups and ensure structured value-bet shortlists                                                                            |
 
 ## Architecture
 

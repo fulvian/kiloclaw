@@ -7,6 +7,24 @@
 
 ---
 
+## Hotfix: CLI Runtime Stability (2026-04-12)
+
+| Issue                         | Root Cause                                                                                        | Fix                                                                    | Impact                                                                            |
+| ----------------------------- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| **Permission logging bloat**  | `PermissionNext.evaluate()` logged entire ruleset (3-4KB) at INFO level on every permission check | Downgraded to DEBUG level, log only rule count                         | 60-75% log reduction (600KB+ → 150-300KB per session)                             |
+| **Pseudo tool call handling** | LLM emits `[TOOL_CALL]...[/TOOL_CALL]` pseudo markup instead of proper tool calls                 | Added detection + recovery logic in session prompt loop                | NBA skill requests now proceed to execution instead of exiting                    |
+| **NBA skill output clarity**  | Generic follow-up questions instead of focused recommendations                                    | Enhanced skill output instructions with structured format requirements | Ensures shortlist format, excludes candidates reasoning, risk notes, HITL marking |
+
+**Files Modified:**
+
+- `packages/opencode/src/permission/next.ts` - Permission logging optimization
+- `packages/opencode/src/session/prompt.ts` - Pseudo tool call recovery
+- `packages/opencode/src/tool/skill.ts` - NBA skill output instructions
+
+**See Also:** [CLI_HANG_INVESTIGATION_REPORT.md](../../CLI_HANG_INVESTIGATION_REPORT.md) for detailed analysis.
+
+---
+
 ## Corrective Update (2026-04-09)
 
 Task scheduling corrective work is now fully shipped for the runtime/TUI path.
