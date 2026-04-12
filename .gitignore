@@ -40,3 +40,6 @@ logs/
 # Telemetry ID
 telemetry-id
 tsconfig.tsbuildinfo
+
+# Kiloclaw runtime data
+.kiloclaw-runtime/

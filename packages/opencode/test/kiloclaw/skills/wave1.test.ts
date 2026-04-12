@@ -671,14 +671,14 @@ describe("WP4.3 Wave 1: Skill Registry Integration", () => {
     expect(developmentSkills).toHaveLength(15)
   })
 
-  it("should export 5 knowledge skills", () => {
-    expect(KNOWLEDGE_SKILL_COUNT).toBe(5)
-    expect(knowledgeSkills).toHaveLength(5)
+  it("should export 9 knowledge skills", () => {
+    expect(KNOWLEDGE_SKILL_COUNT).toBe(9)
+    expect(knowledgeSkills).toHaveLength(9)
   })
 
-  it("should export 20 total wave 1 skills", () => {
-    expect(TOTAL_WAVE1_SKILL_COUNT).toBe(20)
-    expect(allWave1Skills).toHaveLength(20)
+  it("should export 24 total wave 1 skills", () => {
+    expect(TOTAL_WAVE1_SKILL_COUNT).toBe(24)
+    expect(allWave1Skills).toHaveLength(24)
   })
 
   it("should have unique skill IDs", () => {

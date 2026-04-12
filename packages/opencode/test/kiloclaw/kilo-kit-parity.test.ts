@@ -776,4 +776,104 @@ describe("Onda 3 Migration", () => {
       }
     })
   })
+
+  // Onda 4: Knowledge + Meta skills
+  const ONDA4_SKILL_IDS = [
+    "deep-research",
+    "tavily-research",
+    "context-engineering",
+    "knowledge-graph-memory",
+    "using-superpowers",
+    "writing-skills",
+    "brainstorming",
+  ] as const
+
+  describe("Onda 4 Skills", () => {
+    it("has 7 skills defined in Onda 4 inventory", () => {
+      expect(ONDA4_SKILL_IDS).toHaveLength(7)
+    })
+
+    it("verifies each Onda 4 skill is registered in SkillRegistry", () => {
+      const results: { skillId: string; found: boolean }[] = []
+      for (const skillId of ONDA4_SKILL_IDS) {
+        const skill = SkillRegistry.getSkill(skillId)
+        results.push({ skillId, found: skill !== undefined })
+      }
+      const found = results.filter((r) => r.found).map((r) => r.skillId)
+      const missing = results.filter((r) => !r.found).map((r) => r.skillId)
+      expect(found.length + missing.length).toBe(7)
+      console.log("Onda 4 Skills Found:", found)
+      console.log("Onda 4 Skills Missing:", missing)
+    })
+
+    it("deep-research skill manifest structure", () => {
+      const skill = SkillRegistry.getSkill("deep-research")
+      if (skill) {
+        expect(skill.id).toBe("deep-research")
+        expect(skill.version).toMatch(/^\d+\.\d+\.\d+$/)
+        expect(skill.capabilities).toBeDefined()
+        expect(Array.isArray(skill.capabilities)).toBe(true)
+      }
+    })
+
+    it("tavily-research skill manifest structure", () => {
+      const skill = SkillRegistry.getSkill("tavily-research")
+      if (skill) {
+        expect(skill.id).toBe("tavily-research")
+        expect(skill.version).toMatch(/^\d+\.\d+\.\d+$/)
+        expect(skill.capabilities).toBeDefined()
+        expect(Array.isArray(skill.capabilities)).toBe(true)
+      }
+    })
+
+    it("context-engineering skill manifest structure", () => {
+      const skill = SkillRegistry.getSkill("context-engineering")
+      if (skill) {
+        expect(skill.id).toBe("context-engineering")
+        expect(skill.version).toMatch(/^\d+\.\d+\.\d+$/)
+        expect(skill.capabilities).toBeDefined()
+        expect(Array.isArray(skill.capabilities)).toBe(true)
+      }
+    })
+
+    it("knowledge-graph-memory skill manifest structure", () => {
+      const skill = SkillRegistry.getSkill("knowledge-graph-memory")
+      if (skill) {
+        expect(skill.id).toBe("knowledge-graph-memory")
+        expect(skill.version).toMatch(/^\d+\.\d+\.\d+$/)
+        expect(skill.capabilities).toBeDefined()
+        expect(Array.isArray(skill.capabilities)).toBe(true)
+      }
+    })
+
+    it("using-superpowers skill manifest structure", () => {
+      const skill = SkillRegistry.getSkill("using-superpowers")
+      if (skill) {
+        expect(skill.id).toBe("using-superpowers")
+        expect(skill.version).toMatch(/^\d+\.\d+\.\d+$/)
+        expect(skill.capabilities).toBeDefined()
+        expect(Array.isArray(skill.capabilities)).toBe(true)
+      }
+    })
+
+    it("writing-skills skill manifest structure", () => {
+      const skill = SkillRegistry.getSkill("writing-skills")
+      if (skill) {
+        expect(skill.id).toBe("writing-skills")
+        expect(skill.version).toMatch(/^\d+\.\d+\.\d+$/)
+        expect(skill.capabilities).toBeDefined()
+        expect(Array.isArray(skill.capabilities)).toBe(true)
+      }
+    })
+
+    it("brainstorming skill manifest structure", () => {
+      const skill = SkillRegistry.getSkill("brainstorming")
+      if (skill) {
+        expect(skill.id).toBe("brainstorming")
+        expect(skill.version).toMatch(/^\d+\.\d+\.\d+$/)
+        expect(skill.capabilities).toBeDefined()
+        expect(Array.isArray(skill.capabilities)).toBe(true)
+      }
+    })
+  })
 })

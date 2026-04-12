@@ -138,6 +138,54 @@ export {
   type CriticalAnalysisOutput,
 } from "./knowledge/critical-analysis"
 
+export {
+  DeepResearchSkill,
+  type DeepResearchInput,
+  type DeepResearchOutput,
+  type ResearchFinding,
+  type ResearchSource,
+  type ResearchGap,
+} from "./knowledge/deep-research"
+
+export {
+  TavilyResearchSkill,
+  type TavilyResearchInput,
+  type TavilyResearchOutput,
+  type TavilyResult,
+} from "./knowledge/tavily-research"
+
+export {
+  ContextEngineeringSkill,
+  type ContextEngineeringInput,
+  type ContextEngineeringOutput,
+  type ContextMetadata,
+} from "./knowledge/context-engineering"
+
+export {
+  KnowledgeGraphMemorySkill,
+  type KnowledgeGraphMemoryInput,
+  type KnowledgeGraphMemoryOutput,
+  type GraphEntity,
+  type GraphRelationship,
+  type GraphAnalysis,
+} from "./knowledge/knowledge-graph-memory"
+
+// Meta Skills (Onda 4)
+export {
+  UsingSuperpowersSkill,
+  type UsingSuperpowersInput,
+  type UsingSuperpowersOutput,
+} from "./meta/using-superpowers"
+
+export { WritingSkillsSkill, type WritingSkillsInput, type WritingSkillsOutput } from "./meta/writing-skills"
+
+export {
+  BrainstormingSkill,
+  type BrainstormingInput,
+  type BrainstormingOutput,
+  type BrainstormIdea,
+} from "./meta/brainstorming"
+
 // Nutrition Agency Skills
 export {
   DietPlanSkill,
@@ -190,6 +238,13 @@ import { LiteratureReviewSkill } from "./knowledge/literature-review"
 import { FactCheckSkill } from "./knowledge/fact-check"
 import { SynthesisSkill } from "./knowledge/synthesis"
 import { CriticalAnalysisSkill } from "./knowledge/critical-analysis"
+import { DeepResearchSkill } from "./knowledge/deep-research"
+import { TavilyResearchSkill } from "./knowledge/tavily-research"
+import { ContextEngineeringSkill } from "./knowledge/context-engineering"
+import { KnowledgeGraphMemorySkill } from "./knowledge/knowledge-graph-memory"
+import { UsingSuperpowersSkill } from "./meta/using-superpowers"
+import { WritingSkillsSkill } from "./meta/writing-skills"
+import { BrainstormingSkill } from "./meta/brainstorming"
 import { DietPlanSkill } from "./nutrition/diet-plan"
 import { NutritionAnalysisSkill } from "./nutrition/nutrition-analysis"
 import { FoodRecallSkill } from "./nutrition/food-recall"
@@ -226,7 +281,14 @@ export const knowledgeSkills: Skill[] = [
   FactCheckSkill,
   SynthesisSkill,
   CriticalAnalysisSkill,
+  DeepResearchSkill,
+  TavilyResearchSkill,
+  ContextEngineeringSkill,
+  KnowledgeGraphMemorySkill,
 ]
+
+// Meta agency skills
+export const metaSkills: Skill[] = [UsingSuperpowersSkill, WritingSkillsSkill, BrainstormingSkill]
 
 // Nutrition agency skills
 export const nutritionSkills: Skill[] = [DietPlanSkill, NutritionAnalysisSkill, FoodRecallSkill, RecipeSearchSkill]
@@ -243,12 +305,13 @@ export const allWave2Skills: Skill[] = [...nutritionSkills, ...weatherSkills]
 // Wave 3: NBA Betting Agency skills
 export const nbaSkills: Skill[] = [NbaAnalysisSkill]
 
-// All skills combined
-export const allSkills: Skill[] = [...allWave1Skills, ...allWave2Skills, ...nbaSkills]
+// All skills combined (including Onda 4 meta skills)
+export const allSkills: Skill[] = [...allWave1Skills, ...allWave2Skills, ...nbaSkills, ...metaSkills]
 
 // Skill count constants
 export const DEVELOPMENT_SKILL_COUNT = developmentSkills.length
 export const KNOWLEDGE_SKILL_COUNT = knowledgeSkills.length
+export const META_SKILL_COUNT = metaSkills.length
 export const NUTRITION_SKILL_COUNT = nutritionSkills.length
 export const WEATHER_SKILL_COUNT = weatherSkills.length
 export const NBA_SKILL_COUNT = nbaSkills.length

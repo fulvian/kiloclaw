@@ -1,3 +1,10 @@
+// Load API keys from .env file before any other imports that may use process.env
+import { config } from "dotenv"
+import { join } from "path"
+const dotenvPath = process.env.XDG_DATA_HOME
+  ? join(process.env.XDG_DATA_HOME, "kiloclaw", ".env")
+  : join(process.env.HOME || "", ".local", "share", "kiloclaw", ".env")
+config({ path: dotenvPath })
 import yargs from "yargs"
 import { hideBin } from "yargs/helpers"
 import { RunCommand } from "./cli/cmd/run"

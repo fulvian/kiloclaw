@@ -609,6 +609,62 @@ Questo protocollo e vincolante per ogni nuova agency e per refactor che cambiano
 
 ---
 
+## API Keys - Unica Fonte di Verità
+
+Tutte le API keys di KiloClaw sono gestite in un **singolo file**:
+
+```
+~/.local/share/kiloclaw/.env
+```
+
+### Struttura
+
+Ogni provider supporta multiple chiavi per key rotation:
+
+```bash
+# Formato: PROVIDER_API_KEY_N (dove N parte da 1)
+TAVILY_API_KEY_1=tvly-xxxxx
+TAVILY_API_KEY_2=tvly-yyyyy
+
+# OPPURE comma-separated:
+TAVILY_API_KEYS=tvly-xxxxx,tvly-yyyyy
+```
+
+### Provider e variabili
+
+| Provider                    | Variabili                   | Note                                                 |
+| --------------------------- | --------------------------- | ---------------------------------------------------- |
+| Tavily                      | `TAVILY_API_KEY_1`          | Web search                                           |
+| Brave                       | `BRAVE_API_KEY_1`           | Web search                                           |
+| Firecrawl                   | `FIRECRAWL_API_KEY_1`       | Web scraping                                         |
+| Perplexity                  | `PERPLEXITY_API_KEY_1`      | AI research                                          |
+| Ball Don't Lie              | `BALLDONTLIE_API_KEY_1`     | NBA games/stats                                      |
+| **ODDS API** (odds-api.com) | `ODDS_API_KEY_1`            | Multi-bookmaker: Bet365 + FanDuel + DraftKings + 40+ |
+| **ODDS API** (odds-api.io)  | `ODDS_BET365_API_KEY_1/2/3` | Bet365 dedicated                                     |
+| Parlay API                  | `PARLAY_API_KEY_1/2/3`      | 40+ bookmakers aggregated                            |
+| Polymarket                  | `POLYMARKET_API_KEY_1/2`    | Prediction markets                                   |
+
+### Cascata fallback quote bookmaker
+
+```
+ODDS_API (odds-api.com) → ODDS_BET365 (odds-api.io) → PARLAY → ESPN
+```
+
+**ODDS_API** (odds-api.com) è il provider primario - ha Bet365 + 40+ bookmakers.
+
+### Aggiungere una nuova chiave
+
+1. Apri `~/.local/share/kiloclaw/.env`
+2. Trova la sezione del provider
+3. Aggiungi la chiave come `PROVIDER_API_KEY_N` (prossimo numero)
+4. Riavvia il CLI - la chiave viene caricata automaticamente
+
+### Caricamento
+
+Il file `.env` viene caricato automaticamente all'avvio del CLI tramite `dotenv` in `packages/opencode/src/index.ts`. Non serve esportare manualmente le variabili.
+
+---
+
 ## Runtime Verification Obbligatoria dopo attivazione flag (Post-Deployment)
 
 Dopo aver attivato il flag `KILO_ROUTING_AGENCY_CONTEXT_ENABLED=true` in deployment, e **obbligatorio** eseguire un test runtime reale con `bun run dev` PRIMA di considerare l'implementazione completa. Questo passaggio non e sostituibile da test unitari o di integrazione.

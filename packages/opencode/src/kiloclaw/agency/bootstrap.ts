@@ -725,6 +725,142 @@ function doBootstrap(): void {
     }
   }
 
+  // Onda 4: Knowledge + Meta skills aliases
+  const onda4SkillAliases: SkillDefinition[] = [
+    {
+      id: "deep-research",
+      name: "Deep Research",
+      version: "1.0.0",
+      description: "Comprehensive multi-source research synthesis with source evaluation",
+      inputSchema: {
+        type: "object",
+        properties: { query: { type: "string" }, sources: { type: "number" }, depth: { type: "string" } },
+        required: ["query"],
+      },
+      outputSchema: {
+        type: "object",
+        properties: { findings: { type: "array" }, gaps: { type: "array" }, summary: { type: "string" } },
+      },
+      capabilities: ["research-synthesis", "source-evaluation", "gap-analysis", "multi-source-research"],
+      tags: ["knowledge", "research", "analysis"],
+    },
+    {
+      id: "tavily-research",
+      name: "Tavily Research",
+      version: "1.0.0",
+      description: "Tavily AI web search integration for up-to-date information",
+      inputSchema: {
+        type: "object",
+        properties: { query: { type: "string" }, searchDepth: { type: "string" }, maxResults: { type: "number" } },
+        required: ["query"],
+      },
+      outputSchema: {
+        type: "object",
+        properties: { results: { type: "array" }, summary: { type: "string" } },
+      },
+      capabilities: ["web-search", "tavily-integration", "information-gathering"],
+      tags: ["knowledge", "search", "tavily"],
+    },
+    {
+      id: "context-engineering",
+      name: "Context Engineering",
+      version: "1.0.0",
+      description: "Optimize LLM interaction through structured context management",
+      inputSchema: {
+        type: "object",
+        properties: { text: { type: "string" }, strategy: { type: "string" }, maxTokens: { type: "number" } },
+        required: ["text"],
+      },
+      outputSchema: {
+        type: "object",
+        properties: { compressed: { type: "string" }, metadata: { type: "object" } },
+      },
+      capabilities: ["context-compression", "context-expansion", "context-ranking", "token-optimization"],
+      tags: ["knowledge", "context", "llm-optimization"],
+    },
+    {
+      id: "knowledge-graph-memory",
+      name: "Knowledge Graph Memory",
+      version: "1.0.0",
+      description: "Graph-based memory storage and retrieval for persistent context",
+      inputSchema: {
+        type: "object",
+        properties: { action: { type: "string" }, entities: { type: "array" }, relationships: { type: "array" } },
+        required: ["action"],
+      },
+      outputSchema: {
+        type: "object",
+        properties: { stored: { type: "boolean" }, entities: { type: "array" }, query: { type: "string" } },
+      },
+      capabilities: ["graph-storage", "entity-tracking", "relationship-mapping", "memory-retrieval"],
+      tags: ["knowledge", "memory", "graph"],
+    },
+    {
+      id: "using-superpowers",
+      name: "Using Superpowers",
+      version: "1.0.0",
+      description: "Methodology guidance for code-gen, debugging, refactoring, docs, and testing",
+      inputSchema: {
+        type: "object",
+        properties: { task: { type: "string" }, methodology: { type: "string" } },
+        required: ["task"],
+      },
+      outputSchema: {
+        type: "object",
+        properties: { guidance: { type: "string" }, steps: { type: "array" } },
+      },
+      capabilities: ["methodology-guidance", "workflow-assistance", "best-practices"],
+      tags: ["meta", "guidance", "methodology"],
+    },
+    {
+      id: "writing-skills",
+      name: "Writing Skills",
+      version: "1.0.0",
+      description: "Writing type guidance for technical, documentation, creative, business, academic",
+      inputSchema: {
+        type: "object",
+        properties: { text: { type: "string" }, type: { type: "string" }, tone: { type: "string" } },
+        required: ["text"],
+      },
+      outputSchema: {
+        type: "object",
+        properties: { rewritten: { type: "string" }, suggestions: { type: "array" } },
+      },
+      capabilities: ["text-rewriting", "tone-adjustment", "style-improvement", "type-specific-writing"],
+      tags: ["meta", "writing", "language"],
+    },
+    {
+      id: "brainstorming",
+      name: "Brainstorming",
+      version: "1.0.0",
+      description: "Idea generation with SCAMPER, Six Thinking Hats, and other techniques",
+      inputSchema: {
+        type: "object",
+        properties: { topic: { type: "string" }, technique: { type: "string" } },
+        required: ["topic"],
+      },
+      outputSchema: {
+        type: "object",
+        properties: { ideas: { type: "array" }, technique: { type: "string" } },
+      },
+      capabilities: ["idea-generation", "scamper", "six-thinking-hats", "creative-brainstorming"],
+      tags: ["meta", "creativity", "brainstorming"],
+    },
+  ]
+
+  for (const skill of onda4SkillAliases) {
+    try {
+      SkillRegistry.registerSkill(skill)
+      log.debug("skill alias registered", { skillId: skill.id })
+    } catch (error: any) {
+      if (error?.message?.includes("already registered")) {
+        log.debug("skill alias already registered", { skillId: skill.id })
+      } else {
+        log.error("failed to register skill alias", { skillId: skill.id, error: error?.message })
+      }
+    }
+  }
+
   // 3. Register flexible agents
   try {
     registerFlexibleAgents()

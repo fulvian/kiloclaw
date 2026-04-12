@@ -110,6 +110,7 @@
     "clipboardy": "4.0.0",
     "decimal.js": "10.5.0",
     "diff": "catalog:",
+    "dotenv": "17.4.1",
     "drizzle-orm": "1.0.0-beta.16-ea816b6",
     "fuzzysort": "3.1.0",
     "glob": "13.0.5",
