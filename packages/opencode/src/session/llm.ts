@@ -218,7 +218,7 @@ export namespace LLM {
       topP: params.topP,
       topK: params.topK,
       providerOptions: ProviderTransform.providerOptions(input.model, params.options),
-      activeTools: Object.keys(tools).filter((x) => x !== "invalid"),
+      activeTools: Object.keys(tools),
       tools,
       toolChoice: input.toolChoice,
       maxOutputTokens,
@@ -281,6 +281,7 @@ export namespace LLM {
   async function resolveTools(input: Pick<StreamInput, "tools" | "agent" | "user">) {
     const disabled = PermissionNext.disabled(Object.keys(input.tools), input.agent.permission)
     for (const tool of Object.keys(input.tools)) {
+      if (tool === "invalid") continue
       if (input.user.tools?.[tool] === false || disabled.has(tool)) {
         delete input.tools[tool]
       }

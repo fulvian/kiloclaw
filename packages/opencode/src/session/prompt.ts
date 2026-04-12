@@ -89,6 +89,56 @@ export namespace SessionPrompt {
   }
   // kilocode_change end
 
+  type PseudoInvoke = {
+    tool: string
+    args: Record<string, unknown>
+  }
+
+  function parsePseudoInvoke(text: string): PseudoInvoke | undefined {
+    const match = text.match(/<invoke\s+name="([^"]+)">([\s\S]*?)<\/invoke>/i)
+    if (!match) return
+    const tool = match[1]?.trim()
+    if (!tool) return
+
+    const body = match[2] ?? ""
+    const args = Array.from(body.matchAll(/<parameter\s+name="([^"]+)">([\s\S]*?)<\/parameter>/gi)).reduce(
+      (acc, item) => {
+        const key = item[1]?.trim()
+        const raw = item[2]?.trim() ?? ""
+        if (!key) return acc
+
+        const value = iife(() => {
+          if (raw === "true") return true
+          if (raw === "false") return false
+          if (raw === "null") return null
+          const asNum = Number(raw)
+          if (raw.length > 0 && Number.isFinite(asNum) && /^-?\d+(\.\d+)?$/.test(raw)) return asNum
+          return raw
+        })
+
+        return {
+          ...acc,
+          [key]: value,
+        }
+      },
+      {} as Record<string, unknown>,
+    )
+
+    return {
+      tool,
+      args,
+    }
+  }
+
+  function findPseudoInvoke(parts: MessageV2.Part[]): PseudoInvoke | undefined {
+    for (const part of parts) {
+      if (part.type !== "text") continue
+      const parsed = parsePseudoInvoke(part.text)
+      if (parsed) return parsed
+    }
+    return
+  }
+
   const log = Log.create({ service: "session.prompt" })
 
   const state = Instance.state(
@@ -1153,6 +1203,112 @@ export namespace SessionPrompt {
         toolChoice: format.type === "json_schema" ? "required" : undefined,
       })
 
+      const pseudoInvoke = findPseudoInvoke(await MessageV2.parts(processor.message.id))
+      if (result === "stop" && !processor.message.error && pseudoInvoke) {
+        const normalizedPseudo = iife(() => {
+          if (pseudoInvoke.tool !== "tool") return pseudoInvoke
+          const rawName = typeof pseudoInvoke.args.name === "string" ? pseudoInvoke.args.name : ""
+          if (rawName && tools[rawName]) {
+            const nextArgs = { ...pseudoInvoke.args }
+            delete nextArgs.name
+            return {
+              tool: rawName,
+              args: nextArgs,
+            }
+          }
+          if (rawName && tools.skill) {
+            return {
+              tool: "skill",
+              args: { name: rawName },
+            }
+          }
+          return pseudoInvoke
+        })
+
+        const pseudoTool = tools[normalizedPseudo.tool] as any
+        if (pseudoTool?.execute) {
+          log.warn("recovering pseudo invoke tool call", {
+            sessionID,
+            messageID: processor.message.id,
+            tool: normalizedPseudo.tool,
+          })
+
+          const callID = ulid()
+          const part = (await Session.updatePart({
+            id: Identifier.ascending("part"),
+            messageID: processor.message.id,
+            sessionID,
+            type: "tool",
+            callID,
+            tool: normalizedPseudo.tool,
+            state: {
+              status: "running",
+              input: normalizedPseudo.args,
+              time: {
+                start: Date.now(),
+              },
+            },
+          })) as MessageV2.ToolPart
+
+          const recovered = await pseudoTool
+            .execute(normalizedPseudo.args, {
+              toolCallId: callID,
+              abortSignal: abort,
+            })
+            .catch(async (err: unknown) => {
+              await Session.updatePart({
+                ...part,
+                state: {
+                  status: "error",
+                  input: normalizedPseudo.args,
+                  error: err instanceof Error ? err.message : String(err),
+                  time: {
+                    start: part.state.status === "running" ? part.state.time.start : Date.now(),
+                    end: Date.now(),
+                  },
+                },
+              } satisfies MessageV2.ToolPart)
+              return undefined
+            })
+
+          if (recovered) {
+            const output =
+              typeof recovered.output === "string"
+                ? recovered.output
+                : JSON.stringify(recovered.output ?? recovered.content ?? "")
+            const attachments = Array.isArray(recovered.attachments)
+              ? recovered.attachments.map((attachment: MessageV2.FilePart) => ({
+                  ...attachment,
+                  id: Identifier.ascending("part"),
+                  sessionID,
+                  messageID: processor.message.id,
+                }))
+              : undefined
+
+            await Session.updatePart({
+              ...part,
+              state: {
+                status: "completed",
+                input: normalizedPseudo.args,
+                title: typeof recovered.title === "string" ? recovered.title : "",
+                metadata: recovered.metadata,
+                output,
+                attachments,
+                time: {
+                  start: part.state.status === "running" ? part.state.time.start : Date.now(),
+                  end: Date.now(),
+                },
+              },
+            } satisfies MessageV2.ToolPart)
+
+            processor.message.finish = "tool-calls"
+            processor.message.time.completed = Date.now()
+            await Session.updateMessage(processor.message)
+            continue
+          }
+        }
+      }
+
       // If structured output was captured, save it and exit immediately
       // This takes priority because the StructuredOutput tool was called successfully
       if (structuredOutput !== undefined) {
@@ -1286,7 +1442,7 @@ export namespace SessionPrompt {
       { modelID: input.model.api.id, providerID: input.model.providerID },
       input.agent,
     )) {
-      if (agencyTools.enabled && !agencyTools.allowedTools.includes(item.id)) {
+      if (agencyTools.enabled && item.id !== "invalid" && !agencyTools.allowedTools.includes(item.id)) {
         blockedTools.push(item.id)
         continue
       }

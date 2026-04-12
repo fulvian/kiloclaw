@@ -98,6 +98,43 @@ bun run dev -- "stock price for AAPL"
 | ------- | --------------------------------------------------------------------- | ---------------------------------------- |
 | MEDIUM  | Finance è nuovo dominio - copertura keyword non testata in produzione | Routing tests verdi, monitoraggio attivo |
 
+## API Keys Required
+
+### YahooQuery Setup (Primary for Stocks/ETF/Forex)
+
+YahooQuery is a Python library that provides Yahoo Finance data.
+
+```bash
+# Install yahooquery
+pip install yahooquery
+
+# Verify installation
+python3 -c "from yahooquery import Ticker; print(Ticker('AAPL').price)"
+```
+
+### Other API Keys
+
+| Provider      | Purpose                  | Free Tier | Signup                                            |
+| ------------- | ------------------------ | --------- | ------------------------------------------------- |
+| **CoinGecko** | Crypto prices            | ✅        | https://coingecko.com/api                         |
+| **Finnhub**   | Stock fundamentals, news | ✅ 60/min | https://finnhub.io/                               |
+| **FRED**      | Macroeconomic data       | ✅ Free   | https://fred.stlouisfed.org/docs/api/api_key.html |
+
+### .env Configuration
+
+Add to `~/.local/share/kiloclaw/.env`:
+
+```bash
+# CoinGecko (crypto prices) - FREE
+COINGECKO_API_KEY=your_coingecko_api_key
+
+# Finnhub (stock data, news, fundamentals) - FREE tier
+FINNHUB_API_KEY=your_finnhub_api_key
+
+# FRED (macroeconomic data) - FREE
+FRED_API_KEY=your_fred_api_key
+```
+
 ## Decisione finale
 
 - **Esito**: ✅ GO

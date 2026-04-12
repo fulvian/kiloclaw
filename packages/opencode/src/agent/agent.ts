@@ -333,6 +333,7 @@ export namespace Agent {
             todowrite: "allow",
             webfetch: "allow",
             websearch: "allow",
+            skill: "allow",
             codesearch: "allow",
             codebase_search: "allow",
             external_directory: {
