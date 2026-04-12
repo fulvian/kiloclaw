@@ -297,7 +297,40 @@ export namespace RoutingPipeline {
           ? ["websearch", "webfetch", "skill", ...mapped]
           : agencyId === "agency-nba"
             ? ["skill", ...mapped]
-            : mapped,
+            : agencyId === "agency-gworkspace"
+              ? [
+                  "gmail.search",
+                  "gmail.read",
+                  "gmail.draft",
+                  "gmail.send",
+                  "drive.search",
+                  "drive.list",
+                  "drive.read",
+                  "drive.share",
+                  "calendar.list",
+                  "calendar.read",
+                  "calendar.create",
+                  "calendar.update",
+                  "docs.read",
+                  "docs.update",
+                  "sheets.read",
+                  "sheets.update",
+                  ...mapped,
+                ]
+              : agencyId === "agency-development"
+                ? [
+                    "read",
+                    "glob",
+                    "grep",
+                    "apply_patch",
+                    "bash",
+                    "skill",
+                    "codesearch",
+                    "websearch",
+                    "webfetch",
+                    ...mapped,
+                  ]
+                : mapped,
       ),
     )
     const candidates = requestedTools ?? allowlist

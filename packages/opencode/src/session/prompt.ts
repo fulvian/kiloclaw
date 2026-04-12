@@ -1027,6 +1027,54 @@ export namespace SessionPrompt {
             "IMPORTANT: Never suggest actual bets without clear odds comparison and value assessment.",
             "",
           ].join("\n")
+        } else if (agencyContext.agencyId === "agency-gworkspace") {
+          agencyBlock = [
+            "",
+            "<!-- Agency Context: Google Workspace Agency -->",
+            "This conversation has been routed to the Google Workspace Agency.",
+            `Routing confidence: ${Math.round(agencyContext.confidence * 100)}%`,
+            `Routing reason: ${agencyContext.reason}`,
+            `Routing source: ${agencyContext.routeSource}`,
+            ...(agencyContext.fallbackUsed ? [`Routing fallback: ${agencyContext.fallbackReason ?? "none"}`] : []),
+            ...(agencyContext.layers?.L1
+              ? [
+                  `L1 capabilities: ${agencyContext.layers.L1.capabilities.join(", ") || "none"}`,
+                  `L1 route type: ${agencyContext.layers.L1.routeResult?.type ?? "fallback"}`,
+                ]
+              : []),
+            ...(agencyContext.layers?.L2
+              ? [
+                  `L2 agent: ${agencyContext.layers.L2.agentId ?? "none"}`,
+                  `L2 health: ${agencyContext.layers.L2.agentHealth}`,
+                ]
+              : []),
+            ...(agencyContext.layers?.L3
+              ? [
+                  `L3 tools denied: ${agencyContext.layers.L3.toolsDenied}`,
+                  `L3 fallback used: ${agencyContext.layers.L3.fallbackUsed}`,
+                ]
+              : []),
+            "",
+            "CRITICAL TOOL INSTRUCTIONS:",
+            "- For Gmail operations: use ONLY the appropriate MCP Gmail tools",
+            "- For Drive operations: use ONLY the appropriate MCP Drive tools",
+            "- For Calendar operations: use ONLY the appropriate MCP Calendar tools",
+            "- DO NOT use websearch or webfetch for Google Workspace queries",
+            "- DO NOT use generic file operations on Google Drive content",
+            "- Read operations are allowed; write operations require explicit approval",
+            "- Send/draft operations require user confirmation before execution",
+            "",
+            "SKILL USAGE HINTS:",
+            "- For email search: gworkspace-gmail-search skill",
+            "- For file search: gworkspace-drive-search skill",
+            "- For calendar: gworkspace-calendar-list skill",
+            "- For documents: gworkspace-docs-read skill",
+            "- For spreadsheets: gworkspace-sheets-read skill",
+            "",
+            "Google Workspace Agency provides: Gmail search/read/draft, Drive search/list/read, Calendar list/read/create, Docs read, Sheets read.",
+            "Available tools: MCP tools for Gmail, Drive, Calendar, Docs, Sheets (requires approval for send/create/update operations).",
+            "",
+          ].join("\n")
         }
 
         if (agencyBlock) {

@@ -1,5 +1,7 @@
 # KILOCLAW_AGENCY_IMPLEMENTATION_PROTOCOL_V1_2026-04-09
 
+> **DEPRECATO**: Usa `KILOCLAW_AGENCY_IMPLEMENTATION_PROTOCOL_V2_2026-04-12.md`
+
 Protocollo operativo per agenzie con gate e controlli.
 
 ---
