@@ -95,6 +95,35 @@ describe("kiloclaw.routing.pipeline", () => {
     expect(l3.deniedTools).not.toContain("websearch")
   })
 
+  it("enforces nba L3 allowlist and blocks websearch", async () => {
+    AgencyRegistry.registerAgency({
+      id: "agency-nba",
+      name: "NBA Agency",
+      domain: "nba",
+      policies: {
+        allowedCapabilities: ["schedule_live", "injury_status", "odds_markets", "edge_detection"],
+        deniedCapabilities: [],
+        maxRetries: 3,
+        requiresApproval: false,
+        dataClassification: "public",
+      },
+      providers: ["espn"],
+      metadata: {},
+    })
+
+    const l3 = await RoutingPipeline.resolveTools("agency-nba", undefined, undefined, [
+      "webfetch",
+      "skill",
+      "websearch",
+    ])
+    expect(l3.toolsRequested).toBe(3)
+    expect(l3.toolsResolved).toBe(2)
+    expect(l3.toolsDenied).toBe(1)
+    expect(l3.deniedTools).toContain("websearch")
+    expect(l3.blockedTools).toContain("websearch")
+    expect(l3.fallbackUsed).toBe(false)
+  })
+
   it("routes italian typo search-like intent to knowledge agency", async () => {
     AgencyRegistry.registerAgency({
       id: "agency-knowledge",

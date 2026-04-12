@@ -102,7 +102,8 @@ export namespace Flag {
   export const KILO_ROUTING_DYNAMIC_ENABLED = !falsy("KILO_ROUTING_DYNAMIC_ENABLED")
   export const KILO_ROUTING_SHADOW_ENABLED = truthy("KILO_ROUTING_SHADOW_ENABLED")
   export const KILO_ROUTING_MANIFEST_ENABLED = truthy("KILO_ROUTING_MANIFEST_ENABLED")
-  export const KILO_ROUTING_AGENCY_CONTEXT_ENABLED = truthy("KILO_ROUTING_AGENCY_CONTEXT_ENABLED")
+  // Enabled by default - set KILO_ROUTING_AGENCY_CONTEXT_ENABLED=false to disable
+  export const KILO_ROUTING_AGENCY_CONTEXT_ENABLED = !falsy("KILO_ROUTING_AGENCY_CONTEXT_ENABLED")
 
   // Performance tuning flags
   export const KILO_ROUTING_LRU_ENABLED = !falsy("KILO_ROUTING_LRU_ENABLED")
@@ -167,6 +168,13 @@ export namespace Flag {
 
   // Phase 4: Notifications - channel fanout (toast, webhook, email)
   export const KILOCLAW_TASK_NOTIFY_V1 = truthy("KILOCLAW_TASK_NOTIFY_V1")
+
+  // =============================================================================
+  // Native Factory - Capability-based Native-First Routing
+  // =============================================================================
+
+  // Enable NativeFactory for capability-gated operations (default: false)
+  export const KILO_NATIVE_FACTORY_ENABLED = truthy("KILO_NATIVE_FACTORY_ENABLED")
 }
 
 // Dynamic getter for KILO_DISABLE_PROJECT_CONFIG

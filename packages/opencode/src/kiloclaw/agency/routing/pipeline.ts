@@ -271,10 +271,32 @@ export namespace RoutingPipeline {
       if (["search", "web-search", "academic-research"].includes(cap)) return ["websearch"]
       if (["fact-checking", "verification", "source_grounding"].includes(cap)) return ["webfetch"]
       if (["synthesis", "information_gathering"].includes(cap)) return ["skill"]
+      if (["schedule_live", "team_player_stats", "injury_status", "odds_markets", "game_preview"].includes(cap)) {
+        return ["webfetch"]
+      }
+      if (
+        [
+          "probability_estimation",
+          "vig_removal",
+          "edge_detection",
+          "calibration_monitoring",
+          "value_watchlist",
+          "recommendation_report",
+          "stake_sizing",
+        ].includes(cap)
+      ) {
+        return ["skill"]
+      }
       return []
     })
     const allowlist = Array.from(
-      new Set(agencyId === "agency-knowledge" ? ["websearch", "webfetch", "skill", ...mapped] : mapped),
+      new Set(
+        agencyId === "agency-knowledge"
+          ? ["websearch", "webfetch", "skill", ...mapped]
+          : agencyId === "agency-nba"
+            ? ["webfetch", "skill", ...mapped]
+            : mapped,
+      ),
     )
     const candidates = requestedTools ?? allowlist
     const deniedTools = candidates.filter((tool) => !allowlist.includes(tool))

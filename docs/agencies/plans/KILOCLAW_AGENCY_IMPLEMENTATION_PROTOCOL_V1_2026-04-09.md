@@ -386,6 +386,12 @@ Aggiorna la guida ufficiale quando cambia il comportamento operativo o il contra
 - Regression:
 - Telemetry contract:
 - Security checks:
+- **Post-deployment runtime verification** (`bun run dev` con query reale):
+  - Log file:
+  - Criteri passati (N/8):
+  - `policyEnforced`: YES/NO
+  - `websearch` invocato: YES/NO (deve essere NO)
+  - `blockedTools` corretti: YES/NO
 
 ## Rischio residuo
 
@@ -600,3 +606,73 @@ Il modello usa web search invece dell'agenzia specializzata, anche se il routing
 ## Esegui governance finale
 
 Questo protocollo e vincolante per ogni nuova agency e per refactor che cambiano behavior. Se un gate fallisce, il flusso torna alla fase precedente con aggiornamento degli artefatti.
+
+---
+
+## Runtime Verification Obbligatoria dopo attivazione flag (Post-Deployment)
+
+Dopo aver attivato il flag `KILO_ROUTING_AGENCY_CONTEXT_ENABLED=true` in deployment, e **obbligatorio** eseguire un test runtime reale con `bun run dev` PRIMA di considerare l'implementazione completa. Questo passaggio non e sostituibile da test unitari o di integrazione.
+
+### Perche e obbligatorio
+
+I test runtime catturano failure che i test statici non possono rilevare:
+
+- Il blocco contesto agency viene effettivamente iniettato nel system prompt
+- La policy tool viene applicata correttamente dal session layer
+- Il routing L0-L3 produce i tool corretti in condizioni reali
+- I log mostrano `policyEnforced=true` e `blockedTools` corretti
+- Il modello NON usa tool non permessi (es. `websearch` per agency-nba)
+
+### Comando di test obbligatorio
+
+```bash
+# Query NBA di riferimento per verifica runtime
+bun run dev -- --print-logs --log-level DEBUG run "Analizza le partite NBA di stasera e prepara un report betting completo: forma ultime 10 gare, pace, offensive/defensive rating, injury report aggiornato, probabili quintetti, back-to-back, travel spot, confronto quote bookmaker e stima edge con stake consigliato"
+```
+
+### Criteri di passaggio (obbligatori, tutti devono essere verdi)
+
+| #   | Criterio                                   | Log pattern da cercare                                                        |
+| --- | ------------------------------------------ | ----------------------------------------------------------------------------- |
+| 1   | Agency routed a quella corretta            | `agencyId=agency-[dominio]`                                                   |
+| 2   | Confidence >= 40%                          | `confidence=0.x`                                                              |
+| 3   | Policy tool enforce = true                 | `policyEnforced=true`                                                         |
+| 4   | allowedTools contiene solo i tool permessi | `allowedTools=["webfetch","skill"]` (NBA)                                     |
+| 5   | websearch/blocced_tools NON invocato       | `blockedTools=.*websearch.*` presente + nessun `tool call.*websearch` nei log |
+| 6   | Capability L1 corrette                     | `capabilities=["nba_analysis","schedule_live",...]`                           |
+| 7   | Nessun `no tools resolved by policy`       | assente nei log                                                               |
+| 8   | Fallback NOT used                          | `fallbackUsed=false`                                                          |
+
+### Evidenze richieste per G6
+
+1. **Screenshot/estratto log** con tutti i criteri #1-#8 verificabili
+2. **File di log completo** salvato in: `~/.local/share/kilo/tool-output/`
+3. ** Nessuna invocazione tool non permessa** - verificare con grep sui log
+
+### Template frase di check-in nel Go/No-Go Review
+
+```
+## Post-Deployment Runtime Verification
+
+- Command executed: `bun run dev -- --print-logs --log-level DEBUG run "[query specifica del dominio]"`
+- Log file: [path al file in ~/.local/share/kilo/tool-output/]
+- Criteri passati: [N/N]
+- tool-policy enforced: YES/NO
+- websearch invoked: YES/NO (deve essere NO)
+- blockedTools contiene tool non permessi: [lista]
+- Decisione: PROCEED / BLOCK
+```
+
+### Fallimento del test runtime
+
+Se anche solo UNO dei criteri #1-#8 fallisce:
+
+1. NON procedere a G6
+2. Torna a G4 con evidenza dei log
+3. Correggi il componente guasto (prompt.ts, tool-policy.ts, pipeline.ts, capability extraction)
+4. Ripeti il test runtime dopo la fix
+5. Documenta la root cause nel Go/No-Go Review
+
+---
+
+## Routing Implementation Checklist (Obbligatorio)
