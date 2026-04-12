@@ -271,13 +271,11 @@ export namespace RoutingPipeline {
       if (["search", "web-search", "academic-research"].includes(cap)) return ["websearch"]
       if (["fact-checking", "verification", "source_grounding"].includes(cap)) return ["webfetch"]
       if (["synthesis", "information_gathering"].includes(cap)) return ["skill"]
+      if (["schedule_live", "team_player_stats", "injury_status", "odds_markets", "game_preview"].includes(cap)) {
+        return ["websearch", "webfetch", "skill"]
+      }
       if (
         [
-          "schedule_live",
-          "team_player_stats",
-          "injury_status",
-          "odds_markets",
-          "game_preview",
           "probability_estimation",
           "vig_removal",
           "edge_detection",
@@ -287,7 +285,7 @@ export namespace RoutingPipeline {
           "stake_sizing",
         ].includes(cap)
       ) {
-        return ["skill"]
+        return ["skill", "webfetch"]
       }
       return []
     })
@@ -296,7 +294,7 @@ export namespace RoutingPipeline {
         agencyId === "agency-knowledge"
           ? ["websearch", "webfetch", "skill", ...mapped]
           : agencyId === "agency-nba"
-            ? ["skill", ...mapped]
+            ? ["websearch", "webfetch", "skill", ...mapped]
             : agencyId === "agency-gworkspace"
               ? [
                   "gmail.search",

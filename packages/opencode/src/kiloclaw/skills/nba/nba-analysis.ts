@@ -10,6 +10,48 @@ import { NbaRuntime, type NbaPolicyDecision } from "../../agency/nba/runtime"
 import { type Game, type Odds, type Signal, type Recommendation, capConfidence } from "../../agency/nba/schema"
 import { NbaCircuitBreaker } from "../../agency/nba/resilience"
 
+function slug(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+}
+
+function outcomeConsensus(lines: Odds[]): Map<string, number> {
+  const buckets = new Map<string, { sum: number; n: number }>()
+
+  for (const line of lines) {
+    for (const [idx, name] of line.outcomes.entries()) {
+      const fair = line.implied_probabilities_fair[idx]
+      if (fair === undefined) continue
+      const key = name.trim().toLowerCase()
+      const cur = buckets.get(key)
+      if (!cur) {
+        buckets.set(key, { sum: fair, n: 1 })
+        continue
+      }
+      buckets.set(key, { sum: cur.sum + fair, n: cur.n + 1 })
+    }
+  }
+
+  return new Map(Array.from(buckets.entries()).map(([key, value]) => [key, value.sum / value.n]))
+}
+
+function deriveAction(signal: Signal, outcome: string | undefined, game: Game | undefined): Recommendation["action"] {
+  const name = (outcome ?? "").toLowerCase()
+  if (signal.market === "totals") {
+    if (name.includes("over")) return "lean_over"
+    if (name.includes("under")) return "lean_under"
+    return "no_bet"
+  }
+
+  const home = game?.home_team.name.toLowerCase() ?? ""
+  const away = game?.away_team.name.toLowerCase() ?? ""
+  if (home && name.includes(home)) return "lean_home"
+  if (away && name.includes(away)) return "lean_away"
+  return "no_bet"
+}
+
 // NBA Analysis Input
 export interface NbaAnalysisInput {
   /** Game ID to analyze (optional - if not provided, analyzes all games for the day) */
@@ -258,6 +300,7 @@ export const NbaAnalysisSkill: Skill = {
 
     // Step 5: Generate signals for each game
     const signals: Signal[] = []
+    const signalOutcomes = new Map<string, string>()
     let staleBlockedCount = 0
 
     for (const game of games) {
@@ -291,42 +334,57 @@ export const NbaAnalysisSkill: Skill = {
         continue
       }
 
-      // Generate signal for each market
-      for (const oddsData of gameOdds) {
-        // Simple signal generation based on vig removal and edge detection
-        const impliedProbabilities = oddsData.implied_probabilities_fair
+      const markets = new Map<Odds["market"], Odds[]>()
+      for (const line of gameOdds) {
+        const key = line.market
+        const cur = markets.get(key) ?? []
+        cur.push(line)
+        markets.set(key, cur)
+      }
 
-        // Model probability (mock - in production this would use ML model)
-        const modelProbability = 0.5 + (Math.random() - 0.5) * 0.3
+      for (const [market, lines] of markets) {
+        const consensus = outcomeConsensus(lines)
 
-        // Calculate edge
-        const edge = modelProbability - impliedProbabilities[0]
+        for (const line of lines) {
+          for (const [idx, outcome] of line.outcomes.entries()) {
+            const raw = line.implied_probabilities_raw[idx]
+            const fair = line.implied_probabilities_fair[idx]
+            if (raw === undefined || fair === undefined) continue
 
-        // Apply confidence cap
-        const confidence = capConfidence(0.7 + Math.random() * 0.2)
+            const prior = consensus.get(outcome.toLowerCase()) ?? fair
+            const edge = prior - raw
+            const agePenalty = Math.min(0.25, line.freshness_seconds / 14400)
+            const edgeLift = Math.min(0.25, Math.max(0, edge) * 4)
+            const confidence = capConfidence(0.55 + edgeLift - agePenalty)
 
-        const signal: Signal = {
-          signal_id: `sig_${game.game_id}_${oddsData.market}_${Date.now()}`,
-          game_id: game.game_id,
-          market: oddsData.market,
-          model_probability: modelProbability,
-          fair_implied_probability: impliedProbabilities[0],
-          edge,
-          value_flag: edge >= minEdge,
-          confidence,
-          calibration_bucket: confidence >= 0.9 ? "high" : confidence >= 0.7 ? "medium" : "low",
-          stale_blocked: false,
-          freshness_seconds: oddsData.freshness_seconds,
-          freshness_state: oddsData.freshness_state,
-          collected_at_utc: new Date().toISOString(),
+            const signalId = `sig_${game.game_id}_${market}_${slug(outcome)}_${Date.now()}`
+            signalOutcomes.set(signalId, outcome)
+
+            const signal: Signal = {
+              signal_id: signalId,
+              game_id: game.game_id,
+              market,
+              model_probability: prior,
+              fair_implied_probability: fair,
+              edge,
+              value_flag: edge >= minEdge,
+              confidence,
+              calibration_bucket: confidence >= 0.8 ? "high" : confidence >= 0.65 ? "medium" : "low",
+              stale_blocked: false,
+              freshness_seconds: line.freshness_seconds,
+              freshness_state: line.freshness_state,
+              collected_at_utc: new Date().toISOString(),
+            }
+
+            signals.push(signal)
+          }
         }
-
-        signals.push(signal)
       }
     }
 
     // Step 6: Generate recommendations
     const recommendations: Recommendation[] = []
+    const gameById = new Map(games.map((game) => [game.game_id, game]))
 
     for (const signal of signals) {
       if (!signal.value_flag) {
@@ -343,8 +401,8 @@ export const NbaAnalysisSkill: Skill = {
         continue
       }
 
-      // Determine action based on edge direction
-      const action = signal.edge > 0 ? "lean_home" : "lean_away"
+      const outcome = signalOutcomes.get(signal.signal_id)
+      const action = deriveAction(signal, outcome, gameById.get(signal.game_id))
 
       // Apply HITL requirement for stake sizing
       const stakeDecision = NbaRuntime.decide({
@@ -355,7 +413,7 @@ export const NbaAnalysisSkill: Skill = {
         recommendation_id: `rec_${signal.signal_id}`,
         signal_id: signal.signal_id,
         action,
-        rationale: `Edge of ${(signal.edge * 100).toFixed(1)}% detected with ${(signal.confidence * 100).toFixed(0)}% confidence. ${signal.stale_blocked ? "BLOCKED: stale data." : ""}`,
+        rationale: `Outcome ${outcome ?? "n/a"}: edge ${(signal.edge * 100).toFixed(1)}% with ${(signal.confidence * 100).toFixed(0)}% confidence. ${signal.stale_blocked ? "BLOCKED: stale data." : ""}`,
         confidence: signal.confidence,
         constraints: {
           hitl_required: stakeDecision.hitlRequired,

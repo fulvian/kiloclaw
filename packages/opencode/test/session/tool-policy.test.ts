@@ -1,16 +1,14 @@
 import { describe, expect, test } from "bun:test"
 import path from "path"
-import { mapKnowledgeCapabilitiesToTools, resolveAgencyAllowedTools } from "../../src/session/tool-policy"
+import {
+  mapKnowledgeCapabilitiesToTools,
+  mapNbaCapabilitiesToTools,
+  resolveAgencyAllowedTools,
+} from "../../src/session/tool-policy"
 
 describe("session.tool-policy", () => {
   test("maps knowledge capabilities to expected tools", () => {
-    const result = mapKnowledgeCapabilitiesToTools([
-      "search",
-      "verification",
-      "synthesis",
-      "web-search",
-      "unknown-cap",
-    ])
+    const result = mapKnowledgeCapabilitiesToTools(["search", "verification", "synthesis", "web-search", "unknown-cap"])
 
     expect(result).toContain("websearch")
     expect(result).toContain("webfetch")
@@ -29,9 +27,9 @@ describe("session.tool-policy", () => {
     expect(result.allowedTools).toEqual([])
   })
 
-  test("returns disabled policy for non-knowledge agency", () => {
+  test("returns disabled policy for unknown agency", () => {
     const result = resolveAgencyAllowedTools({
-      agencyId: "agency-development",
+      agencyId: "agency-unknown",
       enabled: true,
       capabilities: ["search"],
     })
@@ -53,6 +51,29 @@ describe("session.tool-policy", () => {
     expect(result.allowedTools).toContain("skill")
     expect(result.allowedTools).not.toContain("codesearch")
     expect(result.allowedTools).not.toContain("exa_search")
+  })
+
+  test("maps nba capabilities to nba-relevant tools", () => {
+    const mapped = mapNbaCapabilitiesToTools(["schedule_live", "odds_markets", "edge_detection"])
+
+    expect(mapped).toContain("websearch")
+    expect(mapped).toContain("webfetch")
+    expect(mapped).toContain("skill")
+    expect(new Set(mapped).size).toBe(mapped.length)
+  })
+
+  test("enforces nba allowlist with capability expansion", () => {
+    const result = resolveAgencyAllowedTools({
+      agencyId: "agency-nba",
+      enabled: true,
+      capabilities: ["schedule_live", "odds_markets", "edge_detection"],
+    })
+
+    expect(result.enabled).toBe(true)
+    expect(result.allowedTools).toContain("websearch")
+    expect(result.allowedTools).toContain("webfetch")
+    expect(result.allowedTools).toContain("skill")
+    expect(result.allowedTools).not.toContain("codesearch")
   })
 })
 

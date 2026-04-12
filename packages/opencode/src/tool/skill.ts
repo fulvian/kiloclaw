@@ -159,6 +159,8 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
           "",
           "Execution requirements for NBA requests:",
           "- After loading this skill, produce the requested NBA output directly in the same turn.",
+          "- Use websearch first and webfetch second to collect live NBA/odds/injury data before finalizing.",
+          "- If a requested section has no reliable sources, explicitly mark it unavailable (never fabricate).",
           "- Do not ask generic follow-up questions if the user asked for analysis/recommendations.",
           "- Use a best-effort shortlist with explicit assumptions when some inputs are missing.",
           "- If live markets are unavailable, return an empty shortlist with clear blocking reasons.",
@@ -166,9 +168,13 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
           "",
           "Preferred output shape:",
           "1) Shortlist (max 3): game, market, edge %, confidence, concise rationale",
-          "2) Excluded candidates: why they were filtered out",
-          "3) Risk notes: data freshness, injury uncertainty, market drift",
-          "4) HITL note: no automatic execution",
+          "2) Match pack per game: last 5 games, H2H (last 3), projected lineups, injuries, key stats/top scorers",
+          "3) Odds board: multi-bookmaker comparison with timestamps",
+          "4) Value betting: EV estimate and assumptions",
+          "5) Recommended combo/parlay with risk notes and HITL disclaimer",
+          "6) Excluded candidates: why they were filtered out",
+          "7) Risk notes: data freshness, injury uncertainty, market drift",
+          "8) HITL note: no automatic execution",
         ].join("\n")
 
         const content = agencySkill.id === "nba-analysis" ? nbaContent : genericContent

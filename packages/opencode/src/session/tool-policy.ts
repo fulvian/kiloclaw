@@ -1,5 +1,5 @@
 export const KNOWLEDGE_TOOL_ALLOWLIST = ["websearch", "webfetch", "skill"] as const
-export const NBA_TOOL_ALLOWLIST = ["skill"] as const
+export const NBA_TOOL_ALLOWLIST = ["websearch", "webfetch", "skill"] as const
 export const GWORKSPACE_TOOL_ALLOWLIST = [
   "gmail.search",
   "gmail.read",
@@ -44,13 +44,11 @@ export function mapKnowledgeCapabilitiesToTools(capabilities: string[]) {
 
 export function mapNbaCapabilitiesToTools(capabilities: string[]) {
   const tools = capabilities.flatMap((cap) => {
+    if (["schedule_live", "team_player_stats", "injury_status", "odds_markets", "game_preview"].includes(cap)) {
+      return ["websearch", "webfetch", "skill"]
+    }
     if (
       [
-        "schedule_live",
-        "team_player_stats",
-        "injury_status",
-        "odds_markets",
-        "game_preview",
         "probability_estimation",
         "vig_removal",
         "edge_detection",
@@ -60,7 +58,7 @@ export function mapNbaCapabilitiesToTools(capabilities: string[]) {
         "stake_sizing",
       ].includes(cap)
     ) {
-      return ["skill"]
+      return ["skill", "webfetch"]
     }
     return []
   })
@@ -96,10 +94,16 @@ export function mapFinanceCapabilitiesToTools(capabilities: string[]) {
     if (["price.current", "price.historical", "orderbook", "fundamentals", "macro", "filings", "news"].includes(cap))
       return ["finance-api"]
     // Analytics capabilities
-    if (["technical.indicators", "chart.patterns", "factor.analysis", "stress.test", "correlation", "sentiment"].includes(cap))
+    if (
+      ["technical.indicators", "chart.patterns", "factor.analysis", "stress.test", "correlation", "sentiment"].includes(
+        cap,
+      )
+    )
       return ["skill"]
     // Trading Operations
-    if (["signal.generation", "paper.trade", "order.simulation", "execution.assist", "portfolio.rebalance"].includes(cap))
+    if (
+      ["signal.generation", "paper.trade", "order.simulation", "execution.assist", "portfolio.rebalance"].includes(cap)
+    )
       return ["skill"]
     // Risk capabilities
     if (["risk.assessment", "alert.risk"].includes(cap)) return ["skill"]
