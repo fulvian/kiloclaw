@@ -57,6 +57,52 @@ export {
 
 export { YagniSkill, type YagniInput, type YagniOutput, type YagniFinding } from "./development/yagni"
 
+export {
+  PerformanceOptimizationSkill,
+  type PerformanceInput,
+  type PerformanceOutput,
+  type Bottleneck,
+  type OptimizationSuggestion,
+} from "./development/performance-optimization"
+
+export {
+  DatabaseDesignSkill,
+  type DatabaseDesignInput,
+  type DatabaseDesignOutput,
+  type EntityDefinition,
+  type FieldDefinition,
+  type SchemaDefinition,
+  type Relationship,
+} from "./development/database-design"
+
+export {
+  ApiDevelopmentSkill,
+  type ApiDevelopmentInput,
+  type ApiDevelopmentOutput,
+  type ApiSpec,
+  type ResourceDefinition,
+  type Operation,
+  type Endpoint,
+  type SchemaDefinition as ApiSchemaDefinition,
+} from "./development/api-development"
+
+export {
+  VisualCompanionSkill,
+  type VisualCompanionInput,
+  type VisualCompanionOutput,
+  type DesignObservation,
+  type DesignSuggestion,
+} from "./development/visual-companion"
+
+export {
+  SpecDrivenSkill,
+  type SpecDrivenInput,
+  type SpecDrivenOutput,
+  type Specification,
+  type AcceptanceCriterion,
+  type TestCase,
+} from "./development/spec-driven"
+
 // Knowledge Agency Skills
 export {
   WebResearchSkill,
@@ -134,6 +180,11 @@ import { FinishingBranchSkill } from "./development/finishing-branch"
 import { GitWorktreeSkill } from "./development/git-worktree"
 import { AntiPatternsSkill } from "./development/anti-patterns"
 import { YagniSkill } from "./development/yagni"
+import { PerformanceOptimizationSkill } from "./development/performance-optimization"
+import { DatabaseDesignSkill } from "./development/database-design"
+import { ApiDevelopmentSkill } from "./development/api-development"
+import { VisualCompanionSkill } from "./development/visual-companion"
+import { SpecDrivenSkill } from "./development/spec-driven"
 import { WebResearchSkill } from "./knowledge/web-research"
 import { LiteratureReviewSkill } from "./knowledge/literature-review"
 import { FactCheckSkill } from "./knowledge/fact-check"
@@ -161,6 +212,11 @@ export const developmentSkills: Skill[] = [
   GitWorktreeSkill,
   AntiPatternsSkill,
   YagniSkill,
+  PerformanceOptimizationSkill,
+  DatabaseDesignSkill,
+  ApiDevelopmentSkill,
+  VisualCompanionSkill,
+  SpecDrivenSkill,
 ]
 
 // Knowledge agency skills

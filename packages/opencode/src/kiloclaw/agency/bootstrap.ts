@@ -588,6 +588,143 @@ function doBootstrap(): void {
     }
   }
 
+  // Onda 3: Frontend/Data/ML skills
+  // performance-optimization, database-design, api-development, visual-companion, spec-driven-development
+  const onda3SkillAliases: SkillDefinition[] = [
+    {
+      id: "performance-optimization",
+      name: "Performance Optimization",
+      version: "1.0.0",
+      description: "Identify bottlenecks and suggest optimizations for code performance",
+      inputSchema: {
+        type: "object",
+        properties: { code: { type: "string" }, language: { type: "string" }, targetMetric: { type: "string" } },
+        required: ["code"],
+      },
+      outputSchema: {
+        type: "object",
+        properties: {
+          bottlenecks: { type: "array" },
+          suggestions: { type: "array" },
+          estimatedImpact: { type: "object" },
+          summary: { type: "string" },
+        },
+      },
+      capabilities: ["performance-analysis", "bottleneck-detection", "optimization-suggestions"],
+      tags: ["performance", "optimization", "development"],
+    },
+    {
+      id: "database-design",
+      name: "Database Design",
+      version: "1.0.0",
+      description: "Design database schemas with normalization, relationships, and scale recommendations",
+      inputSchema: {
+        type: "object",
+        properties: { entities: { type: "array" }, requirements: { type: "array" }, scale: { type: "string" } },
+        required: ["entities"],
+      },
+      outputSchema: {
+        type: "object",
+        properties: {
+          schema: { type: "object" },
+          relationships: { type: "array" },
+          recommendations: { type: "array" },
+          summary: { type: "string" },
+        },
+      },
+      capabilities: ["database-design", "schema-creation", "normalization", "relationship-mapping"],
+      tags: ["database", "design", "schema"],
+    },
+    {
+      id: "api-development",
+      name: "API Development",
+      version: "1.0.0",
+      description: "Design and generate REST/GraphQL/gRPC API endpoints with schemas",
+      inputSchema: {
+        type: "object",
+        properties: { spec: { type: "object" }, resources: { type: "array" }, style: { type: "string" } },
+        required: ["resources"],
+      },
+      outputSchema: {
+        type: "object",
+        properties: {
+          endpoints: { type: "array" },
+          schemas: { type: "object" },
+          recommendations: { type: "array" },
+          summary: { type: "string" },
+        },
+      },
+      capabilities: ["api-design", "endpoint-generation", "schema-creation", "rest-conventions"],
+      tags: ["api", "development", "rest", "design"],
+    },
+    {
+      id: "visual-companion",
+      name: "Visual Companion",
+      version: "1.0.0",
+      description: "Assist with visual design decisions: layout, color, typography, spacing",
+      inputSchema: {
+        type: "object",
+        properties: { task: { type: "string" }, context: { type: "string" }, code: { type: "string" } },
+        required: ["task"],
+      },
+      outputSchema: {
+        type: "object",
+        properties: {
+          task: { type: "string" },
+          observations: { type: "array" },
+          suggestions: { type: "array" },
+          summary: { type: "string" },
+        },
+      },
+      capabilities: ["visual-design", "layout-analysis", "design-review", "ui-consistency"],
+      tags: ["design", "ui", "visual", "css", "frontend"],
+    },
+    {
+      id: "spec-driven-development",
+      name: "Spec-Driven Development",
+      version: "1.0.0",
+      description: "Create specifications from objectives, then generate test cases and implementation guides",
+      inputSchema: {
+        type: "object",
+        properties: {
+          objective: { type: "string" },
+          constraints: { type: "array" },
+          acceptanceCriteria: { type: "array" },
+        },
+        required: ["objective"],
+      },
+      outputSchema: {
+        type: "object",
+        properties: {
+          specification: { type: "object" },
+          testCases: { type: "array" },
+          implementationGuide: { type: "array" },
+          summary: { type: "string" },
+        },
+      },
+      capabilities: [
+        "specification-creation",
+        "requirement-analysis",
+        "test-case-generation",
+        "implementation-planning",
+      ],
+      tags: ["specification", "tdd", "requirements", "planning"],
+    },
+  ]
+
+  for (const skill of onda3SkillAliases) {
+    try {
+      SkillRegistry.registerSkill(skill)
+      log.debug("skill alias registered", { skillId: skill.id })
+    } catch (error: any) {
+      if (error?.message?.includes("already registered")) {
+        log.debug("skill alias already registered", { skillId: skill.id })
+      } else {
+        log.error("failed to register skill alias", { skillId: skill.id, error: error?.message })
+      }
+    }
+  }
+
   // 3. Register flexible agents
   try {
     registerFlexibleAgents()

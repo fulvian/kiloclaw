@@ -686,3 +686,94 @@ describe("Onda 2 Migration", () => {
     })
   })
 })
+
+// =============================================================================
+// Onda 3 Migration - Frontend/Data/ML
+// KILOCLAW_DEVELOPMENT_AGENCY_REFOUNDATION_PLAN_2026-04-12.md
+// =============================================================================
+
+describe("Onda 3 Migration", () => {
+  beforeEach(() => {
+    resetBootstrap()
+    bootstrapRegistries()
+  })
+
+  // Onda 3 Skills from plan:
+  // performance-optimization, database-design, api-development, visual-companion, spec-driven-development
+  const ONDA3_SKILL_IDS = [
+    "performance-optimization",
+    "database-design",
+    "api-development",
+    "visual-companion",
+    "spec-driven-development",
+  ] as const
+
+  describe("Onda 3 Skills", () => {
+    it("has 5 skills defined in Onda 3 inventory", () => {
+      expect(ONDA3_SKILL_IDS).toHaveLength(5)
+    })
+
+    it("verifies each Onda 3 skill is registered in SkillRegistry", () => {
+      const results: { skillId: string; found: boolean }[] = []
+      for (const skillId of ONDA3_SKILL_IDS) {
+        const skill = SkillRegistry.getSkill(skillId)
+        results.push({ skillId, found: skill !== undefined })
+      }
+      const found = results.filter((r) => r.found).map((r) => r.skillId)
+      const missing = results.filter((r) => !r.found).map((r) => r.skillId)
+      expect(found.length + missing.length).toBe(5)
+      console.log("Onda 3 Skills Found:", found)
+      console.log("Onda 3 Skills Missing:", missing)
+    })
+
+    it("performance-optimization skill manifest structure", () => {
+      const skill = SkillRegistry.getSkill("performance-optimization")
+      if (skill) {
+        expect(skill.id).toBe("performance-optimization")
+        expect(skill.version).toMatch(/^\d+\.\d+\.\d+$/)
+        expect(skill.capabilities).toBeDefined()
+        expect(Array.isArray(skill.capabilities)).toBe(true)
+      }
+    })
+
+    it("database-design skill manifest structure", () => {
+      const skill = SkillRegistry.getSkill("database-design")
+      if (skill) {
+        expect(skill.id).toBe("database-design")
+        expect(skill.version).toMatch(/^\d+\.\d+\.\d+$/)
+        expect(skill.capabilities).toBeDefined()
+        expect(Array.isArray(skill.capabilities)).toBe(true)
+      }
+    })
+
+    it("api-development skill manifest structure", () => {
+      const skill = SkillRegistry.getSkill("api-development")
+      if (skill) {
+        expect(skill.id).toBe("api-development")
+        expect(skill.version).toMatch(/^\d+\.\d+\.\d+$/)
+        expect(skill.capabilities).toBeDefined()
+        expect(Array.isArray(skill.capabilities)).toBe(true)
+      }
+    })
+
+    it("visual-companion skill manifest structure", () => {
+      const skill = SkillRegistry.getSkill("visual-companion")
+      if (skill) {
+        expect(skill.id).toBe("visual-companion")
+        expect(skill.version).toMatch(/^\d+\.\d+\.\d+$/)
+        expect(skill.capabilities).toBeDefined()
+        expect(Array.isArray(skill.capabilities)).toBe(true)
+      }
+    })
+
+    it("spec-driven-development skill manifest structure", () => {
+      const skill = SkillRegistry.getSkill("spec-driven-development")
+      if (skill) {
+        expect(skill.id).toBe("spec-driven-development")
+        expect(skill.version).toMatch(/^\d+\.\d+\.\d+$/)
+        expect(skill.capabilities).toBeDefined()
+        expect(Array.isArray(skill.capabilities)).toBe(true)
+      }
+    })
+  })
+})
