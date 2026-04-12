@@ -611,57 +611,202 @@ Questo protocollo e vincolante per ogni nuova agency e per refactor che cambiano
 
 ## API Keys - Unica Fonte di Verità
 
-Tutte le API keys di KiloClaw sono gestite in un **singolo file**:
+### Principio Fondamentale
+
+**TUTTE le API keys di KiloClaw risiedono in UN SOLO file:**
 
 ```
 ~/.local/share/kiloclaw/.env
 ```
 
-### Struttura
+**Regola Aurea**: Mai nessun'altra chiave API in alcun altro file `.env` nel progetto. Mai esportare chiavi via shell. Mai mettere chiavi hardcoded.
 
-Ogni provider supporta multiple chiavi per key rotation:
+---
+
+### Struttura del File
 
 ```bash
-# Formato: PROVIDER_API_KEY_N (dove N parte da 1)
-TAVILY_API_KEY_1=tvly-xxxxx
-TAVILY_API_KEY_2=tvly-yyyyy
+# Formato standard: PROVIDER_API_KEY_N (N parte da 1, non da 0!)
+PROVIDER_API_KEY_1=chiave_reale
+PROVIDER_API_KEY_2=chiave_reale_2
 
-# OPPURE comma-separated:
-TAVILY_API_KEYS=tvly-xxxxx,tvly-yyyyy
+# OPPURE comma-separated (usi singola variabile):
+PROVIDER_API_KEYS=chiave1,chiave2,chiave3
 ```
 
-### Provider e variabili
+**Regole di naming**:
 
-| Provider                    | Variabili                   | Note                                                 |
-| --------------------------- | --------------------------- | ---------------------------------------------------- |
-| Tavily                      | `TAVILY_API_KEY_1`          | Web search                                           |
-| Brave                       | `BRAVE_API_KEY_1`           | Web search                                           |
-| Firecrawl                   | `FIRECRAWL_API_KEY_1`       | Web scraping                                         |
-| Perplexity                  | `PERPLEXITY_API_KEY_1`      | AI research                                          |
-| Ball Don't Lie              | `BALLDONTLIE_API_KEY_1`     | NBA games/stats                                      |
-| **ODDS API** (odds-api.com) | `ODDS_API_KEY_1`            | Multi-bookmaker: Bet365 + FanDuel + DraftKings + 40+ |
-| **ODDS API** (odds-api.io)  | `ODDS_BET365_API_KEY_1/2/3` | Bet365 dedicated                                     |
-| Parlay API                  | `PARLAY_API_KEY_1/2/3`      | 40+ bookmakers aggregated                            |
-| Polymarket                  | `POLYMARKET_API_KEY_1/2`    | Prediction markets                                   |
+- Il nome del provider deve corrispondere ESATTAMENTE al pool name in `key-pool.ts`
+- Usa `UPPERCASE` per il nome del provider
+- Per provider con nomi composti: `BALLDONTLIE`, `POLYMARKET`, `ODDS_BET365`
+- Gli alias (vedi sezione "Aggiungere un nuovo Provider") sono gestiti nel codice, non nel file `.env`
 
-### Cascata fallback quote bookmaker
+---
+
+### Provider Attuali e Variabili
+
+| Provider       | Pool Name     | Variabili                   | Priorità/Funzione              |
+| -------------- | ------------- | --------------------------- | ------------------------------ |
+| Tavily         | `TAVILY`      | `TAVILY_API_KEY_1`          | Web search                     |
+| Brave          | `BRAVE`       | `BRAVE_API_KEY_1`           | Web search                     |
+| Firecrawl      | `FIRECRAWL`   | `FIRECRAWL_API_KEY_1`       | Web scraping                   |
+| Perplexity     | `PERPLEXITY`  | `PERPLEXITY_API_KEY_1`      | AI research                    |
+| Ball Don't Lie | `BALLDONTLIE` | `BALLDONTLIE_API_KEY_1`     | NBA games/stats                |
+| The Odds API   | `ODDS`        | `ODDS_API_KEY_1`            | Multi-bookmaker (Bet365 + 40+) |
+| ODDS API (io)  | `ODDS_BET365` | `ODDS_BET365_API_KEY_1/2/3` | Bet365 dedicated               |
+| Parlay API     | `PARLAY`      | `PARLAY_API_KEY_1/2/3`      | 40+ bookmakers aggregated      |
+| Polymarket     | `POLYMARKET`  | `POLYMARKET_API_KEY_1/2`    | Prediction markets             |
+
+---
+
+### Cascata Fallback Quote Bookmaker
 
 ```
 ODDS_API (odds-api.com) → ODDS_BET365 (odds-api.io) → PARLAY → ESPN
 ```
 
-**ODDS_API** (odds-api.com) è il provider primario - ha Bet365 + 40+ bookmakers.
+- **ODDS_API** (odds-api.com): Provider PRIMARIO - copre Bet365 + FanDuel + DraftKings + 40+ bookmakers
+- **ODDS_BET365** (odds-api.io): Fallback Bet365 dedicato
+- **PARLAY**: Aggregatore 40+ bookmakers
+- **ESPN**: Ultimo fallback (pubblico, no odds betting)
 
-### Aggiungere una nuova chiave
+---
+
+### Aggiungere una Nuova Chiave (Provider Esistente)
 
 1. Apri `~/.local/share/kiloclaw/.env`
 2. Trova la sezione del provider
-3. Aggiungi la chiave come `PROVIDER_API_KEY_N` (prossimo numero)
-4. Riavvia il CLI - la chiave viene caricata automaticamente
+3. Conta le chiavi esistenti: se hai `KEY_1` e `KEY_2`, aggiungi `KEY_3`
+4. Aggiungi la nuova chiave
+5. Riavvia il CLI - la chiave viene caricata automaticamente
 
-### Caricamento
+**Esempio**: Per aggiungere una seconda chiave a Polymarket:
 
-Il file `.env` viene caricato automaticamente all'avvio del CLI tramite `dotenv` in `packages/opencode/src/index.ts`. Non serve esportare manualmente le variabili.
+```bash
+POLYMARKET_API_KEY_1=3e693d66-...  # esistente
+POLYMARKET_API_KEY_2=0baa5751-...  # esistente
+POLYMARKET_API_KEY_3=NUOVA_CHIAVE_SEGRETA  # <- aggiunta
+```
+
+---
+
+### Aggiungere un Nuovo Provider (Provider Nuovo)
+
+Quando serve un provider NON presente nella lista, ci sono 3 passi:
+
+#### Passo 1: Aggiungi le chiavi in `.env`
+
+```bash
+# Nuovo provider example
+NUWPROVIDER_API_KEY_1=chiave_segreta
+NUWPROVIDER_API_KEY_2=chiave_segreta_2
+```
+
+#### Passo 2: Registra il provider in `key-pool.ts`
+
+In `packages/opencode/src/kiloclaw/agency/key-pool.ts`, nel metodo `loadAllFromEnv()`:
+
+```typescript
+// Aggiungi questo per caricamento automatico
+this.loadKeysFromEnv("NUWPROVIDER", { requestsPerMinute: 60, requestsPerDay: 5000, retryAfterMs: 60000 })
+```
+
+**Regole per i parametri rate limit**:
+
+- `requestsPerMinute`: dipende dal piano API del provider
+- `requestsPerDay`: limite giornaliero del piano
+- `retryAfterMs`: ms di attesa dopo rate limit (default 60000)
+
+#### Passo 3: Verifica il caricamento
+
+```bash
+DOTENV_CONFIG_PATH=/home/fulvio/.local/share/kiloclaw/.env bun -e '
+import { config } from "dotenv"
+config({ path: "/home/fulvio/.local/share/kiloclaw/.env" })
+import { KeyManager } from "./src/kiloclaw/agency/key-pool.ts"
+const km = KeyManager.getInstance()
+km.loadAllFromEnv()
+console.log(JSON.stringify(km.listProviders(), null, 2))
+'
+```
+
+Cerca il nuovo provider nell'output.
+
+---
+
+### Alias Provider (Backward Compatibility)
+
+Il sistema supporta alias per provider con nomi legacy. Gli alias sono definiti nel terzo parametro di `loadKeysFromEnv()`:
+
+```typescript
+this.loadKeysFromEnv("ODDS", { requestsPerMinute: 10 }, [
+  "THE_ODDS", // alias legacy
+  "ODDS_API", // altro nome
+  "API_STORE_ODDS_API", // ancora legacy
+])
+```
+
+Questo significa che nel file `.env` puoi usare TANTI nomi diversi che puntano allo stesso pool:
+
+```bash
+# Tutti questi caricarebbero la stessa chiave nel pool "ODDS":
+ODDS_API_KEY_1=chiave1           # carica in ODDS
+THE_ODDS_API_KEY_1=chiave2       # carica in ODDS (alias)
+```
+
+**Regola**: Usa SEMPRE il nome canonico del provider (quello in tabella) come nome della variabile.
+
+---
+
+### Key Rotation Automatica
+
+Quando hai piu chiavi per un provider, il sistema usa automaticamente la key rotation:
+
+1. `KeyPool.getKey()` restituisce una chiave disponibile a rotazione
+2. Dopo ogni richiesta, la chiave viene marcata come `success` o `rate_limited`
+3. Se una chiave va in cooldown, il sistema usa automaticamente la prossima disponibile
+4. Le chiavi in cooldown vengono automatically riattivate dopo `retryAfterMs`
+
+**Nessuna configurazione extra richiesta** - funziona out-of-the-box con multiple chiavi.
+
+---
+
+### Validazione e Debug
+
+**Verificare chiavi caricate**:
+
+```bash
+# Mostra tutte le chiavi caricate
+km.listProviders()
+# Output: [{provider: "ODDS", keyCount: 3, availableKeys: 3}, ...]
+```
+
+**Verificare salute singola chiave**:
+
+```bash
+km.getAllStats()["ODDS"]
+# Output: {totalKeys: 3, availableKeys: 2, keysAtMinuteLimit: 1, keysInCooldown: [...]}
+```
+
+---
+
+### Caricamento all'Avvio
+
+Il file `.env` viene caricato automaticamente all'avvio del CLI tramite `dotenv` in `packages/opencode/src/index.ts`.
+
+**Non serve**:
+
+- Esportare variabili in shell (`export FOO=bar`)
+- Mettere chiavi in `~/.bashrc` o simili
+- Usare altri file `.env` sparsi nel progetto
+
+**Il percorso** è determinato da (in ordine di priorità):
+
+1. `DOTENV_CONFIG_PATH` se impostato
+2. `XDG_DATA_HOME/kiloclaw/.env` se `XDG_DATA_HOME` è impostato
+3. `$HOME/.local/share/kiloclaw/.env` altrimenti
+
+**Standard**: `~/.local/share/kiloclaw/.env` (XDG_DATA_HOME default)
 
 ---
 
