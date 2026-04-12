@@ -4,9 +4,14 @@
 
 ## Started: 2026-04-02T12:21:02+02:00
 
-## Last Updated: 2026-04-12T10:35:00+02:00
+## Last Updated: 2026-04-12T11:50:00+02:00
 
 ## Current Track: Development Agency Refoundation (2026-04-12)
+
+### Runtime Hardening Update (2026-04-12)
+
+- NBA routing policy hardened to skill-only (`allowedTools=["skill"]`) to prevent generic web tool first-hop.
+- Dev dotenv bootstrap hardened: load `XDG_DATA_HOME/kiloclaw/.env`, then fallback to `~/.local/share/kiloclaw/.env` when present.
 
 ### Wave Progress
 

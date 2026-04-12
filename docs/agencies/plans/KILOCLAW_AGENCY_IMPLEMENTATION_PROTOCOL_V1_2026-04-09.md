@@ -800,13 +800,14 @@ Il file `.env` viene caricato automaticamente all'avvio del CLI tramite `dotenv`
 - Mettere chiavi in `~/.bashrc` o simili
 - Usare altri file `.env` sparsi nel progetto
 
-**Il percorso** è determinato da (in ordine di priorità):
+**Comportamento runtime attuale (`packages/opencode/src/index.ts`)**:
 
-1. `DOTENV_CONFIG_PATH` se impostato
-2. `XDG_DATA_HOME/kiloclaw/.env` se `XDG_DATA_HOME` è impostato
-3. `$HOME/.local/share/kiloclaw/.env` altrimenti
+1. Carica prima `XDG_DATA_HOME/kiloclaw/.env` se `XDG_DATA_HOME` è impostato.
+2. Se il path precedente è diverso dallo standard home e `~/.local/share/kiloclaw/.env` esiste, lo carica come fallback con `override: false`.
 
-**Standard**: `~/.local/share/kiloclaw/.env` (XDG_DATA_HOME default)
+Questo evita il caso `bun run dev` con runtime XDG isolato (`.kiloclaw-runtime/...`) dove il file locale è vuoto ma le chiavi reali sono in `~/.local/share/kiloclaw/.env`.
+
+**Standard consigliato (single source of truth)**: `~/.local/share/kiloclaw/.env`
 
 ---
 
@@ -822,7 +823,7 @@ I test runtime catturano failure che i test statici non possono rilevare:
 - La policy tool viene applicata correttamente dal session layer
 - Il routing L0-L3 produce i tool corretti in condizioni reali
 - I log mostrano `policyEnforced=true` e `blockedTools` corretti
-- Il modello NON usa tool non permessi (es. `websearch` per agency-nba)
+- Il modello NON usa tool non permessi (es. `websearch`/`webfetch` per agency-nba)
 
 ### Comando di test obbligatorio
 
@@ -833,16 +834,17 @@ bun run dev -- --print-logs --log-level DEBUG run "Analizza le partite NBA di st
 
 ### Criteri di passaggio (obbligatori, tutti devono essere verdi)
 
-| #   | Criterio                                   | Log pattern da cercare                                                        |
-| --- | ------------------------------------------ | ----------------------------------------------------------------------------- |
-| 1   | Agency routed a quella corretta            | `agencyId=agency-[dominio]`                                                   |
-| 2   | Confidence >= 40%                          | `confidence=0.x`                                                              |
-| 3   | Policy tool enforce = true                 | `policyEnforced=true`                                                         |
-| 4   | allowedTools contiene solo i tool permessi | `allowedTools=["webfetch","skill"]` (NBA)                                     |
-| 5   | websearch/blocced_tools NON invocato       | `blockedTools=.*websearch.*` presente + nessun `tool call.*websearch` nei log |
-| 6   | Capability L1 corrette                     | `capabilities=["nba_analysis","schedule_live",...]`                           |
-| 7   | Nessun `no tools resolved by policy`       | assente nei log                                                               |
-| 8   | Fallback NOT used                          | `fallbackUsed=false`                                                          |
+| #   | Criterio                                   | Log pattern da cercare                                                           |
+| --- | ------------------------------------------ | -------------------------------------------------------------------------------- |
+| 1   | Agency routed a quella corretta            | `agencyId=agency-[dominio]`                                                      |
+| 2   | Confidence >= 40%                          | `confidence=0.x`                                                                 |
+| 3   | Policy NBA skill-only applicata            | `allowedTools=["skill"]` e `blockedTools` contiene `webfetch`,`websearch`        |
+| 4   | Policy tool enforce = true                 | `policyEnforced=true`                                                            |
+| 5   | allowedTools contiene solo i tool permessi | `allowedTools=["skill"]` (NBA)                                                   |
+| 6   | websearch/webfetch bloccati e non invocati | `blockedTools` contiene `websearch`,`webfetch` + nessun `tool call` su quei tool |
+| 7   | Capability L1 corrette                     | `capabilities=["nba_analysis","schedule_live",...]`                              |
+| 8   | Nessun `no tools resolved by policy`       | assente nei log                                                                  |
+| 9   | Fallback NOT usato in L3                   | `L3.fallbackUsed=false`                                                          |
 
 ### Evidenze richieste per G6
 
