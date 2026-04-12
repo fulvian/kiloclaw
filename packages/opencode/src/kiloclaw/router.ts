@@ -340,6 +340,98 @@ const DOMAIN_KEYWORDS: Record<string, string[]> = {
     "parlay",
     "acca",
   ],
+  finance: [
+    // English - Stocks/ETF/Crypto
+    "stock",
+    "stocks",
+    "etf",
+    "etfs",
+    "crypto",
+    "cryptocurrency",
+    "bitcoin",
+    "ethereum",
+    "trading",
+    "trader",
+    "market",
+    "markets",
+    "price",
+    "prices",
+    "quote",
+    "quotes",
+    "ticker",
+    "dividend",
+    "earnings",
+    "revenue",
+    "profit",
+    "loss",
+    "portfolio",
+    "investment",
+    "invest",
+    "investing",
+    "bull",
+    "bear",
+    "bullish",
+    "bearish",
+    "long",
+    "short",
+    "position",
+    "signal",
+    "signals",
+    "technical",
+    "chart",
+    "analysis",
+    "analyst",
+    "fintech",
+    "financial",
+    "finance",
+    // Italian - Stocks/Crypto
+    "azion",
+    "azioni",
+    "quotazione",
+    "quotazioni",
+    "criptovaluta",
+    "criptovalute",
+    "trading",
+    "trader",
+    "mercato",
+    "mercati",
+    "prezzo",
+    "prezzi",
+    "investimento",
+    "investimenti",
+    "portafoglio",
+    "analisi",
+    "finanza",
+    "finanziario",
+    "borsa",
+    "listino",
+    "titoli",
+    "obbligazioni",
+    "bond",
+    "forex",
+    "valute",
+    // Trading specific
+    "buy",
+    "sell",
+    "order",
+    "orders",
+    "bid",
+    "ask",
+    "spread",
+    "volume",
+    "liquidity",
+    "leverage",
+    "margin",
+    "stop loss",
+    "take profit",
+    "paper trade",
+    "backtest",
+    "strategy",
+    "rsi",
+    "macd",
+    "moving average",
+    "bollinger",
+  ],
   custom: [],
 }
 
@@ -423,6 +515,28 @@ export const Router = {
         "foglio",
         "cartella",
       ],
+      finance: [
+        "stock",
+        "stocks",
+        "etf",
+        "crypto",
+        "bitcoin",
+        "trading",
+        "market",
+        "price",
+        "quote",
+        "portfolio",
+        "investment",
+        "signal",
+        "technical",
+        "azion",
+        "azioni",
+        "criptovaluta",
+        "finanza",
+        "mercato",
+        "prezzo",
+        "trading",
+      ],
     }
 
     // Calculate keyword match score
@@ -480,7 +594,15 @@ export const Router = {
                         type.includes("game") ||
                         type.includes("score"))
                     ? 0.25
-                    : 0
+                    : domain === "finance" &&
+                        (type.includes("stock") ||
+                          type.includes("trading") ||
+                          type.includes("crypto") ||
+                          type.includes("market") ||
+                          type.includes("price") ||
+                          type.includes("investment"))
+                      ? 0.25
+                      : 0
       return Math.min(1, base + coreBonus + typeBoost)
     }
 
@@ -501,7 +623,7 @@ export const Router = {
 
         // Calculate scores for each domain
         const scores: DomainScore[] = (
-          ["development", "knowledge", "nutrition", "weather", "gworkspace", "nba", "custom"] as string[]
+          ["development", "knowledge", "nutrition", "weather", "gworkspace", "nba", "finance", "custom"] as string[]
         ).map((domain) => {
           const keywordScoreValue = keywordScore(intent, domain)
           const reasons: string[] = []

@@ -1075,6 +1075,54 @@ export namespace SessionPrompt {
             "Available tools: MCP tools for Gmail, Drive, Calendar, Docs, Sheets (requires approval for send/create/update operations).",
             "",
           ].join("\n")
+        } else if (agencyContext.agencyId === "agency-finance") {
+          agencyBlock = [
+            "",
+            "<!-- Agency Context: Finance Agency -->",
+            "This conversation has been routed to the Finance Agency.",
+            `Routing confidence: ${Math.round(agencyContext.confidence * 100)}%`,
+            `Routing reason: ${agencyContext.reason}`,
+            `Routing source: ${agencyContext.routeSource}`,
+            ...(agencyContext.fallbackUsed ? [`Routing fallback: ${agencyContext.fallbackReason ?? "none"}`] : []),
+            ...(agencyContext.layers?.L1
+              ? [
+                  `L1 capabilities: ${agencyContext.layers.L1.capabilities.join(", ") || "none"}`,
+                  `L1 route type: ${agencyContext.layers.L1.routeResult?.type ?? "fallback"}`,
+                ]
+              : []),
+            ...(agencyContext.layers?.L2
+              ? [
+                  `L2 agent: ${agencyContext.layers.L2.agentId ?? "none"}`,
+                  `L2 health: ${agencyContext.layers.L2.agentHealth}`,
+                ]
+              : []),
+            ...(agencyContext.layers?.L3
+              ? [
+                  `L3 tools denied: ${agencyContext.layers.L3.toolsDenied}`,
+                  `L3 fallback used: ${agencyContext.layers.L3.fallbackUsed}`,
+                ]
+              : []),
+            "",
+            "CRITICAL TOOL INSTRUCTIONS:",
+            "- For financial data queries: use ONLY the 'finance-api' tool with the 'skill' tool for finance skills",
+            "- 'finance-api' provides access to: CoinGecko, Binance, Yahoo Finance, Finnhub, FRED, SEC EDGAR",
+            "- DO NOT use websearch or webfetch for market data - use the Finance Agency data providers",
+            "- DO NOT make up stock prices, cryptocurrency values, or financial statistics",
+            "- DO NOT suggest real-money trades without HITL approval",
+            "- DO NOT provide financial advice - always show uncertainty and disclaimer",
+            "- After loading finance skills, answer the user's requested output directly",
+            "- All trading recommendations require human approval (HITL) before execution",
+            "",
+            "FINANCE AGENCY SKILLS:",
+            "- For market data: use finance-market-data skill",
+            "- For technical analysis: use finance-technical-analysis skill",
+            "- For risk assessment: use finance-risk-engine skill",
+            "- For signal generation: use finance-signal-generation skill (requires confirmation)",
+            "",
+            "⚠️ DISCLAIMER: This content is for informational purposes only and does not constitute financial advice.",
+            "Past performance is not indicative of future results. Investing involves risk of loss.",
+            "",
+          ].join("\n")
         }
 
         if (agencyBlock) {

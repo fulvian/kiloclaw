@@ -30,6 +30,8 @@ export const DEVELOPMENT_TOOL_ALLOWLIST = [
   "webfetch",
 ] as const
 
+export const FINANCE_TOOL_ALLOWLIST = ["finance-api", "skill", "websearch", "webfetch"] as const
+
 export function mapKnowledgeCapabilitiesToTools(capabilities: string[]) {
   const tools = capabilities.flatMap((cap) => {
     if (["search", "web-search", "academic-research"].includes(cap)) return ["websearch"]
@@ -88,6 +90,26 @@ export function mapDevelopmentCapabilitiesToTools(capabilities: string[]) {
   return Array.from(new Set(tools))
 }
 
+export function mapFinanceCapabilitiesToTools(capabilities: string[]) {
+  const tools = capabilities.flatMap((cap) => {
+    // Data Ingestion capabilities
+    if (["price.current", "price.historical", "orderbook", "fundamentals", "macro", "filings", "news"].includes(cap))
+      return ["finance-api"]
+    // Analytics capabilities
+    if (["technical.indicators", "chart.patterns", "factor.analysis", "stress.test", "correlation", "sentiment"].includes(cap))
+      return ["skill"]
+    // Trading Operations
+    if (["signal.generation", "paper.trade", "order.simulation", "execution.assist", "portfolio.rebalance"].includes(cap))
+      return ["skill"]
+    // Risk capabilities
+    if (["risk.assessment", "alert.risk"].includes(cap)) return ["skill"]
+    // Reporting
+    if (["watchlist.view", "journal.entry", "report.generate"].includes(cap)) return ["skill"]
+    return []
+  })
+  return Array.from(new Set(tools))
+}
+
 export function resolveAgencyAllowedTools(input: {
   agencyId?: string | null
   enabled: boolean
@@ -130,6 +152,15 @@ export function resolveAgencyAllowedTools(input: {
   if (input.agencyId === "agency-development") {
     const mapped = mapDevelopmentCapabilitiesToTools(input.capabilities ?? [])
     const allowedTools = Array.from(new Set([...DEVELOPMENT_TOOL_ALLOWLIST, ...mapped]))
+    return {
+      enabled: true,
+      allowedTools,
+    }
+  }
+
+  if (input.agencyId === "agency-finance") {
+    const mapped = mapFinanceCapabilitiesToTools(input.capabilities ?? [])
+    const allowedTools = Array.from(new Set([...FINANCE_TOOL_ALLOWLIST, ...mapped]))
     return {
       enabled: true,
       allowedTools,

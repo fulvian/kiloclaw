@@ -166,6 +166,53 @@ const agencyDefinitions: AgencyDefinition[] = [
     providers: ["espn", "balldontlie", "odds_api", "odds_bet365", "parlay", "polymarket", "nba_api"],
     metadata: { wave: 3, description: "NBA data ingestion, probability analytics, and guarded recommendations" },
   },
+  {
+    id: "agency-finance",
+    name: "Finance Agency",
+    domain: "finance",
+    policies: {
+      allowedCapabilities: [
+        // Data Ingestion
+        "price.current",
+        "price.historical",
+        "orderbook",
+        "fundamentals",
+        "macro",
+        "filings",
+        "news",
+        // Analytics
+        "technical.indicators",
+        "chart.patterns",
+        "factor.analysis",
+        "stress.test",
+        "correlation",
+        "sentiment",
+        // Trading Operations
+        "signal.generation",
+        "paper.trade",
+        "order.simulation",
+        "execution.assist",
+        "portfolio.rebalance",
+        "alert.risk",
+        // Reporting
+        "watchlist.view",
+        "journal.entry",
+        "report.generate",
+      ],
+      deniedCapabilities: [
+        "real.execution",
+        "leverage.extreme",
+        "risk.limit.bypass",
+        "market.manipulation",
+        "insider.info",
+      ],
+      maxRetries: 3,
+      requiresApproval: true,
+      dataClassification: "confidential",
+    },
+    providers: ["coingecko", "binance", "yahoo_finance", "finnhub", "fred", "sec_edgar", "alpaca", "hyperliquid"],
+    metadata: { wave: 4, description: "Multi-asset financial analysis, trading signals, and risk assessment" },
+  },
 ]
 
 // Pre-defined skill chains for knowledge agency

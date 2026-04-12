@@ -583,6 +583,187 @@ function bootstrapNbaCapabilities(): void {
 }
 
 /**
+ * Bootstrap Finance agency capabilities
+ */
+function bootstrapFinanceCapabilities(): void {
+  const registry = getCapabilityRegistry()
+
+  const capabilities = [
+    // Data Ingestion
+    {
+      id: "finance_price_current",
+      domain: "finance" as Domain,
+      description: "Get current price for stocks, ETFs, crypto, forex, commodities",
+      keywords: [
+        "price",
+        "current",
+        "stock",
+        "crypto",
+        "bitcoin",
+        "ethereum",
+        "azion",
+        "ETF",
+        "quotazione",
+        "prezzo",
+        "trading",
+        "market",
+        "ticker",
+      ],
+      capabilities: ["price.current"],
+    },
+    {
+      id: "finance_price_historical",
+      domain: "finance" as Domain,
+      description: "Get historical price data for technical analysis",
+      keywords: [
+        "historical",
+        "history",
+        "chart",
+        " candles",
+        "timeframe",
+        "daily",
+        "weekly",
+        "monthly",
+        "storico",
+      ],
+      capabilities: ["price.historical"],
+    },
+    {
+      id: "finance_orderbook",
+      domain: "finance" as Domain,
+      description: "Get order book data for crypto exchanges",
+      keywords: ["orderbook", "bid", "ask", "depth", "liquidity", "libro ordini"],
+      capabilities: ["orderbook"],
+    },
+    {
+      id: "finance_fundamentals",
+      domain: "finance" as Domain,
+      description: "Get fundamental data: earnings, revenue, P/E ratio, book value",
+      keywords: [
+        "fundamental",
+               "earnings",
+        "revenue",
+        "pe ratio",
+        "book value",
+        "dividend",
+        "fondamentale",
+        "utili",
+      ],
+      capabilities: ["fundamentals"],
+    },
+    {
+      id: "finance_macro",
+      domain: "finance" as Domain,
+      description: "Get macroeconomic indicators: GDP, CPI, interest rates",
+      keywords: [
+        "macro",
+        "gdp",
+        "cpi",
+        "inflation",
+        "interest rate",
+        "unemployment",
+        "economico",
+        "macro",
+      ],
+      capabilities: ["macro"],
+    },
+    {
+      id: "finance_filings",
+      domain: "finance" as Domain,
+      description: "Get SEC filings: 10-K, 10-Q, 8-K, annual reports",
+      keywords: ["sec", "filing", "10-k", "10-q", "8-k", "annual report", "sec edgar"],
+      capabilities: ["filings"],
+    },
+    {
+      id: "finance_news",
+      domain: "finance" as Domain,
+      description: "Get financial news and market sentiment",
+      keywords: ["news", "market news", "financial news", "sentiment", "notizie", "mercati"],
+      capabilities: ["news"],
+    },
+    // Analytics
+    {
+      id: "finance_technical",
+      domain: "finance" as Domain,
+      description: "Technical analysis with RSI, MACD, moving averages, Bollinger bands",
+      keywords: [
+        "technical",
+        "rsi",
+        "macd",
+        "moving average",
+        "bollinger",
+        "indicators",
+        "analisi tecnica",
+        "indicatori",
+      ],
+      capabilities: ["technical.indicators"],
+    },
+    {
+      id: "finance_patterns",
+      domain: "finance" as Domain,
+      description: "Chart pattern recognition: support, resistance, trends",
+      keywords: [
+        "pattern",
+        "chart pattern",
+        "support",
+        "resistance",
+        "trend",
+        "pattern grafici",
+        "supporto",
+        "resistenza",
+      ],
+      capabilities: ["chart.patterns"],
+    },
+    {
+      id: "finance_signal",
+      domain: "finance" as Domain,
+      description: "Generate trading signals with confidence scoring",
+      keywords: [
+        "signal",
+        "trading signal",
+        "buy",
+        "sell",
+        "long",
+        "short",
+        "segnale",
+        "acquisto",
+        "vendita",
+      ],
+      capabilities: ["signal.generation"],
+    },
+    {
+      id: "finance_risk",
+      domain: "finance" as Domain,
+      description: "Risk assessment and portfolio analysis",
+      keywords: [
+        "risk",
+        "portfolio",
+        "VaR",
+        "drawdown",
+        "Sharpe",
+        "rischio",
+        "portfolio",
+        "esposizione",
+      ],
+      capabilities: ["risk.assessment"],
+    },
+  ]
+
+  for (const cap of capabilities) {
+    try {
+      registry.register({
+        ...cap,
+        metadata: { source: "bootstrap", domain: "finance" },
+      })
+    } catch (err) {
+      // Skip if already exists
+    }
+  }
+
+  log.info("finance capabilities bootstrapped", { count: capabilities.length })
+}
+
+/**
  * Bootstrap all default capabilities
  */
 export function bootstrapAllCapabilities(): void {
@@ -592,6 +773,7 @@ export function bootstrapAllCapabilities(): void {
   bootstrapWeatherCapabilities()
   bootstrapGWorkspaceCapabilities()
   bootstrapNbaCapabilities()
+  bootstrapFinanceCapabilities()
 
   log.info("all default capabilities bootstrapped", {
     total: getCapabilityRegistry().size(),
