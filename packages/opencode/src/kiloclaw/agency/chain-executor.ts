@@ -57,17 +57,17 @@ export interface ChainStepResult {
 const skillRegistry: Record<string, Skill> = {
   // Knowledge skills
   "web-research": WebResearchSkill,
-  "synthesis": SynthesisSkill,
+  synthesis: SynthesisSkill,
   "fact-check": FactCheckSkill,
   "literature-review": LiteratureReviewSkill,
   "critical-analysis": CriticalAnalysisSkill,
   // Development skills
   "code-review": CodeReviewSkill,
-  "debugging": DebuggingSkill,
-  "tdd": TddSkill,
-  "comparison": ComparisonSkill,
+  debugging: DebuggingSkill,
+  tdd: TddSkill,
+  comparison: ComparisonSkill,
   "document-analysis": DocumentAnalysisSkill,
-  "simplification": SimplificationSkill,
+  simplification: SimplificationSkill,
   // Nutrition skills
   "diet-plan": DietPlanSkill,
   "nutrition-analysis": NutritionAnalysisSkill,
@@ -79,17 +79,13 @@ const skillRegistry: Record<string, Skill> = {
   "weather-current": WeatherCurrentSkill,
 }
 
-// Get a skill by ID
-function getSkill(skillId: string): Skill | undefined {
+// Get a skill by ID (exported for use by execution-bridge)
+export function getSkill(skillId: string): Skill | undefined {
   return skillRegistry[skillId]
 }
 
 // Execute a single step
-async function executeStep(
-  step: SkillChainStep,
-  input: unknown,
-  context: SkillContext,
-): Promise<ChainStepResult> {
+async function executeStep(step: SkillChainStep, input: unknown, context: SkillContext): Promise<ChainStepResult> {
   const start = Date.now()
   const skill = getSkill(step.skillId)
 
@@ -223,7 +219,7 @@ export async function executeBestChain(
     "web-research": ["search", "information_gathering"],
     "academic-research": ["paper_search", "academic_research"],
     "fact-checking": ["fact-checking", "verification"],
-    "synthesis": ["synthesis", "multi_doc"],
+    synthesis: ["synthesis", "multi_doc"],
     "literature-review": ["paper_search", "academic_research"],
   }
 

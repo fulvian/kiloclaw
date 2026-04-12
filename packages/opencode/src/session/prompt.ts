@@ -50,7 +50,9 @@ import { PlanFollowup } from "@/kilocaw-legacy/plan-followup" // kilocode_change
 import { environmentDetails } from "@/kilocaw-legacy/editor-context" // kilocode_change
 import { CoreOrchestrator } from "../kiloclaw/orchestrator" // kilocode_change - agency routing
 import { RoutingPipeline, type PipelineResult } from "@/kiloclaw/agency/routing/pipeline"
-import { resolveAgencyAllowedTools } from "./tool-policy"
+import { resolveAgencyAllowedTools, getAgencyCanonicalToolIds, isCanonicalAlias } from "./tool-policy"
+import { ToolIdentityResolver } from "./tool-identity-resolver"
+import { RuntimeRemediationMetrics } from "@/kiloclaw/telemetry/runtime-remediation.metrics"
 
 // @ts-ignore
 globalThis.AI_SDK_LOG_WARNINGS = false
@@ -1403,6 +1405,11 @@ export namespace SessionPrompt {
     const blockedTools: string[] = []
     const allowedTools: string[] = []
 
+    // kilocode_change start - pass routeResult to tool context for telemetry correlation
+    // routeResult contains the L1 routing decision (type: "skill" | "chain" | "agent", skill, confidence, etc.)
+    // Filter out null to match RouteResult | undefined type
+    const routeResult = input.agencyContext?.layers?.L1?.routeResult ?? undefined
+
     const context = (args: any, options: ToolCallOptions): Tool.Context => ({
       sessionID: input.session.id,
       abort: options.abortSignal!,
@@ -1411,6 +1418,7 @@ export namespace SessionPrompt {
       extra: { model: input.model, bypassAgentCheck: input.bypassAgentCheck },
       agent: input.agent.name,
       messages: input.messages,
+      routeResult, // kilocode_change - L1 routing decision for telemetry correlation
       metadata: async (val: { title?: string; metadata?: any }) => {
         const match = input.processor.partFromToolCall(options.toolCallId)
         if (match && match.state.status === "running") {
@@ -1437,6 +1445,7 @@ export namespace SessionPrompt {
         })
       },
     })
+    // kilocode_change end
 
     for (const item of await ToolRegistry.tools(
       { modelID: input.model.api.id, providerID: input.model.providerID },
@@ -1494,9 +1503,47 @@ export namespace SessionPrompt {
     for (const [key, item] of Object.entries(await MCP.tools())) {
       const execute = item.execute
       if (!execute) continue
-      if (agencyTools.enabled && !agencyTools.allowedTools.includes(key)) {
-        blockedTools.push(key)
-        continue
+      // P0: Use ToolIdentityResolver for policy binding
+      // MCP keys are sanitized format (e.g., "google_workspace_search_gmail_messages")
+      // Policy allowlist uses canonical aliases (e.g., "gmail.search")
+      // We need to resolve whether this MCP key is allowed via alias mapping
+      if (agencyTools.enabled) {
+        // Check if this MCP key's canonical alias is in allowlist
+        // Try to find an allowed alias that resolves to this runtime key
+        let isAllowed = agencyTools.allowedTools.includes(key) // Direct match (native-like keys)
+        if (!isAllowed && enabledAgency) {
+          // Check if any allowed alias maps to this MCP key
+          for (const alias of agencyTools.allowedTools) {
+            const result = ToolIdentityResolver.resolve(alias, enabledAgency)
+            if (result.resolved && result.runtimeKey === key) {
+              isAllowed = true
+              break
+            }
+          }
+        }
+        if (!isAllowed) {
+          blockedTools.push(key)
+          // P0: Telemetry for blocked tool
+          RuntimeRemediationMetrics.recordToolPolicyDecision({
+            correlationId: input.session.id,
+            agencyId: enabledAgency || "unknown",
+            tool: key,
+            toolType: "mcp",
+            decision: "blocked",
+            reason: "not in agency policy allowlist after alias resolution",
+          })
+          RuntimeRemediationMetrics.incrementToolPolicyBlocked()
+          continue
+        }
+        // P0: Telemetry for allowed tool
+        RuntimeRemediationMetrics.recordToolPolicyDecision({
+          correlationId: input.session.id,
+          agencyId: enabledAgency || "unknown",
+          tool: key,
+          toolType: "mcp",
+          decision: "allowed",
+        })
+        RuntimeRemediationMetrics.incrementToolPolicyAllowed()
       }
       allowedTools.push(key)
 

@@ -8,6 +8,11 @@ import { Ripgrep } from "../file/ripgrep"
 import { iife } from "@/util/iife"
 import { knowledgeSkills, developmentSkills, nutritionSkills, weatherSkills, nbaSkills } from "../kiloclaw/skills" // kilocode_change - agency skills
 import type { Skill as KiloclawSkill } from "../kiloclaw/skill" // kilocode_change
+import { SKILL_TOOL_EXECUTE_MODE_ENABLED, SKILL_NO_SILENT_FALLBACK_ENABLED } from "../session/runtime-flags" // kilocode_change - P1 skill execute mode
+import { RuntimeRemediationMetrics } from "@/kiloclaw/telemetry/runtime-remediation.metrics" // kilocode_change - P1 telemetry
+import { executeSkill } from "../kiloclaw/agency/execution-bridge" // kilocode_change - P1 execution bridge
+import { Session } from "../session" // kilocode_change - to get user messages
+import { MessageV2 } from "../session/message-v2" // kilocode_change - to get message parts
 
 const BUILTIN = Skill.BUILTIN_LOCATION // kilocode_change
 
@@ -122,12 +127,20 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
 
   const parameters = z.object({
     name: z.string().describe(`The name of the skill from available_skills${hint}`),
+    mode: z
+      .enum(["load", "execute"])
+      .optional()
+      .describe("Mode: 'load' returns skill content only (documental), 'execute' triggers actual skill execution"),
   })
 
   return {
     description,
     parameters,
     async execute(params: z.infer<typeof parameters>, ctx) {
+      // P1: Distinguish load-skill (documental) vs execute-skill (operational)
+      const isExecuteMode = params.mode === "execute" || SKILL_TOOL_EXECUTE_MODE_ENABLED()
+      const noSilentFallback = SKILL_NO_SILENT_FALLBACK_ENABLED()
+
       // kilocode_change start - check for agency skills first
       const allKiloclawSkills = [
         ...knowledgeSkills,
@@ -200,20 +213,106 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
                 : "nba"
         const skillName = agencySkill.id as string // Cast branded SkillId to string
 
+        // P1: Build skill output
+        const skillOutput = [
+          `<skill_content name="${agencySkill.id}">`,
+          `# Agency Skill: ${agencySkill.id}`,
+          "",
+          content,
+          "",
+          `This is a ${agencyType === "knowledge" ? "Knowledge" : agencyType === "development" ? "Development" : agencyType === "nutrition" ? "Nutrition" : agencyType === "weather" ? "Weather" : "NBA"} Agency skill.`,
+          "</skill_content>",
+        ].join("\n")
+
+        // P1: Telemetry - record skill loaded
+        RuntimeRemediationMetrics.recordAgencyChainStarted({
+          correlationId: ctx.sessionID ?? "unknown",
+          agencyId: agencyType,
+          skill: agencySkill.id,
+        })
+        RuntimeRemediationMetrics.incrementAgencyChainStarted()
+
+        // P1: Guardrail - if execute mode not enabled, warn about load-only behavior
+        if (!isExecuteMode && noSilentFallback) {
+          RuntimeRemediationMetrics.recordSkillLoadedNotExecuted({
+            correlationId: ctx.sessionID ?? "unknown",
+            agencyId: agencyType,
+            skill: agencySkill.id,
+            reason: "skill tool in load-only mode; set mode=execute for operational execution",
+          })
+          RuntimeRemediationMetrics.incrementSkillLoadedNotExecuted()
+        }
+
+        // P1: If execute mode enabled, call the execution bridge
+        if (isExecuteMode) {
+          // Get user's message to extract skill input
+          let userInput: unknown = {}
+          try {
+            const msgs = await Session.messages({ sessionID: ctx.sessionID })
+            const lastUserMsg = msgs.findLast((m: any) => m.info.role === "user")
+            if (lastUserMsg) {
+              const textParts = lastUserMsg.parts
+                .filter((p: any) => p.type === "text" && !p.ignored && !p.synthetic)
+                .map((p: any) => p.text)
+                .join(" ")
+                .trim()
+              userInput = { query: textParts, sources: 5 }
+            }
+          } catch (err) {
+            // If we can't get user message, use empty input
+            userInput = {}
+          }
+
+          // Call the execution bridge
+          const bridgeConfig = {
+            maxSteps: 10,
+            timeoutMs: 60000,
+            correlationId: ctx.sessionID ?? `skill-${Date.now()}`,
+            agencyId: agencyType,
+          }
+
+          const bridgeResult = await executeSkill(agencySkill.id as string, userInput, bridgeConfig)
+
+          if (bridgeResult.success) {
+            // Return the actual execution result
+            return {
+              title: `Executed skill: ${agencySkill.id}`,
+              output: bridgeResult.output !== undefined ? String(bridgeResult.output) : "Skill executed successfully",
+              metadata: {
+                name: skillName,
+                dir: BUILTIN,
+                skillExecuted: true,
+                success: true,
+                stepsExecuted: bridgeResult.stepsExecuted,
+                durationMs: bridgeResult.durationMs,
+              },
+            } as any
+          } else {
+            // Bridge execution failed - fall back to load mode
+            return {
+              title: `Skill execution failed: ${agencySkill.id}`,
+              output: skillOutput,
+              metadata: {
+                name: skillName,
+                dir: BUILTIN,
+                skillExecuted: false,
+                success: false,
+                errorMessage: bridgeResult.error,
+                fallbackToLoadMode: true,
+              },
+            } as any
+          }
+        }
+
         return {
           title: `Loaded agency skill: ${agencySkill.id}`,
-          output: [
-            `<skill_content name="${agencySkill.id}">`,
-            `# Agency Skill: ${agencySkill.id}`,
-            "",
-            content,
-            "",
-            `This is a ${agencyType === "knowledge" ? "Knowledge" : agencyType === "development" ? "Development" : agencyType === "nutrition" ? "Nutrition" : agencyType === "weather" ? "Weather" : "NBA"} Agency skill.`,
-            "</skill_content>",
-          ].join("\n"),
+          output: skillOutput,
           metadata: {
             name: skillName,
             dir: BUILTIN,
+            // P1: Flag to indicate this skill is loaded but not executed (documental mode)
+            // This prevents downstream code from treating this as a completed operational step
+            ...(isExecuteMode ? {} : { skillLoadedNotExecuted: true }),
           },
         }
       }
@@ -235,6 +334,25 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
 
       // kilocode_change start - built-in skills have no filesystem directory
       if (skill.location === BUILTIN) {
+        // P1: Telemetry for built-in skill load
+        RuntimeRemediationMetrics.recordAgencyChainStarted({
+          correlationId: ctx.sessionID ?? "unknown",
+          agencyId: "standard",
+          skill: skill.name,
+        })
+        RuntimeRemediationMetrics.incrementAgencyChainStarted()
+
+        // P1: Guardrail for built-in skills
+        if (!isExecuteMode && noSilentFallback) {
+          RuntimeRemediationMetrics.recordSkillLoadedNotExecuted({
+            correlationId: ctx.sessionID ?? "unknown",
+            agencyId: "standard",
+            skill: skill.name,
+            reason: "skill tool in load-only mode; set mode=execute for operational execution",
+          })
+          RuntimeRemediationMetrics.incrementSkillLoadedNotExecuted()
+        }
+
         return {
           title: `Loaded skill: ${skill.name}`,
           output: [
@@ -247,6 +365,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
           metadata: {
             name: skill.name,
             dir: BUILTIN,
+            ...(isExecuteMode ? {} : { skillLoadedNotExecuted: true }),
           },
         }
       }
@@ -275,6 +394,25 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
         return arr
       }).then((f) => f.map((file) => `<file>${file}</file>`).join("\n"))
 
+      // P1: Telemetry for filesystem skill load
+      RuntimeRemediationMetrics.recordAgencyChainStarted({
+        correlationId: ctx.sessionID ?? "unknown",
+        agencyId: "standard",
+        skill: skill.name,
+      })
+      RuntimeRemediationMetrics.incrementAgencyChainStarted()
+
+      // P1: Guardrail for filesystem skills
+      if (!isExecuteMode && noSilentFallback) {
+        RuntimeRemediationMetrics.recordSkillLoadedNotExecuted({
+          correlationId: ctx.sessionID ?? "unknown",
+          agencyId: "standard",
+          skill: skill.name,
+          reason: "skill tool in load-only mode; set mode=execute for operational execution",
+        })
+        RuntimeRemediationMetrics.incrementSkillLoadedNotExecuted()
+      }
+
       return {
         title: `Loaded skill: ${skill.name}`,
         output: [
@@ -295,6 +433,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
         metadata: {
           name: skill.name,
           dir,
+          ...(isExecuteMode ? {} : { skillLoadedNotExecuted: true }),
         },
       }
     },

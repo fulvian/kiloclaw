@@ -3,6 +3,7 @@ import type { MessageV2 } from "../session/message-v2"
 import type { Agent } from "../agent/agent"
 import type { PermissionNext } from "../permission/next"
 import { Truncate } from "./truncation"
+import type { RouteResult } from "@/kiloclaw/types" // kilocode_change - routing context in tool execution
 
 export namespace Tool {
   interface Metadata {
@@ -13,6 +14,9 @@ export namespace Tool {
     agent?: Agent.Info
   }
 
+  // kilocode_change start - routing context in tool execution
+  // routeResult contains the L1 routing decision when agency routing is active
+  // This enables telemetry correlation between routing and execution phases
   export type Context<M extends Metadata = Metadata> = {
     sessionID: string
     messageID: string
@@ -21,9 +25,11 @@ export namespace Tool {
     callID?: string
     extra?: { [key: string]: any }
     messages: MessageV2.WithParts[]
+    routeResult?: RouteResult // kilocode_change - L1 routing decision for telemetry correlation
     metadata(input: { title?: string; metadata?: M }): void
     ask(input: Omit<PermissionNext.Request, "id" | "sessionID" | "tool">): Promise<void>
   }
+  // kilocode_change end
   export interface Info<Parameters extends z.ZodType = z.ZodType, M extends Metadata = Metadata> {
     id: string
     init: (ctx?: InitContext) => Promise<{

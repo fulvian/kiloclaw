@@ -1,3 +1,85 @@
+// Canonical tool ID exports for policy/runtime binding
+// P0: Stabilizza identità tool e policy binding
+// These canonical IDs map to actual runtime keys via ToolIdentityResolver
+
+export type CanonicalToolId =
+  // Knowledge/NBA
+  | "websearch"
+  | "webfetch"
+  | "skill"
+  // GWorkspace
+  | "gmail.search"
+  | "gmail.read"
+  | "gmail.draft"
+  | "gmail.send"
+  | "drive.search"
+  | "drive.list"
+  | "drive.read"
+  | "drive.share"
+  | "calendar.list"
+  | "calendar.read"
+  | "calendar.create"
+  | "calendar.update"
+  | "docs.read"
+  | "docs.update"
+  | "sheets.read"
+  | "sheets.update"
+  // Development
+  | "read"
+  | "glob"
+  | "grep"
+  | "apply_patch"
+  | "bash"
+  | "codesearch"
+  // Finance
+  | "finance-api"
+
+/**
+ * Returns the canonical tool IDs for a given agency.
+ * These are the policy-level IDs that get resolved to runtime keys
+ * via ToolIdentityResolver.
+ */
+export function getAgencyCanonicalToolIds(agencyId: string): CanonicalToolId[] {
+  switch (agencyId) {
+    case "agency-knowledge":
+      return ["websearch", "webfetch", "skill"]
+    case "agency-nba":
+      return ["websearch", "webfetch", "skill"]
+    case "agency-gworkspace":
+      return [
+        "gmail.search",
+        "gmail.read",
+        "gmail.draft",
+        "gmail.send",
+        "drive.search",
+        "drive.list",
+        "drive.read",
+        "drive.share",
+        "calendar.list",
+        "calendar.read",
+        "calendar.create",
+        "calendar.update",
+        "docs.read",
+        "docs.update",
+        "sheets.read",
+        "sheets.update",
+      ]
+    case "agency-development":
+      return ["read", "glob", "grep", "apply_patch", "bash", "skill", "codesearch", "websearch", "webfetch"]
+    case "agency-finance":
+      return ["finance-api", "skill", "websearch", "webfetch"]
+    default:
+      return []
+  }
+}
+
+/**
+ * Check if a tool ID is a canonical policy alias (vs native or runtime key)
+ */
+export function isCanonicalAlias(toolId: string): boolean {
+  return toolId.includes(".")
+}
+
 export const KNOWLEDGE_TOOL_ALLOWLIST = ["websearch", "webfetch", "skill"] as const
 export const NBA_TOOL_ALLOWLIST = ["websearch", "webfetch", "skill"] as const
 export const GWORKSPACE_TOOL_ALLOWLIST = [
