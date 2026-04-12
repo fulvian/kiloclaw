@@ -374,6 +374,26 @@ export namespace SessionPrompt {
       }
 
       if (!lastUser) throw new Error("No user message found in stream. This should never happen.")
+
+      // kilocode_change start - Pseudo tool call recovery for NBA
+      // Check if the assistant message contains pseudo [TOOL_CALL]...[/TOOL_CALL] markup
+      // If found, treat it as a tool-calls finish state to continue the loop
+      const hasPseudoToolCall = iife(() => {
+        if (!lastAssistant) return false
+        const lastMsg = msgs.findLast((m) => m.info.id === lastAssistant?.id)
+        if (!lastMsg) return false
+        const textParts = lastMsg.parts.filter((p) => p.type === "text")
+        return textParts.some((p) => {
+          const text = (p as MessageV2.TextPart).text
+          return text && /\[TOOL_CALL\][\s\S]*?\[\/TOOL_CALL\]/m.test(text)
+        })
+      })
+      if (hasPseudoToolCall && lastAssistant) {
+        log.info("pseudo tool call detected, forcing tool-calls finish state")
+        lastAssistant.finish = "tool-calls"
+      }
+      // kilocode_change end
+
       if (
         lastAssistant?.finish &&
         !["tool-calls", "unknown"].includes(lastAssistant.finish) &&
@@ -998,6 +1018,8 @@ export namespace SessionPrompt {
             "- Do NOT use 'webfetch' or 'websearch' in NBA Agency sessions",
             "- DO NOT use generic web search for NBA queries",
             "- DO NOT make up NBA statistics or odds - use the NBA Agency data providers",
+            "- After loading nba-analysis, answer the user's requested output directly (no generic follow-up prompts)",
+            "- If required inputs are missing, proceed with explicit assumptions and note uncertainty",
             "- All betting recommendations require human approval (HITL) before execution",
             "",
             "NBA Agency provides: NBA game analysis, betting odds, injury reports, value betting detection, and guarded recommendations.",
