@@ -4,7 +4,38 @@
 
 ## Started: 2026-04-02T12:21:02+02:00
 
-## Last Updated: 2026-04-11T20:04:00+02:00
+## Last Updated: 2026-04-12T07:40:00+02:00
+
+## Current Track: Development Agency Refoundation (2026-04-12)
+
+### Wave Progress (Onda 0 — Baseline Freeze + Wave 1 Core)
+
+| Deliverable                                                                                     | Status      | Evidence                                             |
+| ----------------------------------------------------------------------------------------------- | ----------- | ---------------------------------------------------- |
+| Native-first factory scaffold (`capability-registry`, `fallback-policy`, `factory`, 9 adapters) | ✅ Done     | `tooling/native/*`                                   |
+| Auto-repair 3-strike runtime (`error-taxonomy`, `auto-repair`)                                  | ✅ Done     | `runtime/*`                                          |
+| Telemetry contracts (`runtime_repair`, `parity_check`, `native_fallback`)                       | ✅ Done     | `telemetry/*.metrics.ts`                             |
+| Agency context block for development routing                                                    | ✅ Done     | `prompt.ts`                                          |
+| `NativeRuntime` wired in `CoreOrchestrator` + flag `KILO_NATIVE_FACTORY_ENABLED`                | ✅ Done     | `orchestrator.ts`                                    |
+| Wiki capability guardrail test + flags (`KILO_WIKI_ENABLED` default OFF)                        | ✅ Done     | `test/kiloclaw/wiki-capabilities.test.ts`, `flag.ts` |
+| Deterministic routing + deny/no-fallback tests                                                  | ✅ Verified | 4 test files                                         |
+| Parity harness C1..C7 + ratio tracking                                                          | ✅ Done     | `kilo-kit-parity.test.ts`                            |
+
+### G4 Gate — PASSED ✅
+
+- All 36 new tests pass (auto-repair, native-factory, security-mcp-fallback, kilo-kit-parity, wiki-capabilities, routing-pipeline)
+- Full kiloclaw suite: **953 pass, 0 fail, 3 skip** across 73 test files — no regressions
+
+### Next: G5 Verification / G6 Rollout
+
+- G5: Full dual-run harness vs kilo_kit baseline (Onda 1-5 parity hardening)
+- G6: Shadow/canary rollout + rollback drill
+
+**Verification evidence (fresh 2026-04-12T07:35):**
+
+- `bun test test/kiloclaw/auto-repair.test.ts test/kiloclaw/native-factory.test.ts test/kiloclaw/security-mcp-fallback.test.ts test/kiloclaw/kilo-kit-parity.test.ts test/kiloclaw/wiki-capabilities.test.ts test/kiloclaw/routing-pipeline.test.ts` -> **36 pass, 0 fail**
+- `bun test test/kiloclaw/` (full suite) -> **953 pass, 0 fail, 3 skip**
+- `bun run typecheck` -> **pass**
 
 ## Corrective Track: Task Scheduling (2026-04-09)
 

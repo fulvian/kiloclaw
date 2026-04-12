@@ -175,6 +175,27 @@ export namespace Flag {
 
   // Enable NativeFactory for capability-gated operations (default: false)
   export const KILO_NATIVE_FACTORY_ENABLED = truthy("KILO_NATIVE_FACTORY_ENABLED")
+
+  // =============================================================================
+  // LLM Wiki - CONDITIONAL-GO, default OFF until guardrails and parity gates
+  // KILOCLAW_DEVELOPMENT_AGENCY_REFOUNDATION_PLAN_2026-04-12.md
+  // =============================================================================
+
+  // Master kill-switch for wiki capability (wiki.ingest, wiki.query, wiki.lint)
+  // Default: OFF until CONDITIONAL-GO decision after parity >= 99%
+  export const KILO_WIKI_ENABLED = truthy("KILO_WIKI_ENABLED")
+
+  // Wiki L4 context budget per step (tokens)
+  export const KILO_WIKI_CONTEXT_BUDGET_PER_STEP = number("KILO_WIKI_CONTEXT_BUDGET_PER_STEP") ?? 4096
+
+  // Wiki L4 context budget per run (tokens)
+  export const KILO_WIKI_CONTEXT_BUDGET_PER_RUN = number("KILO_WIKI_CONTEXT_BUDGET_PER_RUN") ?? 8192
+
+  // Wiki lint: block ingest on high-severity conflicts
+  export const KILO_WIKI_LINT_BLOCK_CONFLICTS = !falsy("KILO_WIKI_LINT_BLOCK_CONFLICTS")
+
+  // Wiki provenance: require citation in every query output
+  export const KILO_WIKI_PROVENANCE_REQUIRED = truthy("KILO_WIKI_PROVENANCE_REQUIRED")
 }
 
 // Dynamic getter for KILO_DISABLE_PROJECT_CONFIG

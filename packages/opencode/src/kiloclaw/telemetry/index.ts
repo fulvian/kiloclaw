@@ -137,3 +137,16 @@ export type {
   PolicyDenied,
   FallbackUsed,
 } from "./routing.metrics"
+
+// =============================================================================
+// Runtime Repair / Parity / Native Fallback Metrics
+// =============================================================================
+
+export { RuntimeRepairEvent, RuntimeRepairMetrics } from "./runtime-repair.metrics"
+export type { RuntimeRepairEvent as RuntimeRepairEventType } from "./runtime-repair.metrics"
+
+export { ParityContract, ParityEvent, ParityMetrics } from "./parity.metrics"
+export type { ParityContract as ParityContractType, ParityEvent as ParityEventType } from "./parity.metrics"
+
+export { FallbackEvent, FallbackMetrics } from "./fallback.metrics"
+export type { FallbackEvent as FallbackEventType } from "./fallback.metrics"

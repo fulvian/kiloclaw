@@ -9,6 +9,18 @@ import { PolicyEngine } from "./policy/engine"
 import { Policy } from "./policy/rules"
 import { AuditStore, type AuditEntry } from "./audit/store"
 import { getOrchestratorMemory } from "./memory.adapter"
+import { Flag } from "@/flag/flag"
+import { NativeFactory, type FactoryInput, type FactoryOutput } from "./tooling/native/factory"
+import { FallbackMetrics, type FallbackEvent } from "./telemetry/fallback.metrics"
+import { RouteReason } from "./tooling/native/capability-registry"
+
+// Native runtime interface for capability-based tool execution
+export interface NativeRuntime {
+  execute(
+    input: FactoryInput,
+    mcp?: (payload: Record<string, unknown>) => Promise<{ ok: boolean; data?: unknown; error?: string }>,
+  ): Promise<FactoryOutput>
+}
 
 // Memory broker interface
 export interface MemoryBroker {
@@ -41,6 +53,7 @@ export interface CoreOrchestrator {
   memory(): MemoryBroker
   scheduler(): Scheduler
   audit(): AuditLogger
+  nativeRuntime(): NativeRuntime
 }
 
 // Orchestrator factory
@@ -63,11 +76,60 @@ export const CoreOrchestrator = {
       const router = Router.create({})
       const policy = new PolicyEngine({ enableCaching: true, fallbackToConsultative: false })
 
+      // Native Factory runtime - capability-based routing for native-first execution
+      const nativeFactoryRuntime = Flag.KILO_NATIVE_FACTORY_ENABLED
+        ? NativeFactory.create()
+        : {
+            execute: async () =>
+              ({
+                ok: false,
+                route: {
+                  route_reason: "native_unimplemented" as RouteReason,
+                  adapter_id: "none",
+                  fallback_flag: false,
+                  policy_decision: "deny",
+                },
+                error: "native factory disabled",
+              }) as FactoryOutput,
+            registry: { get: () => undefined, all: () => [], register: () => {} },
+          }
+
       const writeAudit = (corr: string, event: string, payload: Record<string, unknown>) => {
         const record = auditStore.append({ correlationId: corr, event, payload })
         auditLogs.push(record)
         log.debug("audit event", { event, correlationId: corr })
         return record
+      }
+
+      const emitNativeFallback = (event: Omit<FallbackEvent, "event" | "ts">) => {
+        const fbEvent = FallbackMetrics.build(event)
+        writeAudit(event.correlation_id, "native_fallback", fbEvent as unknown as Record<string, unknown>)
+        log.info("native_fallback", {
+          capability: event.capability,
+          route_reason: event.route_reason,
+          policy_decision: event.policy_decision,
+        })
+      }
+
+      const nativeRuntime: NativeRuntime = {
+        execute: async (input, mcp) => {
+          const result = await nativeFactoryRuntime.execute(
+            input,
+            mcp as (payload: Record<string, unknown>) => Promise<{ ok: boolean; data?: unknown; error?: string }>,
+          )
+          if (result.route.fallback_flag || result.route.route_reason !== "native_primary") {
+            emitNativeFallback({
+              correlation_id: "",
+              capability: input.capability,
+              adapter_id: result.route.adapter_id,
+              route_reason: result.route.route_reason,
+              fallback_flag: result.route.fallback_flag,
+              policy_decision: result.route.policy_decision,
+              retry_count: 0,
+            })
+          }
+          return result
+        },
       }
 
       const byCorr = (correlationId: string) => {
@@ -222,6 +284,9 @@ export const CoreOrchestrator = {
               return byEvent(event)
             },
           }
+        },
+        nativeRuntime(): NativeRuntime {
+          return nativeRuntime
         },
       }
 

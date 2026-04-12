@@ -107,3 +107,10 @@ export * from "./audit"
 
 // Isolation helpers
 export * from "./isolation"
+
+// Native Factory - capability-based routing
+export { NativeFactory } from "./tooling/native/factory"
+export type { FactoryInput, FactoryOutput } from "./tooling/native/factory"
+export type { NativeRuntime } from "./orchestrator"
+export { FallbackMetrics } from "./telemetry/fallback.metrics"
+export type { FallbackEvent } from "./telemetry/fallback.metrics"

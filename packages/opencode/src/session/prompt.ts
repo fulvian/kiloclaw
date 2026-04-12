@@ -916,6 +916,51 @@ export namespace SessionPrompt {
             "Available tools: websearch (REQUIRED for search), webfetch, skill (for loading knowledge skills).",
             "",
           ].join("\n")
+        } else if (agencyContext.agencyId === "agency-development") {
+          agencyBlock = [
+            "",
+            "<!-- Agency Context: Development Agency -->",
+            "This conversation has been routed to the Development Agency.",
+            `Routing confidence: ${Math.round(agencyContext.confidence * 100)}%`,
+            `Routing reason: ${agencyContext.reason}`,
+            `Routing source: ${agencyContext.routeSource}`,
+            ...(agencyContext.fallbackUsed ? [`Routing fallback: ${agencyContext.fallbackReason ?? "none"}`] : []),
+            ...(agencyContext.layers?.L1
+              ? [
+                  `L1 capabilities: ${agencyContext.layers.L1.capabilities.join(", ") || "none"}`,
+                  `L1 route type: ${agencyContext.layers.L1.routeResult?.type ?? "fallback"}`,
+                ]
+              : []),
+            ...(agencyContext.layers?.L2
+              ? [
+                  `L2 agent: ${agencyContext.layers.L2.agentId ?? "none"}`,
+                  `L2 health: ${agencyContext.layers.L2.agentHealth}`,
+                ]
+              : []),
+            ...(agencyContext.layers?.L3
+              ? [
+                  `L3 tools denied: ${agencyContext.layers.L3.toolsDenied}`,
+                  `L3 fallback used: ${agencyContext.layers.L3.fallbackUsed}`,
+                ]
+              : []),
+            "",
+            "CRITICAL TOOL INSTRUCTIONS:",
+            "- Use native development tools first: read, glob, grep, apply_patch, and bash for build/test/git",
+            "- Keep deny-by-default behavior: if a capability is denied, do not route to MCP fallback",
+            "- Use deterministic fallback only for allowed capability gaps or exhausted native retries",
+            "- Never execute destructive git operations or secret exfiltration flows",
+            "",
+            "SKILL USAGE HINTS:",
+            "- For debugging and incidents: systematic-debugging + verification-before-completion",
+            "- For feature delivery: spec-driven-development + test-driven-development",
+            "- For review cycles: code-review-discipline + receiving-code-review/requesting-code-review",
+            "",
+            "DOMAIN GUARDRAILS:",
+            "- Validate patches with targeted tests before concluding",
+            "- Keep edits scoped to requested files and approved workspace boundaries",
+            "- Block fallback on denied policy paths, destructive actions, and secret-sensitive operations",
+            "",
+          ].join("\n")
         } else if (agencyContext.agencyId === "agency-nba") {
           agencyBlock = [
             "",
@@ -1067,7 +1112,9 @@ export namespace SessionPrompt {
 
     const enabledAgency = input.agencyContext?.agencyId
     const agencyCapabilities = await import("@/kiloclaw/agency/registry/agency-registry")
-      .then((x) => (enabledAgency ? x.AgencyRegistry.getAgency(enabledAgency)?.policies.allowedCapabilities ?? [] : []))
+      .then((x) =>
+        enabledAgency ? (x.AgencyRegistry.getAgency(enabledAgency)?.policies.allowedCapabilities ?? []) : [],
+      )
       .catch(() => [])
     const agencyTools = resolveAgencyAllowedTools({
       agencyId: enabledAgency,
