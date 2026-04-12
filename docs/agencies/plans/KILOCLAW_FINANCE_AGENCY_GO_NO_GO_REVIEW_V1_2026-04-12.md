@@ -100,45 +100,48 @@ bun run dev -- "stock price for AAPL"
 
 ## API Keys Required
 
-### YahooQuery Setup (Primary for Stocks/ETF/Forex)
+### Finance Agency Providers
 
-YahooQuery is a Python library that provides Yahoo Finance data.
+All API keys are stored in `~/.local/share/kiloclaw/.env` (single source of truth).
 
-```bash
-# Install yahooquery
-pip install yahooquery
+| Provider          | Env Variable            | Purpose                                      | Free Tier      | Signup                                 |
+| ----------------- | ----------------------- | -------------------------------------------- | -------------- | -------------------------------------- |
+| **Twelve Data**   | `TWELVE_DATA_API_KEY`   | Primary - stocks, forex, crypto, commodities | ✅ 800 req/day | https://twelvedata.com/docs            |
+| **Polygon**       | `POLYGON_API_KEY`       | US stocks, crypto, real-time                 | ✅ 100 req/min | https://polygon.io/docs                |
+| **Alpha Vantage** | `ALPHA_VANTAGE_API_KEY` | Technical indicators, forex                  | ✅ 75 req/day  | https://www.alphavantage.co            |
+| **FRED**          | `FRED_API_KEY`          | Macroeconomic data (GDP, CPI, etc.)          | ✅ Free        | https://fred.stlouisfed.org/docs/api   |
+| **NASDAQ**        | `NASDAQ_DATA_API_KEY`   | Market data                                  | ✅             | https://api.nasdaq.com/api/docs        |
+| **Finnhub**       | `FINNHUB_API_KEY`       | Fundamentals, news, SEC filings              | ✅ 60 req/min  | https://finnhub.io/                    |
+| **FMP**           | `FMP_API_KEY`           | Financial ratios, metrics                    | ✅ 250 req/day | https://site.financialmodelingprep.com |
 
-# Verify installation
-python3 -c "from yahooquery import Ticker; print(Ticker('AAPL').price)"
+### Provider Routing
+
+```
+Stocks → twelve_data → fmp → finnhub → polygon → nasdaq
+ETF → twelve_data → nasdaq
+Crypto → twelve_data → polygon → alpha_vantage
+Forex → twelve_data → alpha_vantage
+Commodities → twelve_data
+Macro → fred
 ```
 
-### Other API Keys
-
-| Provider      | Purpose                  | Free Tier | Signup                                            |
-| ------------- | ------------------------ | --------- | ------------------------------------------------- |
-| **CoinGecko** | Crypto prices            | ✅        | https://coingecko.com/api                         |
-| **Finnhub**   | Stock fundamentals, news | ✅ 60/min | https://finnhub.io/                               |
-| **FRED**      | Macroeconomic data       | ✅ Free   | https://fred.stlouisfed.org/docs/api/api_key.html |
-
-### .env Configuration
-
-Add to `~/.local/share/kiloclaw/.env`:
+### Current .env Configuration
 
 ```bash
-# CoinGecko (crypto prices) - FREE
-COINGECKO_API_KEY=your_coingecko_api_key
-
-# Finnhub (stock data, news, fundamentals) - FREE tier
-FINNHUB_API_KEY=your_finnhub_api_key
-
-# FRED (macroeconomic data) - FREE
-FRED_API_KEY=your_fred_api_key
+# Finance Agency Keys (already configured in ~/.local/share/kiloclaw/.env)
+TWELVE_DATA_API_KEY=a6b795d69cbe4be4ba5642af11f8583f
+POLYGON_API_KEY=0Pt1u6gw1qhJphl9nnBfKbE4ZiabRHCg
+ALPHA_VANTAGE_API_KEY=XJPNMOI93SPUGVQE
+FRED_API_KEY=4ff036c1b8acc53c7353f9b0f2c95f76
+NASDAQ_DATA_API_KEY=9Pd7rXqZJ38iMZ23X2sh
+FINNHUB_API_KEY=d20jjc1r01qrk6clbijgd20jjc1r01qrk6clbik0
+FMP_API_KEY=sxC0alsWbRxdzeq7wygHEg9yfF9fvMJK
 ```
 
 ## Decisione finale
 
 - **Esito**: ✅ GO
-- **Condizioni**: Merge approved, runtime test passati
+- **Condizioni**: API keys configured, merge approved, runtime test passati
 - **Owner**: coding agent
 - **Approvatore**: pending
 - **Data**: 2026-04-12
