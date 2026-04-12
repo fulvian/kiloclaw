@@ -202,7 +202,7 @@ describe("HybridRouter multilingual support", () => {
     const intent: Intent = {
       id: "test-mixed-1",
       type: "query",
-      description: "Show me annunci for MacBook Pro price",
+      description: "Show me annunci for MacBook Pro",
       risk: "low",
     }
 
