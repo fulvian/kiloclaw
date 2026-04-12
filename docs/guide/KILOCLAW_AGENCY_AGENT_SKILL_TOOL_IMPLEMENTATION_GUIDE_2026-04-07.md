@@ -246,7 +246,103 @@ if (policy.enabled && !policy.allowedTools.includes(tool.id)) return
 
 ---
 
-## 12) Usa template pronti all’uso
+## 12) I 5 file da modificare per ogni nuova agenzia
+
+Per ogni nuova agenzia, devi modificare **esattamente 5 file**:
+
+### 1. `packages/opencode/src/kiloclaw/agency/bootstrap.ts`
+
+Aggiungi definizione agency in `agencyDefinitions[]`.
+
+### 2. `packages/opencode/src/kiloclaw/agency/routing/semantic/bootstrap.ts`
+
+Aggiungi funzione `bootstrap[Nome]Capabilities()` e chiamala in `bootstrapAllCapabilities()`.
+
+**CRITICO**: L'ordine di bootstrap DEVE essere:
+1. `bootstrapRegistries()` - agencies, skills, agents, chains
+2. `bootstrapAllCapabilities()` - capabilities per routing
+
+Se invertito, il routing fallisce silenziosamente.
+
+### 3. `packages/opencode/src/kiloclaw/router.ts`
+
+Aggiungi keywords in `DOMAIN_KEYWORDS` e `CORE_KEYWORDS`:
+- 50-100 keywords totali per dominio
+- 15-25 CORE_KEYWORDS ad alta specificità
+- Keywords italiane se dominio italiano
+
+### 4. `packages/opencode/src/session/prompt.ts` (~linea 900)
+
+Aggiungi blocco contesto agency con istruzioni CRITICAL TOOL.
+
+**CRITICO**: Il context block DEVE allineare con tool-policy.ts. Se il context block dice "usa skill X" ma tool-policy.ts non include quella skill nella allowlist, il modello non avrà accesso al tool.
+
+### 5. `packages/opencode/src/session/tool-policy.ts`
+
+Aggiungi allowlist e funzione `map[Nome]CapabilitiesToTools()`.
+
+---
+
+## 12b) Best practices dalle prime implementazioni
+
+### 1. Bootstrap Order è Critico
+
+L'ordine di bootstrap DEVE essere:
+1. `bootstrapRegistries()` - registra agencies, skills, agents, chains
+2. `bootstrapAllCapabilities()` - registra capabilities per routing
+
+Se invertito, il routing fallisce silenziosamente.
+
+### 2. Context Block Non Basta - Tool Policy Deve Essere Allineata
+
+Se il context block dice "usa skill X" ma tool-policy.ts non include skill nella allowlist, il modello non avrà accesso al tool.
+
+Verifica sempre che:
+- `prompt.ts` context block elenchi i tool permessi
+- `tool-policy.ts` allowlist contenga quegli stessi tool
+
+### 3. Confidence Score Non Sufficiente - Verifica Routing Reale
+
+Il confidence score >= 40% non garantisce routing corretto. Il modello potrebbe ignorare il routing e usare websearch.
+
+Verifica sempre con test runtime che:
+- L'agency routed sia quella corretta
+- I tool non permessi siano effettivamente bloccati (log: `blockedTools`)
+
+### 4. Skill Caricata Non Significa Skill Usata
+
+Anche se la skill è caricata nel context block, il modello potrebbe non usarla per rispondere.
+
+Istruzioni esplicite come "use ONLY the 'skill' tool" sono più efficaci di "you have access to X skill".
+
+### 5. Keyword Coverage Devono Essere Bilanciate
+
+Troppe keywords = altri domini le matchano accidentalmente.
+Troppo poche = false negative.
+
+Target: 50-100 keywords per dominio, di cui 15-25 CORE_KEYWORDS ad alta specificità.
+
+---
+
+## 12c) PolicyLevel Standard
+
+Usa questo enum standardizzato per tutte le agenzie:
+
+```typescript
+export type PolicyLevel = "SAFE" | "NOTIFY" | "CONFIRM" | "HITL" | "DENY"
+```
+
+| Livello | Quando usarlo | Esempi |
+|---------|---------------|--------|
+| SAFE | Operazioni read-only, nessun side effect | Leggere dati, cercare file |
+| NOTIFY | Operazioni con side effect reversibili | Inviare email (bozza), creare file temporanei |
+| CONFIRM | Operazioni con impatto significativo | Inviare email definitiva, eliminare file |
+| HITL | Operazioni irreversibili o ad alto rischio | Betting, trading, modifiche permanenti |
+| DENY | Mai consentito | Auto-bet, operazioni illegali |
+
+---
+
+## 12d) Usa template pronti all'uso
 
 Template agency manifest (`schema.ts` compatibile):
 
@@ -324,17 +420,36 @@ test("blocca tool non in allowlist", () => {
 ## 13) Gestisci rollout sicuro
 
 - Introduci ogni cambiamento dietro flag in `packages/opencode/src/flag/flag.ts`.
-- Esegui shadow mode prima del cutover con `KILO_ROUTING_SHADOW_ENABLED=true` e confronto decisioni.
+- **Runtime verification obbligatoria** dopo G5: esegui `bun run dev -- --print-logs --log-level DEBUG run "[query]"`.
 - Applica canary su subset di sessioni/progetti e monitora `toolsDenied`, fallback ratio e latenza L0-L3.
 - Definisci rollback immediato via flag toggle senza rollback codice.
 - Congela merge se audit trail o metadata provider mostrano drift rispetto al comportamento atteso.
 
-Sequenza raccomandata:
+### Sequenza rollout (dopo V2 Protocol)
 
-1. `shadow`: osserva differenze senza enforcement pieno
-2. `hard-gate canary`: enforcement su traffico limitato
-3. `full rollout`: allarga dopo due cicli senza regressioni
-4. `stabilize`: consolida test golden e regression
+**Nota**: Eliminata fase shadow - rollout diretto dopo G5.
+
+1. `hard-gate canary`: enforcement su traffico limitato
+2. `full rollout`: allarga dopo due cicli senza regressioni
+3. `stabilize`: consolida test golden e regression
+
+### Criteri runtime obbligatori (9/9 dopo G5)
+
+Esegui `bun run dev -- --print-logs --log-level DEBUG run "[query]"`.
+
+| #   | Criterio                            | Log Pattern                                    |
+| --- | ----------------------------------- | ---------------------------------------------- |
+| 1   | Agency routed corretta              | `agencyId=agency-[dominio]`                    |
+| 2   | Confidence >= 40%                   | `confidence=0.x`                               |
+| 3   | Policy applicata                    | `allowedTools=[...]` e `blockedTools` corretti |
+| 4   | Policy enforce = true               | `policyEnforced=true`                          |
+| 5   | allowedTools contiene solo permessi | `allowedTools=[...]`                           |
+| 6   | blockedTools non invocati           | `blockedTools` contiene solo non-permessi      |
+| 7   | Capability L1 corrette              | `capabilities=[...]`                           |
+| 8   | Nessun "no tools resolved"          | assente nei log                                |
+| 9   | Fallback NOT used in L3             | `L3.fallbackUsed=false`                        |
+
+**Failure protocol**: Se anche UNO fallisce, torna a G4, correggi, ripeti test, documenta root cause.
 
 ---
 
