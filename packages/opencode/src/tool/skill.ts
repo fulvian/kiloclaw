@@ -6,7 +6,7 @@ import { Skill } from "../skill"
 import { PermissionNext } from "../permission/next"
 import { Ripgrep } from "../file/ripgrep"
 import { iife } from "@/util/iife"
-import { knowledgeSkills, developmentSkills } from "../kiloclaw/skills" // kilocode_change - agency skills
+import { knowledgeSkills, developmentSkills, nutritionSkills, weatherSkills, nbaSkills } from "../kiloclaw/skills" // kilocode_change - agency skills
 import type { Skill as KiloclawSkill } from "../kiloclaw/skill" // kilocode_change
 
 const BUILTIN = Skill.BUILTIN_LOCATION // kilocode_change
@@ -28,6 +28,24 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
       content: "",
     })),
     ...developmentSkills.map((s) => ({
+      name: s.id as string,
+      description: buildAgencySkillDescription(s),
+      location: "builtin" as const,
+      content: "",
+    })),
+    ...nutritionSkills.map((s) => ({
+      name: s.id as string,
+      description: buildAgencySkillDescription(s),
+      location: "builtin" as const,
+      content: "",
+    })),
+    ...weatherSkills.map((s) => ({
+      name: s.id as string,
+      description: buildAgencySkillDescription(s),
+      location: "builtin" as const,
+      content: "",
+    })),
+    ...nbaSkills.map((s) => ({
       name: s.id as string,
       description: buildAgencySkillDescription(s),
       location: "builtin" as const,
@@ -87,7 +105,10 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
           "Invoke this tool to load a skill when a task matches one of the available skills listed below:",
           "",
           // kilocode_change start - show agency skills separately
-          buildSkillsSection(agencySkillsList, "<!-- Agency Skills (Knowledge + Development) -->"),
+          buildSkillsSection(
+            agencySkillsList,
+            "<!-- Agency Skills (Knowledge + Development + Nutrition + Weather + NBA) -->",
+          ),
           buildSkillsSection(standardSkills, "<!-- Standard Skills -->"),
           // kilocode_change end
         ].join("\n")
