@@ -83,6 +83,36 @@ export type SkillName = z.infer<typeof SkillName>
 export const AgencyName = z.enum(["development", "knowledge", "nutrition", "weather", "nba", "finance"])
 export type AgencyName = z.infer<typeof AgencyName>
 
+/**
+ * Policy enforcement level for capabilities and tools
+ * - SAFE: Operazioni read-only, nessun side effect
+ * - NOTIFY: Operazioni con side effect reversibili (notifica post-exec)
+ * - CONFIRM: Operazioni con impatto significativo (richiedi conferma)
+ * - HITL: Operazioni irreversibili/ad alto rischio (richiedi approvazione umana)
+ * - DENY: Mai consentito
+ */
+export type PolicyLevel = "SAFE" | "NOTIFY" | "CONFIRM" | "HITL" | "DENY"
+
+export const PolicyLevelOrder = {
+  SAFE: 0,
+  NOTIFY: 1,
+  CONFIRM: 2,
+  HITL: 3,
+  DENY: 4,
+} as const
+
+export function isMoreRestrictive(a: PolicyLevel, b: PolicyLevel): boolean {
+  return PolicyLevelOrder[a] > PolicyLevelOrder[b]
+}
+
+export function enforcePolicy(level: PolicyLevel, requiresApproval: boolean): "allow" | "notify" | "confirm" | "deny" {
+  if (level === "DENY" || requiresApproval) return "deny"
+  if (level === "HITL") return "deny" // Can only proceed with user approval
+  if (level === "CONFIRM") return "confirm"
+  if (level === "NOTIFY") return "notify"
+  return "allow"
+}
+
 // AgentDefinition: formal definition of an agent as per HANDOVER doc
 export const AgentDefinitionSchema = z.object({
   id: z.string().min(1),
