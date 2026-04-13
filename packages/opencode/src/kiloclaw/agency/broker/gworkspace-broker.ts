@@ -557,8 +557,10 @@ export namespace GWorkspaceBroker {
       // Get all MCP tools
       const allTools = await MCP.tools()
 
-      // MCP tools are named as "serverName_toolName"
-      const keys = config.fallbackServers.map((server) => `${server}_${toolName}`)
+      // MCP tools are named as "sanitizedServerName_toolName"
+      // Server names like "google-workspace" are sanitized to "google_workspace" by MCP index
+      const sanitize = (name: string) => name.replace(/[^a-zA-Z0-9_-]/g, "_")
+      const keys = config.fallbackServers.map((server) => `${sanitize(server)}_${toolName}`)
       const toolKey = keys.find((key) => Boolean(allTools[key]))
       const tool = toolKey ? allTools[toolKey] : undefined
 
