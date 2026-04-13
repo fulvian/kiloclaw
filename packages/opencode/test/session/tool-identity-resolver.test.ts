@@ -21,7 +21,7 @@ describe("ToolIdentityResolver", () => {
     test("resolves GWorkspace alias to MCP runtime key", () => {
       const result = ToolIdentityResolver.resolve("gmail.search", "agency-gworkspace")
       expect(result.resolved).toBe(true)
-      expect(result.runtimeKey).toBe("google_workspace_search_gmail_messages")
+      expect(result.runtimeKey).toBe("gworkspace_search_gmail_messages")
       expect(result.toolType).toBe("mcp")
     })
 
@@ -39,10 +39,10 @@ describe("ToolIdentityResolver", () => {
     })
 
     test("verifies runtime key exists in knownMcpKeys when provided", () => {
-      const knownKeys = new Set(["google_workspace_search_gmail_messages", "google_workspace_list_gmail_messages"])
+      const knownKeys = new Set(["gworkspace_search_gmail_messages", "gworkspace_list_gmail_messages"])
       const result = ToolIdentityResolver.resolve("gmail.search", "agency-gworkspace", knownKeys)
       expect(result.resolved).toBe(true)
-      expect(result.runtimeKey).toBe("google_workspace_search_gmail_messages")
+      expect(result.runtimeKey).toBe("gworkspace_search_gmail_messages")
     })
 
     test("returns unresolved when runtime key not in knownMcpKeys", () => {
@@ -60,9 +60,9 @@ describe("ToolIdentityResolver", () => {
 
       expect(results).toHaveLength(3)
       expect(results[0]!.resolved).toBe(true)
-      expect(results[0]!.runtimeKey).toBe("google_workspace_search_gmail_messages")
+      expect(results[0]!.runtimeKey).toBe("gworkspace_search_gmail_messages")
       expect(results[1]!.resolved).toBe(true)
-      expect(results[1]!.runtimeKey).toBe("google_workspace_read_gmail_message")
+      expect(results[1]!.runtimeKey).toBe("gworkspace_get_gmail_message_content")
       expect(results[2]!.resolved).toBe(true)
       expect(results[2]!.runtimeKey).toBe("websearch")
     })
@@ -80,31 +80,31 @@ describe("ToolIdentityResolver", () => {
     })
 
     test("allows tools via alias resolution", () => {
-      const requested = ["google_workspace_search_gmail_messages"]
+      const requested = ["gworkspace_search_gmail_messages"]
       const allowed = ["gmail.search"] // Policy uses alias
       const result = ToolIdentityResolver.filterByPolicy(
         requested,
         allowed,
         "agency-gworkspace",
-        new Set(["google_workspace_search_gmail_messages"]),
+        new Set(["gworkspace_search_gmail_messages"]),
       )
 
-      expect(result.allowed).toContain("google_workspace_search_gmail_messages")
+      expect(result.allowed).toContain("gworkspace_search_gmail_messages")
       expect(result.blocked).toHaveLength(0)
     })
 
     test("blocks tools not in allowlist after resolution", () => {
-      const requested = ["google_workspace_search_gmail_messages"]
+      const requested = ["gworkspace_search_gmail_messages"]
       const allowed = ["websearch", "webfetch"] // No gmail alias
       const result = ToolIdentityResolver.filterByPolicy(
         requested,
         allowed,
         "agency-gworkspace",
-        new Set(["google_workspace_search_gmail_messages"]),
+        new Set(["gworkspace_search_gmail_messages"]),
       )
 
-      expect(result.blocked).toContain("google_workspace_search_gmail_messages")
-      expect(result.blockedReason["google_workspace_search_gmail_messages"]).toContain("not in policy allowlist")
+      expect(result.blocked).toContain("gworkspace_search_gmail_messages")
+      expect(result.blockedReason["gworkspace_search_gmail_messages"]).toContain("not in policy allowlist")
     })
   })
 
@@ -113,8 +113,8 @@ describe("ToolIdentityResolver", () => {
       const allowlist = ["gmail.search", "gmail.read", "websearch"]
       const normalized = ToolIdentityResolver.normalizeAllowlist(allowlist, "agency-gworkspace")
 
-      expect(normalized).toContain("google_workspace_search_gmail_messages")
-      expect(normalized).toContain("google_workspace_read_gmail_message")
+      expect(normalized).toContain("gworkspace_search_gmail_messages")
+      expect(normalized).toContain("gworkspace_get_gmail_message_content")
       expect(normalized).toContain("websearch")
     })
 
@@ -134,21 +134,14 @@ describe("ToolIdentityResolver", () => {
 
     test("returns true for alias and runtime key", () => {
       expect(
-        ToolIdentityResolver.areEquivalent(
-          "gmail.search",
-          "google_workspace_search_gmail_messages",
-          "agency-gworkspace",
-        ),
+        ToolIdentityResolver.areEquivalent("gmail.search", "gworkspace_search_gmail_messages", "agency-gworkspace"),
       ).toBe(true)
     })
   })
 
   describe("getCanonicalAlias()", () => {
     test("returns canonical alias for runtime key", () => {
-      const alias = ToolIdentityResolver.getCanonicalAlias(
-        "google_workspace_search_gmail_messages",
-        "agency-gworkspace",
-      )
+      const alias = ToolIdentityResolver.getCanonicalAlias("gworkspace_search_gmail_messages", "agency-gworkspace")
       expect(alias).toBe("gmail.search")
     })
 
@@ -178,7 +171,7 @@ describe("ToolIdentityMap", () => {
   describe("getAgencyToolMap()", () => {
     test("returns GWorkspace map for agency-gworkspace", () => {
       const map = ToolIdentityMap.getAgencyToolMap("agency-gworkspace")
-      expect(map["gmail.search"]).toBe("google_workspace_search_gmail_messages")
+      expect(map["gmail.search"]).toBe("gworkspace_search_gmail_messages")
     })
 
     test("returns empty object for unknown agency", () => {
@@ -202,7 +195,7 @@ describe("ToolIdentityMap", () => {
   describe("buildReverseMap()", () => {
     test("creates reverse mapping from runtime to alias", () => {
       const reverse = ToolIdentityMap.buildReverseMap("agency-gworkspace")
-      expect(reverse["google_workspace_search_gmail_messages"]).toBe("gmail.search")
+      expect(reverse["gworkspace_search_gmail_messages"]).toBe("gmail.search")
     })
   })
 })

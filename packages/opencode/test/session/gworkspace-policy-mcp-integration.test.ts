@@ -14,13 +14,13 @@ import { isCanonicalAlias } from "../../src/session/tool-policy"
 // Mock MCP runtime keys (simulating what MCP server exposes)
 // These MUST match the actual mappings in tool-identity-map.ts
 const mockMcpTools: Record<string, string> = {
-  google_workspace_search_gmail_messages: "search",
-  google_workspace_list_gmail_messages: "list",
-  google_workspace_send_gmail_message: "send",
-  google_workspace_list_calendars: "calendar.list",
-  google_workspace_create_calendar_event: "calendar.create",
-  google_workspace_list_drive_files: "drive.list",
-  google_workspace_create_drive_file: "drive.create",
+  gworkspace_search_gmail_messages: "search",
+  gworkspace_list_gmail_messages: "list",
+  gworkspace_send_gmail_message: "send",
+  gworkspace_list_calendars: "calendar.list",
+  gworkspace_manage_event: "calendar.create",
+  gworkspace_list_drive_items: "drive.list",
+  gworkspace_create_drive_file: "drive.create",
 }
 
 // Mock policy allowlist with abstract aliases (from tool-identity-map.ts)
@@ -46,7 +46,7 @@ describe("gworkspace-policy-mcp integration", () => {
       expect(result.alias).toBe("gmail.search")
       expect(result.toolType).toBe("mcp")
       expect(result.resolved).toBe(true)
-      expect(result.runtimeKey).toBe("google_workspace_search_gmail_messages")
+      expect(result.runtimeKey).toBe("gworkspace_search_gmail_messages")
     })
 
     test("resolve returns ResolveResult for calendar.list", () => {
@@ -59,7 +59,7 @@ describe("gworkspace-policy-mcp integration", () => {
       expect(result.alias).toBe("calendar.list")
       expect(result.toolType).toBe("mcp")
       expect(result.resolved).toBe(true)
-      expect(result.runtimeKey).toBe("google_workspace_list_calendars")
+      expect(result.runtimeKey).toBe("gworkspace_list_calendars")
     })
 
     test("resolve returns unknown for non-existent alias", () => {
@@ -112,7 +112,7 @@ describe("gworkspace-policy-mcp integration", () => {
 
     test("reports blocked tools with reasons", () => {
       // Request tools not in policy
-      const requestedTools = ["google_workspace_search_gmail_messages", "some_unknown_tool"]
+      const requestedTools = ["gworkspace_search_gmail_messages", "some_unknown_tool"]
       const filtered = ToolIdentityResolver.filterByPolicy(requestedTools, mockPolicyAllowlist, "agency-gworkspace")
 
       expect(filtered).toHaveProperty("blockedReason")
@@ -128,8 +128,8 @@ describe("gworkspace-policy-mcp integration", () => {
     })
 
     test("isCanonicalAlias returns false for runtime keys", () => {
-      expect(isCanonicalAlias("google_workspace_search_gmail_messages")).toBe(false)
-      expect(isCanonicalAlias("google_workspace_list_calendars")).toBe(false)
+      expect(isCanonicalAlias("gworkspace_search_gmail_messages")).toBe(false)
+      expect(isCanonicalAlias("gworkspace_list_calendars")).toBe(false)
     })
   })
 
@@ -152,8 +152,8 @@ describe("gworkspace-policy-mcp integration", () => {
     test("handles policy with partial MCP coverage", () => {
       // Only some MCP tools are available
       const partialMcpTools = {
-        google_workspace_search_gmail_messages: "search",
-        google_workspace_list_calendars: "calendar.list",
+        gworkspace_search_gmail_messages: "search",
+        gworkspace_list_calendars: "calendar.list",
       }
 
       const filtered = ToolIdentityResolver.filterByPolicy(
@@ -192,10 +192,10 @@ describe("gworkspace-policy-mcp integration", () => {
       const result = ToolIdentityResolver.resolve("gmail.search", "agency-gworkspace", knownMcpKeysSet)
 
       expect(result.resolved).toBe(true)
-      expect(result.runtimeKey).toBe("google_workspace_search_gmail_messages")
+      expect(result.runtimeKey).toBe("gworkspace_search_gmail_messages")
 
       // And if we have partial MCP tools (some not available)
-      const partialMcpKeysSet = new Set(["google_workspace_search_gmail_messages", "google_workspace_list_calendars"])
+      const partialMcpKeysSet = new Set(["gworkspace_search_gmail_messages", "gworkspace_list_calendars"])
 
       const result2 = ToolIdentityResolver.resolve(
         "gmail.send", // This is not in partial set
