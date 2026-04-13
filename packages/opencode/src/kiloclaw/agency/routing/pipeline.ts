@@ -381,21 +381,16 @@ export namespace RoutingPipeline {
           ? ["websearch", "webfetch", "skill", ...mapped]
           : agencyId === "agency-nba"
             ? [
-                // NBA skill executes internally, other tools are adapters
+                // NBA Agency tools - real callable tools via NbaOrchestrator
                 "skill",
-                // Games/Schedule adapters
+                "nba-games",
+                "nba-odds",
+                "nba-injuries",
+                // Fallback: adapter names resolved by tool-identity-map
                 "balldontlie.getGames",
-                "balldontlie.getStats",
                 "balldontlie.getInjuries",
-                "espn.getScoreboard",
-                "espn.getStandings",
-                "espn.getInjuries",
-                "nba_api.getStats",
-                // Odds adapters
                 "odds_bet365.getOdds",
                 "odds_api.getOdds",
-                "parlay.getOdds",
-                "polymarket.getOdds",
                 ...mapped,
               ]
             : agencyId === "agency-finance"

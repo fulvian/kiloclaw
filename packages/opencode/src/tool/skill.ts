@@ -276,15 +276,24 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
               // For weather skills, extract location from query text
               // Pattern: "weather in/at/city_name" or "tempo a/in city_name"
               if (agencySkill.id.startsWith("weather-")) {
+                // Extract location - look for "a [city]" pattern at end of query
+                // or patterns like "in [city]"
                 const locationPatterns = [
-                  /(?:a|ad|at|in|da|della|di)\s+([A-Za-zÀ-ÿ\.\-\'\s]+?)(?:\s+d[aei]|\s+da\s+gioved|\s+da\s+vener|\s+per|\s+dal|$)/i,
-                  /(?:tempo|meteo|previsioni|forecast)\s+(?:a|ad|at|in|da|della|di)\s+([A-Za-zÀ-ÿ\.\-\'\s]+?)(?:\s+d[aei]|\s+da\s+gioved|\s+da\s+vener|\s+per|\s+dal|$)/i,
+                  // Match "a Roma" or "ad Roma" at the end of string
+                  /(?:a|ad)\s+([A-Za-zÀ-ÿ\s\.\-\']+?)(?:\s*$)/i,
+                  // Match "in Italia", "in Roma" etc
+                  /(?:in)\s+([A-Za-zÀ-ÿ\s\.\-\']+?)(?:\s*$)/i,
+                  // Match "tempo a Roma", "previsioni Roma"
+                  /(?:tempo|meteo|previsioni|forecast)\s+(?:a\s+)?([A-Za-zÀ-ÿ\s\.\-\']+?)(?:\s*$)/i,
                 ]
                 let location = ""
                 for (const pattern of locationPatterns) {
                   const match = textParts.match(pattern)
                   if (match && match[1]) {
                     location = match[1].trim()
+                    // Clean up - remove trailing prepositions or days
+                    location = location.replace(/\s+(da|del|della|dalle|dai)\s+.*$/i, "")
+                    location = location.replace(/\s+(e|da|dei|degli|al|ai|alla|alle)\s+.*$/i, "")
                     break
                   }
                 }
@@ -293,7 +302,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
                   location = "Roma" // default
                 }
 
-                // Extract days if mentioned
+                // Extract days if mentioned (temporal "da giovedi")
                 const daysMatch = textParts.match(/(\d+)\s*giorn[oi]|(\d+)\s*days?/i)
                 const days = daysMatch ? parseInt(daysMatch[1] || daysMatch[2]) : 7
 

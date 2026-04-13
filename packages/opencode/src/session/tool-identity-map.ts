@@ -90,10 +90,18 @@ export namespace ToolIdentityMap {
 
   /**
    * NBA agency uses native tools directly.
-   * No mapping needed - these are native tool IDs.
+   * Native tool IDs: nba-games, nba-odds, nba-injuries
    */
   export const NBA_TOOL_MAP: Record<string, string> = {
-    // Native tools used directly - same ID
+    // NBA native tools - same ID as native tool
+    "nba-games": "nba-games",
+    "nba-odds": "nba-odds",
+    "nba-injuries": "nba-injuries",
+    // Adapter aliases (resolved by tool-identity-resolver)
+    "balldontlie.getGames": "balldontlie.getGames",
+    "balldontlie.getInjuries": "balldontlie.getInjuries",
+    "odds_bet365.getOdds": "odds_bet365.getOdds",
+    "odds_api.getOdds": "odds_api.getOdds",
   }
 
   // =============================================================================
