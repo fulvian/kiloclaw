@@ -44,7 +44,15 @@ KILO_NATIVE_FACTORY_CANARY_PERCENT=100    # 100% rollout (all users)
 See [docs/plans/KILOCLAW_FOUNDATION_PLAN.md](docs/plans/KILOCLAW_FOUNDATION_PLAN.md) for the full roadmap.  
 See [docs/agencies/plans/](docs/agencies/plans/) for Development Agency refactoring documentation.
 
-## Recent Fixes (2026-04-12)
+## Recent Fixes
+
+### Latest (2026-04-13)
+
+| Fix                         | Impact              | Details                                                                                                                                                                                                                                                               |
+| --------------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **MCP Tool Resolution Fix** | gworkspace restored | Fixed three-layer MCP key mismatch that prevented gworkspace tools (Gmail, Calendar, Drive, Docs, Sheets) from being invoked. Sanitization aligned across MCP index, broker, and identity map. See [DEPLOYMENT_STATUS_2026-04-13.md](DEPLOYMENT_STATUS_2026-04-13.md) |
+
+### Earlier (2026-04-12)
 
 | Fix                                 | Impact                 | Details                                                                                                                                                                                           |
 | ----------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -120,7 +128,8 @@ Run `kiloclaw agent list` to see all available agents.
 | [ADR-002](docs/adr/ADR-002_Memory_4_Layer.md)                                                                   | 4-layer memory architecture                      |
 | [ADR-003](docs/adr/ADR-003_Safety_Guardrails_Proactivity.md)                                                    | Safety, guardrails, proactivity policy           |
 | [ADR-004](docs/adr/ADR-004_Isolation_from_KiloCode.md)                                                          | Isolation from KiloCode runtime                  |
-| [DEPLOYMENT_STATUS](DEPLOYMENT_STATUS_2026-04-12.md)                                                            | Development Agency Shadow Mode deployment status |
+| [DEPLOYMENT_STATUS_GA](DEPLOYMENT_STATUS_2026-04-12.md)                                                         | Development Agency General Availability status   |
+| [DEPLOYMENT_STATUS_HOTFIX](DEPLOYMENT_STATUS_2026-04-13.md)                                                     | MCP Tool Resolution Fix deployment status        |
 | [ROLLOUT_PLAN](docs/agencies/plans/KILOCLAW_DEVELOPMENT_AGENCY_ROLLOUT_PLAN_V1_2026-04-12.md)                   | Phased rollout (shadow → canary → GA)            |
 | [GO_NO_GO_REVIEW](docs/agencies/plans/KILOCLAW_DEVELOPMENT_AGENCY_GO_NO_GO_REVIEW_V1_2026-04-12.md)             | Development Agency verification & gate review    |
 
