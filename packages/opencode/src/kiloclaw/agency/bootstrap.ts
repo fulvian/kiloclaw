@@ -20,7 +20,15 @@ import {
 } from "./lazy-registry"
 
 // Import all skills
-import { allSkills, knowledgeSkills, developmentSkills, nutritionSkills, weatherSkills } from "../skills"
+import {
+  allSkills,
+  knowledgeSkills,
+  developmentSkills,
+  nutritionSkills,
+  weatherSkills,
+  nbaSkills,
+  financeSkills,
+} from "../skills"
 
 // Import and register flexible agents
 import { registerFlexibleAgents } from "./agency-definitions"

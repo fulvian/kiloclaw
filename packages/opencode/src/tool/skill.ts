@@ -6,7 +6,14 @@ import { Skill } from "../skill"
 import { PermissionNext } from "../permission/next"
 import { Ripgrep } from "../file/ripgrep"
 import { iife } from "@/util/iife"
-import { knowledgeSkills, developmentSkills, nutritionSkills, weatherSkills, nbaSkills } from "../kiloclaw/skills" // kilocode_change - agency skills
+import {
+  knowledgeSkills,
+  developmentSkills,
+  nutritionSkills,
+  weatherSkills,
+  nbaSkills,
+  financeSkills,
+} from "../kiloclaw/skills" // kilocode_change - agency skills
 import type { Skill as KiloclawSkill } from "../kiloclaw/skill" // kilocode_change
 import { SKILL_TOOL_EXECUTE_MODE_ENABLED, SKILL_NO_SILENT_FALLBACK_ENABLED } from "../session/runtime-flags" // kilocode_change - P1 skill execute mode
 import { RuntimeRemediationMetrics } from "@/kiloclaw/telemetry/runtime-remediation.metrics" // kilocode_change - P1 telemetry
@@ -19,7 +26,7 @@ const BUILTIN = Skill.BUILTIN_LOCATION // kilocode_change
 export const SkillTool = Tool.define("skill", async (ctx) => {
   const skills = await Skill.all()
 
-  // kilocode_change start - include agency skills (Knowledge + Development)
+  // kilocode_change start - include agency skills (Knowledge + Development + Nutrition + Weather + NBA + Finance)
   // Convert kiloclaw skills to Skill.Info format
   // Note: kiloclaw skills have id, name, capabilities, tags but NOT description directly
   const buildAgencySkillDescription = (s: KiloclawSkill) =>
@@ -51,6 +58,12 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
       content: "",
     })),
     ...nbaSkills.map((s) => ({
+      name: s.id as string,
+      description: buildAgencySkillDescription(s),
+      location: "builtin" as const,
+      content: "",
+    })),
+    ...financeSkills.map((s) => ({
       name: s.id as string,
       description: buildAgencySkillDescription(s),
       location: "builtin" as const,
@@ -112,7 +125,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
           // kilocode_change start - show agency skills separately
           buildSkillsSection(
             agencySkillsList,
-            "<!-- Agency Skills (Knowledge + Development + Nutrition + Weather + NBA) -->",
+            "<!-- Agency Skills (Knowledge + Development + Nutrition + Weather + NBA + Finance) -->",
           ),
           buildSkillsSection(standardSkills, "<!-- Standard Skills -->"),
           // kilocode_change end
@@ -148,6 +161,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
         ...nutritionSkills,
         ...weatherSkills,
         ...nbaSkills,
+        ...financeSkills,
       ]
       const agencySkill = allKiloclawSkills.find((s) => s.id === params.name)
 
@@ -210,7 +224,9 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
               ? "nutrition"
               : weatherSkills.some((s) => s.id === agencySkill.id)
                 ? "weather"
-                : "nba"
+                : nbaSkills.some((s) => s.id === agencySkill.id)
+                  ? "nba"
+                  : "finance"
         const skillName = agencySkill.id as string // Cast branded SkillId to string
 
         // P1: Build skill output
@@ -220,7 +236,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
           "",
           content,
           "",
-          `This is a ${agencyType === "knowledge" ? "Knowledge" : agencyType === "development" ? "Development" : agencyType === "nutrition" ? "Nutrition" : agencyType === "weather" ? "Weather" : "NBA"} Agency skill.`,
+          `This is a ${agencyType === "knowledge" ? "Knowledge" : agencyType === "development" ? "Development" : agencyType === "nutrition" ? "Nutrition" : agencyType === "weather" ? "Weather" : agencyType === "nba" ? "NBA" : "Finance"} Agency skill.`,
           "</skill_content>",
         ].join("\n")
 

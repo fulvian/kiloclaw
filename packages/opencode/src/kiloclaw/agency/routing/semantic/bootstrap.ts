@@ -9,6 +9,7 @@ import {
   nutritionSkills,
   weatherSkills,
   nbaSkills,
+  financeSkills,
   allSkills,
 } from "@/kiloclaw/skills"
 import type { Skill } from "@/kiloclaw/skill"
@@ -35,6 +36,15 @@ function inferDomain(skill: Skill): Domain {
   }
   if (tags.includes("nba") || tags.includes("sports") || tags.includes("betting")) {
     return "nba"
+  }
+  if (
+    tags.includes("finance") ||
+    tags.includes("trading") ||
+    tags.includes("market") ||
+    name.includes("price") ||
+    name.includes("stock")
+  ) {
+    return "finance"
   }
 
   return "knowledge" // default
@@ -80,6 +90,13 @@ function extractKeywords(skill: Skill): string[] {
     "literature",
     "fact",
     "critical",
+    "price",
+    "market",
+    "trade",
+    "stock",
+    "risk",
+    "signal",
+    "technical",
   ]
 
   for (const pattern of patterns) {
@@ -615,17 +632,7 @@ function bootstrapFinanceCapabilities(): void {
       id: "finance_price_historical",
       domain: "finance" as Domain,
       description: "Get historical price data for technical analysis",
-      keywords: [
-        "historical",
-        "history",
-        "chart",
-        " candles",
-        "timeframe",
-        "daily",
-        "weekly",
-        "monthly",
-        "storico",
-      ],
+      keywords: ["historical", "history", "chart", " candles", "timeframe", "daily", "weekly", "monthly", "storico"],
       capabilities: ["price.historical"],
     },
     {
@@ -639,32 +646,14 @@ function bootstrapFinanceCapabilities(): void {
       id: "finance_fundamentals",
       domain: "finance" as Domain,
       description: "Get fundamental data: earnings, revenue, P/E ratio, book value",
-      keywords: [
-        "fundamental",
-               "earnings",
-        "revenue",
-        "pe ratio",
-        "book value",
-        "dividend",
-        "fondamentale",
-        "utili",
-      ],
+      keywords: ["fundamental", "earnings", "revenue", "pe ratio", "book value", "dividend", "fondamentale", "utili"],
       capabilities: ["fundamentals"],
     },
     {
       id: "finance_macro",
       domain: "finance" as Domain,
       description: "Get macroeconomic indicators: GDP, CPI, interest rates",
-      keywords: [
-        "macro",
-        "gdp",
-        "cpi",
-        "inflation",
-        "interest rate",
-        "unemployment",
-        "economico",
-        "macro",
-      ],
+      keywords: ["macro", "gdp", "cpi", "inflation", "interest rate", "unemployment", "economico", "macro"],
       capabilities: ["macro"],
     },
     {
@@ -718,33 +707,14 @@ function bootstrapFinanceCapabilities(): void {
       id: "finance_signal",
       domain: "finance" as Domain,
       description: "Generate trading signals with confidence scoring",
-      keywords: [
-        "signal",
-        "trading signal",
-        "buy",
-        "sell",
-        "long",
-        "short",
-        "segnale",
-        "acquisto",
-        "vendita",
-      ],
+      keywords: ["signal", "trading signal", "buy", "sell", "long", "short", "segnale", "acquisto", "vendita"],
       capabilities: ["signal.generation"],
     },
     {
       id: "finance_risk",
       domain: "finance" as Domain,
       description: "Risk assessment and portfolio analysis",
-      keywords: [
-        "risk",
-        "portfolio",
-        "VaR",
-        "drawdown",
-        "Sharpe",
-        "rischio",
-        "portfolio",
-        "esposizione",
-      ],
+      keywords: ["risk", "portfolio", "VaR", "drawdown", "Sharpe", "rischio", "portfolio", "esposizione"],
       capabilities: ["risk.assessment"],
     },
   ]

@@ -16,15 +16,15 @@ export interface RegistryStats {
 export interface Registry {
   // Skill management
   registerSkill(skill: Skill): void
-  unregisterSkill(skillId: SkillId): boolean
-  getSkill(skillId: SkillId, version?: SemanticVersion): Skill | undefined
+  unregisterSkill(skillId: string): boolean
+  getSkill(skillId: string, version?: SemanticVersion): Skill | undefined
   listSkills(): Skill[]
   findSkillsByCapability(capability: string): Skill[]
 
   // Tool management
   registerTool(tool: Tool): void
-  unregisterTool(toolId: ToolId): boolean
-  getTool(toolId: ToolId): Tool | undefined
+  unregisterTool(toolId: string): boolean
+  getTool(toolId: string): Tool | undefined
   listTools(): Tool[]
 
   // Stats
@@ -35,8 +35,8 @@ export interface Registry {
 export const Registry = {
   create: fn(z.object({}), () => {
     const log = Log.create({ service: "kiloclaw.registry" })
-    const skills = new Map<SkillId, Skill>()
-    const tools = new Map<ToolId, Tool>()
+    const skills = new Map<string, Skill>()
+    const tools = new Map<string, Tool>()
     const capabilities = new Set<string>()
 
     const registry: Registry = {
@@ -47,7 +47,7 @@ export const Registry = {
         log.info("skill registered", { skillId: skill.id, version: skill.version })
       },
 
-      unregisterSkill(skillId: SkillId): boolean {
+      unregisterSkill(skillId: string): boolean {
         const skill = skills.get(skillId)
         if (skill) {
           // Remove capabilities that are no longer used
@@ -67,7 +67,7 @@ export const Registry = {
         return false
       },
 
-      getSkill(skillId: SkillId, version?: SemanticVersion): Skill | undefined {
+      getSkill(skillId: string, version?: SemanticVersion): Skill | undefined {
         const skill = skills.get(skillId)
         if (!skill) return undefined
         if (version && skill.version !== version) return undefined
@@ -88,7 +88,7 @@ export const Registry = {
         log.info("tool registered", { toolId: tool.id })
       },
 
-      unregisterTool(toolId: ToolId): boolean {
+      unregisterTool(toolId: string): boolean {
         const deleted = tools.delete(toolId)
         if (deleted) {
           log.info("tool unregistered", { toolId })
@@ -96,7 +96,7 @@ export const Registry = {
         return deleted
       },
 
-      getTool(toolId: ToolId): Tool | undefined {
+      getTool(toolId: string): Tool | undefined {
         return tools.get(toolId)
       },
 

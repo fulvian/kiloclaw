@@ -1,7 +1,7 @@
 import { Log } from "@/util/log"
 import { fn } from "@/util/fn"
 import z from "zod"
-import { type SkillId, type SemanticVersion } from "./types"
+import { type SemanticVersion } from "./types"
 import type { SkillContext } from "./agency"
 export type { SkillContext }
 export { SkillContext as SkillContextType } from "./agency"
@@ -23,7 +23,7 @@ interface JsonSchema {
 
 // Skill interface
 export interface Skill {
-  readonly id: SkillId
+  readonly id: string
   readonly version: SemanticVersion
   readonly name: string
   readonly inputSchema: JsonSchema
@@ -36,7 +36,7 @@ export interface Skill {
 // Skill namespace with factory
 export namespace Skill {
   export interface Info {
-    readonly id: SkillId
+    readonly id: string
     readonly version: SemanticVersion
     readonly name: string
     readonly capabilities: string[]
@@ -62,7 +62,7 @@ export namespace Skill {
       const skillName = input.name
 
       const skill: Skill = {
-        id: skillId as SkillId,
+        id: skillId as string,
         version: input.version as SemanticVersion,
         name: skillName,
         inputSchema: input.inputSchema as unknown as JsonSchema,

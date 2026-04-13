@@ -137,12 +137,12 @@ describe("no-silent-fallback guardrail", () => {
   describe("runtime flag integration logic", () => {
     test("execute mode detection combines mode parameter and flag", () => {
       // When mode=execute is passed
-      let params = { mode: "execute" as const }
+      let params: { mode: string } = { mode: "execute" }
       let isExecuteMode = params.mode === "execute" || SKILL_TOOL_EXECUTE_MODE_ENABLED()
       expect(isExecuteMode).toBe(true)
 
       // When mode=load and flag disabled
-      params = { mode: "load" as const }
+      params = { mode: "load" }
       Flag.KILO_RUNTIME_SKILL_TOOL_EXECUTE_MODE_ENABLED = false
       isExecuteMode = params.mode === "execute" || SKILL_TOOL_EXECUTE_MODE_ENABLED()
       expect(isExecuteMode).toBe(false)
