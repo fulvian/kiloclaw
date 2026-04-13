@@ -32,6 +32,11 @@ Given a user intent, classify it into one or more of these capabilities:
 - document_analysis: Analyze documents
 - comparison: Compare options and solutions
 - refactoring: Refactor and improve code
+- nba_analysis: Analyze NBA games, teams, players, statistics
+- nba_schedule: Get NBA game schedules and fixtures
+- nba_injuries: Get NBA injury reports and player status
+- nba_odds: Get NBA betting odds and markets
+- nba_edge_detection: Analyze value betting opportunities
 
 User intent: "{intent}"
 
@@ -49,6 +54,7 @@ Given a user intent, classify it into one of these domains:
 - nutrition: Diet, food, nutrition analysis, recipes
 - weather: Weather forecasts, conditions, alerts
 - gworkspace: Gmail, Google Drive, Calendar, Docs, Sheets, workspace operations
+- nba: NBA games, statistics, injuries, betting analysis, odds, sports betting
 - custom: Custom/unknown tasks
 
 User intent: "{intent}"
@@ -158,6 +164,33 @@ function extractCapabilitiesFromKeywords(text: string): string[] {
     foglio: ["sheets.read"],
     refactor: ["refactoring"],
     simplify: ["refactoring"],
+    nba: ["nba_analysis", "nba_schedule", "nba_injuries", "nba_odds"],
+    basketball: ["nba_analysis", "nba_schedule"],
+    basket: ["nba_analysis", "nba_schedule"],
+    partita: ["nba_schedule"],
+    partite: ["nba_schedule"],
+    giocatore: ["nba_analysis"],
+    giocatori: ["nba_analysis"],
+    roster: ["nba_analysis"],
+    infortunio: ["nba_injuries"],
+    infortuni: ["nba_injuries"],
+    injury: ["nba_injuries"],
+    odds: ["nba_odds"],
+    scommessa: ["nba_odds", "nba_edge_detection"],
+    scommesse: ["nba_odds", "nba_edge_detection"],
+    betting: ["nba_odds", "nba_edge_detection"],
+    quote: ["nba_odds"],
+    quota: ["nba_odds"],
+    pronostico: ["nba_edge_detection"],
+    pronostici: ["nba_edge_detection"],
+    statistiche: ["nba_analysis"],
+    stats: ["nba_analysis"],
+    puntata: ["nba_odds"],
+    puntate: ["nba_odds"],
+    multipla: ["nba_odds", "nba_edge_detection"],
+    "play-in": ["nba_schedule"],
+    stagione: ["nba_schedule", "nba_analysis"],
+    playoffs: ["nba_schedule"],
   }
 
   for (const [keyword, caps] of Object.entries(keywordMap)) {
@@ -249,6 +282,54 @@ export function classifyDomainWithLLM(intent: SemanticIntent): string {
       "fogli",
       "workspace",
       "condivisi",
+    ],
+    nba: [
+      "nba",
+      "basketball",
+      "basket",
+      "partita",
+      "partite",
+      "squadre",
+      "giocatore",
+      "giocatori",
+      "roster",
+      "infortunio",
+      "infortuni",
+      "injury",
+      "odds",
+      "scommesse",
+      "scommessa",
+      "betting",
+      "quote",
+      "quota",
+      "lakers",
+      "celtics",
+      "warriors",
+      "heat",
+      "stagione",
+      "regular season",
+      "playoffs",
+      "western conference",
+      "eastern conference",
+      "pronostico",
+      "pronostici",
+      "statistiche",
+      "stats",
+      "puntata",
+      "puntate",
+      "multipla",
+      "over",
+      "under",
+      "handicap",
+      "spread",
+      "moneyline",
+      "parlay",
+      "acca",
+      "play-in",
+      "game tonight",
+      "stasera",
+      "notte",
+      "sera",
     ],
   }
 
