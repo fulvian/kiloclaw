@@ -13,41 +13,45 @@ export namespace ToolIdentityMap {
 
   /**
    * GWorkspace tool mapping: policy alias → MCP runtime key format
-   * MCP format: {clientName}_{toolName} with sanitization
+   * MCP format: {sanitizedClientName}_{toolName}
    *
-   * Example: "gmail.search" → "google_workspace_search_gmail_messages"
+   * Client name "google-workspace" sanitizes to "google-workspace" (hyphens preserved)
+   * Tool names come from MCP server (e.g., "search_gmail_messages")
+   * Combined: "google-workspace_search_gmail_messages"
+   *
+   * Example: "gmail.search" → "google-workspace_search_gmail_messages"
    */
   export const GWORKSPACE_TOOL_MAP: Record<string, string> = {
     // Gmail tools
-    "gmail.search": "google_workspace_search_gmail_messages",
-    "gmail.read": "google_workspace_read_gmail_message",
-    "gmail.draft": "google_workspace_create_gmail_draft",
-    "gmail.send": "google_workspace_send_gmail_message",
-    "gmail.list": "google_workspace_list_gmail_messages",
+    "gmail.search": "google-workspace_search_gmail_messages",
+    "gmail.read": "google-workspace_get_gmail_message_content",
+    "gmail.draft": "google-workspace_create_gmail_draft",
+    "gmail.send": "google-workspace_send_gmail_message",
+    "gmail.list": "google-workspace_list_gmail_messages",
 
     // Drive tools
-    "drive.search": "google_workspace_search_drive_files",
-    "drive.list": "google_workspace_list_drive_files",
-    "drive.read": "google_workspace_read_drive_file",
-    "drive.share": "google_workspace_share_drive_file",
-    "drive.create": "google_workspace_create_drive_file",
+    "drive.search": "google-workspace_search_drive_files",
+    "drive.list": "google-workspace_list_drive_items",
+    "drive.read": "google-workspace_get_drive_file_content",
+    "drive.share": "google-workspace_manage_drive_access",
+    "drive.create": "google-workspace_create_drive_file",
 
     // Calendar tools
-    "calendar.list": "google_workspace_list_calendars",
-    "calendar.read": "google_workspace_read_calendar_event",
-    "calendar.create": "google_workspace_create_calendar_event",
-    "calendar.update": "google_workspace_update_calendar_event",
-    "calendar.delete": "google_workspace_delete_calendar_event",
+    "calendar.list": "google-workspace_list_calendars",
+    "calendar.read": "google-workspace_get_events",
+    "calendar.create": "google-workspace_manage_event",
+    "calendar.update": "google-workspace_manage_event",
+    "calendar.delete": "google-workspace_manage_event",
 
     // Docs tools
-    "docs.read": "google_workspace_read_docs_document",
-    "docs.update": "google_workspace_update_docs_document",
-    "docs.create": "google_workspace_create_docs_document",
+    "docs.read": "google-workspace_get_doc_content",
+    "docs.update": "google-workspace_update_doc_content",
+    "docs.create": "google-workspace_create_doc_content",
 
     // Sheets tools
-    "sheets.read": "google_workspace_read_sheets_spreadsheet",
-    "sheets.update": "google_workspace_update_sheets_spreadsheet",
-    "sheets.create": "google_workspace_create_sheets_spreadsheet",
+    "sheets.read": "google-workspace_read_sheet_values",
+    "sheets.update": "google-workspace_update_sheet_values",
+    "sheets.create": "google-workspace_create_sheet",
   }
 
   // =============================================================================

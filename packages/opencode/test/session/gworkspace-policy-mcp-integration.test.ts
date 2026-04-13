@@ -14,13 +14,13 @@ import { isCanonicalAlias } from "../../src/session/tool-policy"
 // Mock MCP runtime keys (simulating what MCP server exposes)
 // These MUST match the actual mappings in tool-identity-map.ts
 const mockMcpTools: Record<string, string> = {
-  gworkspace_search_gmail_messages: "search",
-  gworkspace_list_gmail_messages: "list",
-  gworkspace_send_gmail_message: "send",
-  gworkspace_list_calendars: "calendar.list",
-  gworkspace_manage_event: "calendar.create",
-  gworkspace_list_drive_items: "drive.list",
-  gworkspace_create_drive_file: "drive.create",
+  "google-workspace_search_gmail_messages": "search",
+  "google-workspace_list_gmail_messages": "list",
+  "google-workspace_send_gmail_message": "send",
+  "google-workspace_list_calendars": "calendar.list",
+  "google-workspace_manage_event": "calendar.create",
+  "google-workspace_list_drive_items": "drive.list",
+  "google-workspace_create_drive_file": "drive.create",
 }
 
 // Mock policy allowlist with abstract aliases (from tool-identity-map.ts)
@@ -46,7 +46,7 @@ describe("gworkspace-policy-mcp integration", () => {
       expect(result.alias).toBe("gmail.search")
       expect(result.toolType).toBe("mcp")
       expect(result.resolved).toBe(true)
-      expect(result.runtimeKey).toBe("gworkspace_search_gmail_messages")
+      expect(result.runtimeKey).toBe("google-workspace_search_gmail_messages")
     })
 
     test("resolve returns ResolveResult for calendar.list", () => {
@@ -59,7 +59,7 @@ describe("gworkspace-policy-mcp integration", () => {
       expect(result.alias).toBe("calendar.list")
       expect(result.toolType).toBe("mcp")
       expect(result.resolved).toBe(true)
-      expect(result.runtimeKey).toBe("gworkspace_list_calendars")
+      expect(result.runtimeKey).toBe("google-workspace_list_calendars")
     })
 
     test("resolve returns unknown for non-existent alias", () => {
@@ -152,8 +152,8 @@ describe("gworkspace-policy-mcp integration", () => {
     test("handles policy with partial MCP coverage", () => {
       // Only some MCP tools are available
       const partialMcpTools = {
-        gworkspace_search_gmail_messages: "search",
-        gworkspace_list_calendars: "calendar.list",
+        "google-workspace_search_gmail_messages": "search",
+        "google-workspace_list_calendars": "calendar.list",
       }
 
       const filtered = ToolIdentityResolver.filterByPolicy(
@@ -192,10 +192,10 @@ describe("gworkspace-policy-mcp integration", () => {
       const result = ToolIdentityResolver.resolve("gmail.search", "agency-gworkspace", knownMcpKeysSet)
 
       expect(result.resolved).toBe(true)
-      expect(result.runtimeKey).toBe("gworkspace_search_gmail_messages")
+      expect(result.runtimeKey).toBe("google-workspace_search_gmail_messages")
 
       // And if we have partial MCP tools (some not available)
-      const partialMcpKeysSet = new Set(["gworkspace_search_gmail_messages", "gworkspace_list_calendars"])
+      const partialMcpKeysSet = new Set(["google-workspace_search_gmail_messages", "google-workspace_list_calendars"])
 
       const result2 = ToolIdentityResolver.resolve(
         "gmail.send", // This is not in partial set
