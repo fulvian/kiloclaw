@@ -272,6 +272,8 @@ export namespace RoutingPipeline {
     // Specialized agencies use native adapters, not generic web tools
     const isNbaAgency = agencyId === "agency-nba"
     const isFinanceAgency = agencyId === "agency-finance"
+    const isNutritionAgency = agencyId === "agency-nutrition"
+    const isWeatherAgency = agencyId === "agency-weather"
 
     const nbaCapabilityToTools: Record<string, string[]> = {
       schedule_live: ["balldontlie.getGames", "espn.getScoreboard"],
@@ -296,7 +298,7 @@ export namespace RoutingPipeline {
       macro: ["fred.data", "fmp.macro"],
       filings: ["fmp.filings"],
       news: ["finnhub.news", "fmp.news"],
-      "technical.indicators": ["skill"], // Computed by analytics engine
+      "technical.indicators": ["skill"],
       "chart.patterns": ["skill"],
       "factor.analysis": ["skill"],
       "stress.test": ["skill"],
@@ -313,6 +315,20 @@ export namespace RoutingPipeline {
       "report.generate": ["skill"],
     }
 
+    const nutritionCapabilityToTools: Record<string, string[]> = {
+      "nutrition-analysis": ["skill"],
+      "food-analysis": ["usda.fooddata", "openfoodfacts.products"],
+      "recipe-search": ["skill"],
+      "meal-planning": ["skill"],
+      "diet-generation": ["skill"],
+    }
+
+    const weatherCapabilityToTools: Record<string, string[]> = {
+      "weather-query": ["openweathermap.current"],
+      "weather-forecast": ["openweathermap.forecast"],
+      "weather-alerts": ["openweathermap.alerts"],
+    }
+
     const mapped = capabilities.flatMap((cap) => {
       // NBA-specific capability mapping
       if (isNbaAgency && cap in nbaCapabilityToTools) {
@@ -324,13 +340,23 @@ export namespace RoutingPipeline {
         return financeCapabilityToTools[cap as keyof typeof financeCapabilityToTools]
       }
 
+      // Nutrition-specific capability mapping
+      if (isNutritionAgency && cap in nutritionCapabilityToTools) {
+        return nutritionCapabilityToTools[cap as keyof typeof nutritionCapabilityToTools]
+      }
+
+      // Weather-specific capability mapping
+      if (isWeatherAgency && cap in weatherCapabilityToTools) {
+        return weatherCapabilityToTools[cap as keyof typeof weatherCapabilityToTools]
+      }
+
       // Generic capability mapping (for non-specialized agencies)
       if (["search", "web-search", "academic-research"].includes(cap)) return ["websearch"]
       if (["fact-checking", "verification", "source_grounding"].includes(cap)) return ["webfetch"]
       if (["synthesis", "information_gathering"].includes(cap)) return ["skill"]
       // Don't use generic tools for specialized agencies
       if (["schedule_live", "team_player_stats", "injury_status", "odds_markets", "game_preview"].includes(cap)) {
-        return isNbaAgency || isFinanceAgency ? [] : ["websearch", "webfetch", "skill"]
+        return isNbaAgency || isFinanceAgency || isNutritionAgency || isWeatherAgency ? [] : ["websearch", "webfetch", "skill"]
       }
       if (
         [
@@ -343,7 +369,7 @@ export namespace RoutingPipeline {
           "stake_sizing",
         ].includes(cap)
       ) {
-        return isNbaAgency || isFinanceAgency ? [] : ["skill", "webfetch"]
+        return isNbaAgency || isFinanceAgency || isNutritionAgency || isWeatherAgency ? [] : ["skill", "webfetch"]
       }
       return []
     })
@@ -393,6 +419,23 @@ export namespace RoutingPipeline {
                   "fred.data",
                   ...mapped,
                 ]
+              : agencyId === "agency-nutrition"
+                ? [
+                    "skill",
+                    // Food/Nutrition data adapters
+                    "usda.fooddata",
+                    "openfoodfacts.products",
+                    ...mapped,
+                  ]
+              : agencyId === "agency-weather"
+                ? [
+                    "skill",
+                    // Weather data adapters
+                    "openweathermap.current",
+                    "openweathermap.forecast",
+                    "openweathermap.alerts",
+                    ...mapped,
+                  ]
               : agencyId === "agency-gworkspace"
                 ? [
                     "gmail.search",

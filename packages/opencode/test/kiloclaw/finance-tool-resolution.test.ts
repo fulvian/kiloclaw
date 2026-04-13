@@ -98,7 +98,7 @@ describe("Finance Tool Resolution (L3)", () => {
 
     for (const tool of allFinanceTools) {
       const l3Result = await RoutingPipeline.resolveTools("agency-finance", undefined, undefined, [tool])
-      expect(l3Result.deniedTools).not.toContain(tool, `Tool ${tool} should not be denied`)
+      expect(l3Result.deniedTools).not.toContain(tool)
     }
 
     console.log(`All ${allFinanceTools.length} Finance tools allowed ✅`)
