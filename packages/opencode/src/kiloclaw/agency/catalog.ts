@@ -935,7 +935,7 @@ export class AgencyCatalog {
 
         const current = weatherData.current
         const wmoCode = current?.weather_code ?? 0
-        const condition = this.wmoCodeToDescription(wmoCode)
+        const condition = AgencyCatalog.wmoCodeToDescription(wmoCode)
 
         return [
           {
@@ -1129,7 +1129,7 @@ export class AgencyCatalog {
   }
 
   // Helper to convert WMO weather codes to descriptions
-  private wmoCodeToDescription(code: number): string {
+  private static wmoCodeToDescription(code: number): string {
     const wmoCodes: Record<number, string> = {
       0: "Clear sky",
       1: "Mainly clear",
