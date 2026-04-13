@@ -116,9 +116,7 @@ interface WeatherCurrentOutput {
 }
 
 // Geocode location using Open-Meteo Geocoding API
-async function geocode(
-  location: string,
-): Promise<{
+async function geocode(location: string): Promise<{
   latitude: number
   longitude: number
   name: string
@@ -193,12 +191,7 @@ export const WeatherCurrentSkill: Skill = {
     type: "object",
     properties: {
       location: { type: "string", description: "City or location name" },
-      units: {
-        type: "string",
-        enum: ["metric", "imperial"],
-        default: "metric",
-        description: "Unit system for temperature and wind",
-      },
+      units: { type: "string", enum: ["metric", "imperial"], description: "Unit system for temperature and wind" },
     },
     required: ["location"],
   },

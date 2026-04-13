@@ -192,12 +192,10 @@ export const WeatherForecastSkill: Skill = {
         description: "Number of days to forecast (1-16)",
         minimum: 1,
         maximum: 16,
-        default: 7,
       },
       units: {
         type: "string",
         enum: ["metric", "imperial"],
-        default: "metric",
         description: "Unit system for temperature and wind",
       },
     },

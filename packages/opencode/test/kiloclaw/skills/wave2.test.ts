@@ -82,19 +82,36 @@ interface WeatherCurrentResult {
   conditions: {
     temperature: number
     condition: string
+    conditionCode?: number
+    description?: string
     humidity: number
     windSpeed: number
     windDirection: string
+    windDirectionDegrees?: number
     feelsLike: number
     pressure: number
     visibility: number
     uvIndex: number
     cloudCover: number
+    precipitation?: number
+    isDay?: boolean
   }
-  location: string
-  temp: number
+  location: {
+    name: string
+    latitude?: number
+    longitude?: number
+    timezone?: string
+    country?: string
+    admin1?: string
+  }
+  temp?: number
+  tempF?: number
   localTime: string
   observationTime: string
+  provider?: { id: string; name: string; attribution?: string }
+  fallbackChain?: string[]
+  errors?: Array<{ provider: string; error: string; timestamp: string }>
+  meta?: { generationTimeMs: number; cached: boolean }
 }
 
 // Test fixtures
@@ -325,7 +342,7 @@ describe("WP4.3 Wave 2: Weather Agency Skills", () => {
   describe("weather-forecast skill", () => {
     it("should have correct metadata", () => {
       expect(WeatherForecastSkill.id as string).toBe("weather-forecast")
-      expect(WeatherForecastSkill.version).toEqual("1.0.0")
+      expect(WeatherForecastSkill.version).toEqual("2.0.0")
       expect(WeatherForecastSkill.name).toBe("Weather Forecast")
       expect(WeatherForecastSkill.capabilities).toContain("prediction")
       expect(WeatherForecastSkill.capabilities).toContain("multi_day")
@@ -339,7 +356,7 @@ describe("WP4.3 Wave 2: Weather Agency Skills", () => {
       )) as WeatherForecastResult
       expect(result).toHaveProperty("forecast")
       expect(result).toHaveProperty("location")
-      expect(result).toHaveProperty("timezone")
+      expect(result.location).toHaveProperty("timezone")
       expect(result.forecast.length).toBe(5)
     })
 
@@ -351,12 +368,12 @@ describe("WP4.3 Wave 2: Weather Agency Skills", () => {
       expect(result.forecast.length).toBe(7)
     })
 
-    it("should limit to max 7 days", async () => {
+    it("should limit to max 16 days", async () => {
       const result = (await WeatherForecastSkill.execute(
         { location: "Chicago", days: 10 },
         SKILL_CONTEXT,
       )) as WeatherForecastResult
-      expect(result.forecast.length).toBe(7)
+      expect(result.forecast.length).toBe(10)
     })
 
     it("should have forecast items with required fields", async () => {
@@ -387,7 +404,7 @@ describe("WP4.3 Wave 2: Weather Agency Skills", () => {
   describe("weather-alerts skill", () => {
     it("should have correct metadata", () => {
       expect(WeatherAlertsSkill.id as string).toBe("weather-alerts")
-      expect(WeatherAlertsSkill.version).toEqual("1.0.0")
+      expect(WeatherAlertsSkill.version).toEqual("2.0.0")
       expect(WeatherAlertsSkill.name).toBe("Weather Alerts")
       expect(WeatherAlertsSkill.capabilities).toContain("warning_detection")
       expect(WeatherAlertsSkill.capabilities).toContain("notification")
@@ -430,7 +447,7 @@ describe("WP4.3 Wave 2: Weather Agency Skills", () => {
   describe("weather-current skill", () => {
     it("should have correct metadata", () => {
       expect(WeatherCurrentSkill.id as string).toBe("weather-current")
-      expect(WeatherCurrentSkill.version).toEqual("1.0.0")
+      expect(WeatherCurrentSkill.version).toEqual("2.0.0")
       expect(WeatherCurrentSkill.name).toBe("Current Weather Conditions")
       expect(WeatherCurrentSkill.capabilities).toContain("current_conditions")
       expect(WeatherCurrentSkill.tags).toContain("weather")
@@ -449,7 +466,10 @@ describe("WP4.3 Wave 2: Weather Agency Skills", () => {
     })
 
     it("should return temperature in Fahrenheit", async () => {
-      const result = (await WeatherCurrentSkill.execute({ location: "Phoenix" }, SKILL_CONTEXT)) as WeatherCurrentResult
+      const result = (await WeatherCurrentSkill.execute(
+        { location: "Phoenix", units: "imperial" },
+        SKILL_CONTEXT,
+      )) as WeatherCurrentResult
       // Check if temp is in reasonable Fahrenheit range (32-120 F)
       expect(result.temp).toBeGreaterThanOrEqual(32)
       expect(result.temp).toBeLessThanOrEqual(120)
@@ -474,7 +494,7 @@ describe("WP4.3 Wave 2: Weather Agency Skills", () => {
     it("should handle empty location", async () => {
       const result = (await WeatherCurrentSkill.execute({ location: "" }, SKILL_CONTEXT)) as WeatherCurrentResult
       expect(result.conditions.temperature).toBe(0)
-      expect(result.location).toBe("")
+      expect(result.location.name).toBe("")
     })
   })
 })
