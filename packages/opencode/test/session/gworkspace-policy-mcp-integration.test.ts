@@ -7,10 +7,9 @@
  * (e.g., google_workspace_search_gmail_messages).
  */
 
-import { describe, expect, test, beforeEach } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import { ToolIdentityResolver } from "../../src/session/tool-identity-resolver"
 import { isCanonicalAlias } from "../../src/session/tool-policy"
-import { Flag } from "../../src/flag/flag"
 
 // Mock MCP runtime keys (simulating what MCP server exposes)
 // These MUST match the actual mappings in tool-identity-map.ts
@@ -36,11 +35,6 @@ const mockPolicyAllowlist = [
 ]
 
 describe("gworkspace-policy-mcp integration", () => {
-  beforeEach(() => {
-    Flag.KILO_RUNTIME_TOOL_IDENTITY_RESOLVER_ENABLED = true
-    Flag.KILO_RUNTIME_TOOL_IDENTITY_RESOLVER_SHADOW = false
-  })
-
   describe("canonical alias resolution via ToolIdentityResolver", () => {
     test("resolve returns ResolveResult for gmail.search", () => {
       const result = ToolIdentityResolver.resolve(
@@ -170,6 +164,47 @@ describe("gworkspace-policy-mcp integration", () => {
 
       // gmail.search should be allowed
       expect(filtered.allowed.some((k) => k.includes("gmail"))).toBe(true)
+    })
+
+    test("detects when runtime key not in knownMcpKeys set", () => {
+      // Test the critical fix: knownMcpKeys validation
+      // When an alias maps to a runtime key not in the knownMcpKeys set,
+      // resolution should fail with resolved: false
+      const result = ToolIdentityResolver.resolve(
+        "gmail.search",
+        "agency-gworkspace",
+        new Set(), // Empty set - no known MCP keys
+      )
+
+      expect(result.resolved).toBe(false)
+      expect(result.reason).toContain("not found in MCP tools")
+    })
+
+    test("validates runtime keys against knownMcpKeys set in prompt.ts scenario", () => {
+      // Simulate the fix in prompt.ts:
+      // 1. Get all MCP tools
+      // 2. Create Set of known MCP keys
+      // 3. Pass to resolver for validation
+      const allMcpKeys = Object.keys(mockMcpTools)
+      const knownMcpKeysSet = new Set(allMcpKeys)
+
+      // Now resolve should work
+      const result = ToolIdentityResolver.resolve("gmail.search", "agency-gworkspace", knownMcpKeysSet)
+
+      expect(result.resolved).toBe(true)
+      expect(result.runtimeKey).toBe("google_workspace_search_gmail_messages")
+
+      // And if we have partial MCP tools (some not available)
+      const partialMcpKeysSet = new Set(["google_workspace_search_gmail_messages", "google_workspace_list_calendars"])
+
+      const result2 = ToolIdentityResolver.resolve(
+        "gmail.send", // This is not in partial set
+        "agency-gworkspace",
+        partialMcpKeysSet,
+      )
+
+      // Should fail validation because the runtime key is not available
+      expect(result2.resolved).toBe(false)
     })
   })
 })
