@@ -118,12 +118,16 @@ describe("kiloclaw.routing.pipeline", () => {
       "codesearch",
     ])
     expect(l3.toolsRequested).toBe(4)
-    expect(l3.toolsResolved).toBe(3)
-    expect(l3.toolsDenied).toBe(1)
+    // After fix: websearch and webfetch are DENIED for NBA (not generic tools)
+    // skill is allowed, codesearch is denied
+    expect(l3.toolsResolved).toBe(1) // only "skill"
+    expect(l3.toolsDenied).toBe(3) // webfetch, websearch, codesearch all denied
     expect(l3.deniedTools).toContain("codesearch")
+    expect(l3.deniedTools).toContain("webfetch")
+    expect(l3.deniedTools).toContain("websearch")
     expect(l3.blockedTools).toContain("codesearch")
-    expect(l3.deniedTools).not.toContain("webfetch")
-    expect(l3.deniedTools).not.toContain("websearch")
+    expect(l3.blockedTools).toContain("websearch")
+    expect(l3.blockedTools).toContain("webfetch")
     expect(l3.fallbackUsed).toBe(false)
   })
 
