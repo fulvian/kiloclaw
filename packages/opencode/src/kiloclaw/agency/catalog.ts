@@ -903,7 +903,63 @@ export class AgencyCatalog {
   }
 
   private bootstrapWeatherProviders(): void {
-    // OpenWeatherMap
+    // Open-Meteo (primary - no API key required)
+    this.registerProvider({
+      name: "open-meteo",
+      agency: "weather",
+      async search(query: SearchQuery): Promise<SearchResult[]> {
+        // First geocode using Open-Meteo Geocoding API
+        const geoResponse = await fetch(
+          `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query.query)}&count=1&language=en&format=json`,
+        )
+        const geoData = await geoResponse.json()
+
+        if (!geoData.results?.length) {
+          return [
+            {
+              title: `Weather for ${query.query}`,
+              url: "",
+              description: "Location not found",
+              provider: "open-meteo",
+            },
+          ]
+        }
+
+        const { latitude, longitude, name, country, admin1 } = geoData.results[0]
+
+        // Get current weather from Open-Meteo
+        const weatherResponse = await fetch(
+          `https://api.open-meteo.com/v1/current?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m&timezone=auto`,
+        )
+        const weatherData = await weatherResponse.json()
+
+        const current = weatherData.current
+        const wmoCode = current?.weather_code ?? 0
+        const condition = this.wmoCodeToDescription(wmoCode)
+
+        return [
+          {
+            title: `Current Weather in ${name}${admin1 ? `, ${admin1}` : ""}, ${country}`,
+            url: `https://open-meteo.com/en/docs`,
+            description: `${condition}, ${current?.temperature_2m ?? "?"}°C, Feels like ${current?.apparent_temperature ?? "?"}°C, Humidity ${current?.relative_humidity_2m ?? "?"}%`,
+            publishedAt: current?.time ? new Date(current.time).toISOString() : new Date().toISOString(),
+            provider: "open-meteo",
+          },
+        ]
+      },
+      async health(): Promise<boolean> {
+        try {
+          const response = await fetch(
+            "https://api.open-meteo.com/v1/current?latitude=45.4642&longitude=9.1900&current=temperature_2m",
+          )
+          return response.ok
+        } catch {
+          return false
+        }
+      },
+    })
+
+    // OpenWeatherMap (secondary - requires API key)
     this.registerProvider({
       name: "openweathermap",
       agency: "weather",
@@ -951,7 +1007,153 @@ export class AgencyCatalog {
       },
     })
 
+    // NWS/NOAA (tertiary - US alerts only)
+    this.registerProvider({
+      name: "nws",
+      agency: "weather",
+      async search(query: SearchQuery): Promise<SearchResult[]> {
+        // First geocode using Nominatim (OpenStreetMap)
+        const geoResponse = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query.query)}&format=json&limit=1`,
+          { headers: { "User-Agent": "Kiloclaw-Weather/1.0" } },
+        )
+        const geoData = await geoResponse.json()
+
+        if (!geoData.length) {
+          return [
+            {
+              title: `Weather alerts for ${query.query}`,
+              url: "",
+              description: "Location not found",
+              provider: "nws",
+            },
+          ]
+        }
+
+        const { lat, lon, address } = geoData[0]
+
+        // Check if in US
+        const countryCode = address?.country_code?.toUpperCase()
+        if (countryCode !== "US") {
+          return [
+            {
+              title: `Weather alerts for ${query.query}`,
+              url: "",
+              description: "NWS alerts only available for US locations",
+              provider: "nws",
+            },
+          ]
+        }
+
+        // Get NWS grid point
+        const pointsResponse = await fetch(`https://api.weather.gov/points/${lat},${lon}`, {
+          headers: { "User-Agent": "Kiloclaw-Weather/1.0" },
+        })
+
+        if (!pointsResponse.ok) {
+          return [
+            {
+              title: `Weather alerts for ${query.query}`,
+              url: "",
+              description: "Could not retrieve NWS data",
+              provider: "nws",
+            },
+          ]
+        }
+
+        const pointsData = await pointsResponse.json()
+        const alertsUrl = pointsData.properties?.forecastZone?.split("/").pop()
+
+        if (!alertsUrl) {
+          return [
+            {
+              title: `Weather alerts for ${query.query}`,
+              url: "",
+              description: "No alert zone found",
+              provider: "nws",
+            },
+          ]
+        }
+
+        // Get alerts
+        const alertsResponse = await fetch(`https://api.weather.gov/alerts/active?zone=${alertsUrl}`, {
+          headers: { "User-Agent": "Kiloclaw-Weather/1.0" },
+        })
+
+        if (!alertsResponse.ok) {
+          return [
+            {
+              title: `Weather alerts for ${query.query}`,
+              url: "",
+              description: "Could not retrieve alerts",
+              provider: "nws",
+            },
+          ]
+        }
+
+        const alertsData = await alertsResponse.json()
+        const alerts = alertsData.features || []
+
+        if (alerts.length === 0) {
+          return [
+            {
+              title: `No active alerts for ${query.query}`,
+              url: "https://www.weather.gov/",
+              description: "No active weather alerts for this area",
+              provider: "nws",
+            },
+          ]
+        }
+
+        return alerts.slice(0, 3).map((alert: any) => ({
+          title: alert.properties?.headline || alert.properties?.event || "Weather Alert",
+          url: alert.id || "https://www.weather.gov/",
+          description: `${alert.properties?.event || ""} - ${alert.properties?.description || ""}`.slice(0, 200),
+          publishedAt: alert.properties?.sent || new Date().toISOString(),
+          provider: "nws",
+        }))
+      },
+      async health(): Promise<boolean> {
+        try {
+          const response = await fetch("https://api.weather.gov/points/40.71,-74.00", {
+            headers: { "User-Agent": "Kiloclaw-Weather/1.0" },
+          })
+          return response.ok
+        } catch {
+          return false
+        }
+      },
+    })
+
     this.log.debug("weather providers bootstrapped", { count: this.listProviders("weather").length })
+  }
+
+  // Helper to convert WMO weather codes to descriptions
+  private wmoCodeToDescription(code: number): string {
+    const wmoCodes: Record<number, string> = {
+      0: "Clear sky",
+      1: "Mainly clear",
+      2: "Partly cloudy",
+      3: "Overcast",
+      45: "Fog",
+      48: "Depositing rime fog",
+      51: "Light drizzle",
+      53: "Moderate drizzle",
+      55: "Dense drizzle",
+      61: "Slight rain",
+      63: "Moderate rain",
+      65: "Heavy rain",
+      71: "Slight snow",
+      73: "Moderate snow",
+      75: "Heavy snow",
+      80: "Slight rain showers",
+      81: "Moderate rain showers",
+      82: "Violent rain showers",
+      95: "Thunderstorm",
+      96: "Thunderstorm with slight hail",
+      99: "Thunderstorm with heavy hail",
+    }
+    return wmoCodes[code] || `Weather code ${code}`
   }
 }
 

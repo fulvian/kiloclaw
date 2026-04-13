@@ -356,7 +356,9 @@ export namespace RoutingPipeline {
       if (["synthesis", "information_gathering"].includes(cap)) return ["skill"]
       // Don't use generic tools for specialized agencies
       if (["schedule_live", "team_player_stats", "injury_status", "odds_markets", "game_preview"].includes(cap)) {
-        return isNbaAgency || isFinanceAgency || isNutritionAgency || isWeatherAgency ? [] : ["websearch", "webfetch", "skill"]
+        return isNbaAgency || isFinanceAgency || isNutritionAgency || isWeatherAgency
+          ? []
+          : ["websearch", "webfetch", "skill"]
       }
       if (
         [
@@ -427,49 +429,49 @@ export namespace RoutingPipeline {
                     "openfoodfacts.products",
                     ...mapped,
                   ]
-              : agencyId === "agency-weather"
-                ? [
-                    "skill",
-                    // Weather data adapters
-                    "openweathermap.current",
-                    "openweathermap.forecast",
-                    "openweathermap.alerts",
-                    ...mapped,
-                  ]
-              : agencyId === "agency-gworkspace"
-                ? [
-                    "gmail.search",
-                    "gmail.read",
-                    "gmail.draft",
-                    "gmail.send",
-                    "drive.search",
-                    "drive.list",
-                    "drive.read",
-                    "drive.share",
-                    "calendar.list",
-                    "calendar.read",
-                    "calendar.create",
-                    "calendar.update",
-                    "docs.read",
-                    "docs.update",
-                    "sheets.read",
-                    "sheets.update",
-                    ...mapped,
-                  ]
-                : agencyId === "agency-development"
-                ? [
-                    "read",
-                    "glob",
-                    "grep",
-                    "apply_patch",
-                    "bash",
-                    "skill",
-                    "codesearch",
-                    "websearch",
-                    "webfetch",
-                    ...mapped,
-                  ]
-                : mapped,
+                : agencyId === "agency-weather"
+                  ? [
+                      "skill",
+                      // Weather data adapters
+                      "openweathermap.current",
+                      "openweathermap.forecast",
+                      "openweathermap.alerts",
+                      ...mapped,
+                    ]
+                  : agencyId === "agency-gworkspace"
+                    ? [
+                        "gmail.search",
+                        "gmail.read",
+                        "gmail.draft",
+                        "gmail.send",
+                        "drive.search",
+                        "drive.list",
+                        "drive.read",
+                        "drive.share",
+                        "calendar.list",
+                        "calendar.read",
+                        "calendar.create",
+                        "calendar.update",
+                        "docs.read",
+                        "docs.update",
+                        "sheets.read",
+                        "sheets.update",
+                        ...mapped,
+                      ]
+                    : agencyId === "agency-development"
+                      ? [
+                          "read",
+                          "glob",
+                          "grep",
+                          "apply_patch",
+                          "bash",
+                          "skill",
+                          "codesearch",
+                          "websearch",
+                          "webfetch",
+                          ...mapped,
+                        ]
+                      : mapped,
       ),
     )
     const candidates = requestedTools ?? allowlist
@@ -684,7 +686,39 @@ function doExtractCapabilities(intent: Intent): string[] {
     test: ["test", "testing", "verify"],
     planning: ["plan", "planning", "roadmap"],
     nutrition: ["nutrition", "food", "diet", "meal", "calorie"],
-    weather: ["weather", "temperature", "forecast", "rain"],
+    weather: [
+      "weather",
+      "temperature",
+      "temperatura",
+      "forecast",
+      "previsioni",
+      "rain",
+      "pioggia",
+      "sun",
+      "sole",
+      "snow",
+      "neve",
+      "meteo",
+      "clima",
+      "humidity",
+      "umidità",
+      "wind",
+      "vento",
+      "alert",
+      "allerta",
+      "warning",
+      "avviso",
+      "cloudy",
+      "nuvoloso",
+      "storm",
+      "tempesta",
+      "fog",
+      "nebbia",
+      "hot",
+      "cold",
+      "caldo",
+      "freddo",
+    ],
     nba_analysis: ["nba", "basketball", "partita", "partite", "game", "games", "analisi", "analysis"],
     schedule_live: ["schedule", "tonight", "today", "programma", "sera", "notte", "live", "score"],
     team_player_stats: ["statistiche", "stats", "player", "players", "team", "squadra", "squadre", "realizzatori"],

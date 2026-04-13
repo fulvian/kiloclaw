@@ -1247,6 +1247,59 @@ export namespace SessionPrompt {
             "Past performance is not indicative of future results. Investing involves risk of loss.",
             "",
           ].join("\n")
+        } else if (agencyContext.agencyId === "agency-weather") {
+          agencyBlock = [
+            "",
+            "<!-- Agency Context: Weather Agency -->",
+            "This conversation has been routed to the Weather Agency.",
+            `Routing confidence: ${Math.round(agencyContext.confidence * 100)}%`,
+            `Routing reason: ${agencyContext.reason}`,
+            `Routing source: ${agencyContext.routeSource}`,
+            ...(agencyContext.fallbackUsed ? [`Routing fallback: ${agencyContext.fallbackReason ?? "none"}`] : []),
+            ...(agencyContext.layers?.L1
+              ? [
+                  `L1 capabilities: ${agencyContext.layers.L1.capabilities.join(", ") || "none"}`,
+                  `L1 route type: ${agencyContext.layers.L1.routeResult?.type ?? "fallback"}`,
+                ]
+              : []),
+            ...(agencyContext.layers?.L2
+              ? [
+                  `L2 agent: ${agencyContext.layers.L2.agentId ?? "none"}`,
+                  `L2 health: ${agencyContext.layers.L2.agentHealth}`,
+                ]
+              : []),
+            ...(agencyContext.layers?.L3
+              ? [
+                  `L3 tools denied: ${agencyContext.layers.L3.toolsDenied}`,
+                  `L3 fallback used: ${agencyContext.layers.L3.fallbackUsed}`,
+                ]
+              : []),
+            "",
+            "CRITICAL TOOL INSTRUCTIONS:",
+            "- For weather queries: use ONLY the 'weather-api' tool or weather skills (weather-current, weather-forecast, weather-alerts)",
+            "- 'weather-api' provides access to: Open-Meteo, OpenWeatherMap, NWS alerts",
+            "- DO NOT use websearch or webfetch for weather data - use the Weather Agency providers",
+            "- DO NOT make up weather statistics, temperatures, or forecasts",
+            "- DO NOT provide weather advice that could lead to safety risks",
+            "- Always include uncertainty ranges for forecasts when available",
+            "- Always show provider attribution in responses",
+            "",
+            "WEATHER AGENCY SKILLS:",
+            "- For current conditions: use weather-current skill",
+            "- For forecasts: use weather-forecast skill",
+            "- For alerts: use weather-alerts skill",
+            "",
+            "PROVIDER PRIORITY:",
+            "- Primary: Open-Meteo (global, free, no API key required)",
+            "- Fallback: OpenWeatherMap (requires API key)",
+            "- Alerts fallback: NWS/NOAA (US alerts only)",
+            "",
+            "OUTPUT REQUIREMENTS:",
+            "- All responses must include provider metadata",
+            "- Forecasts must include uncertainty/confidence fields",
+            "- Alerts must include severity and effective/expires times",
+            "",
+          ].join("\n")
         }
 
         if (agencyBlock) {

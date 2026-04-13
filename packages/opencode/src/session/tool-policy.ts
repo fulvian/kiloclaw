@@ -33,6 +33,8 @@ export type CanonicalToolId =
   | "codesearch"
   // Finance
   | "finance-api"
+  // Weather
+  | "weather-api"
 
 /**
  * Returns the canonical tool IDs for a given agency.
@@ -68,6 +70,8 @@ export function getAgencyCanonicalToolIds(agencyId: string): CanonicalToolId[] {
       return ["read", "glob", "grep", "apply_patch", "bash", "skill", "codesearch", "websearch", "webfetch"]
     case "agency-finance":
       return ["finance-api", "skill", "websearch", "webfetch"]
+    case "agency-weather":
+      return ["weather-api", "skill"]
     default:
       return []
   }
@@ -114,6 +118,7 @@ export const DEVELOPMENT_TOOL_ALLOWLIST = [
 ] as const
 
 export const FINANCE_TOOL_ALLOWLIST = ["finance-api", "skill", "websearch", "webfetch"] as const
+export const WEATHER_TOOL_ALLOWLIST = ["weather-api", "skill"] as const
 
 export function mapKnowledgeCapabilitiesToTools(capabilities: string[]) {
   const tools = capabilities.flatMap((cap) => {
@@ -228,6 +233,57 @@ export function mapFinanceCapabilitiesToTools(capabilities: string[]) {
   return Array.from(new Set(tools))
 }
 
+export function mapWeatherCapabilitiesToTools(capabilities: string[]) {
+  const tools = capabilities.flatMap((cap) => {
+    // Current conditions
+    if (
+      [
+        "current_conditions",
+        "current_observation",
+        "current_astronomy",
+        "weather_monitoring",
+        "real_time_data",
+        "temperature",
+        "humidity",
+        "wind",
+      ].includes(cap)
+    ) {
+      return ["weather-api"]
+    }
+    // Forecast capabilities
+    if (
+      [
+        "forecast_daily",
+        "forecast_hourly",
+        "forecast_probabilistic",
+        "forecast_minutely",
+        "prediction",
+        "multi_day",
+        "weather_analysis",
+        "precipitation",
+      ].includes(cap)
+    ) {
+      return ["weather-api"]
+    }
+    // Alert capabilities
+    if (
+      [
+        "alerts_severe",
+        "alerts_advisory",
+        "alerts_summary",
+        "warning_detection",
+        "notification",
+        "safety_alerts",
+        "severe_weather",
+      ].includes(cap)
+    ) {
+      return ["weather-api"]
+    }
+    return []
+  })
+  return Array.from(new Set(tools))
+}
+
 export function resolveAgencyAllowedTools(input: {
   agencyId?: string | null
   enabled: boolean
@@ -279,6 +335,15 @@ export function resolveAgencyAllowedTools(input: {
   if (input.agencyId === "agency-finance") {
     const mapped = mapFinanceCapabilitiesToTools(input.capabilities ?? [])
     const allowedTools = Array.from(new Set([...FINANCE_TOOL_ALLOWLIST, ...mapped]))
+    return {
+      enabled: true,
+      allowedTools,
+    }
+  }
+
+  if (input.agencyId === "agency-weather") {
+    const mapped = mapWeatherCapabilitiesToTools(input.capabilities ?? [])
+    const allowedTools = Array.from(new Set([...WEATHER_TOOL_ALLOWLIST, ...mapped]))
     return {
       enabled: true,
       allowedTools,
