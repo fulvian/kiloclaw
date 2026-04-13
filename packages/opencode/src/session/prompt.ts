@@ -1068,24 +1068,41 @@ export namespace SessionPrompt {
               ? [
                   `L3 tools denied: ${agencyContext.layers.L3.toolsDenied}`,
                   `L3 fallback used: ${agencyContext.layers.L3.fallbackUsed}`,
+                  `L3 policy enforced: true`, // NUOVO (FIX 6)
                 ]
               : []),
             "",
+            "<!-- HARD POLICY (Runtime Enforcement) -->",
+            "⚠️  IMPORTANT: Tool policy is enforced at runtime, independent of prompt guidance.",
+            "The tools below are determined by policy, not softly suggested:",
+            "",
+            "ALLOWED TOOLS (Hard Policy Enforcement):",
+            "- read, glob, grep, codesearch: Read-only file operations (SAFE)",
+            "- apply_patch: Apply code patches with verification (NOTIFY)",
+            "- bash: Execute build/test/git scripts (NOTIFY)",
+            "- skill: Invoke development skills (NOTIFY)",
+            "",
+            "BLOCKED TOOLS (Denied by Policy):",
+            "- websearch, webfetch: Use native code analysis instead",
+            "- codesearch_web: Only local codesearch allowed",
+            "",
             "CRITICAL TOOL INSTRUCTIONS:",
-            "- Use native development tools first: read, glob, grep, apply_patch, and bash for build/test/git",
-            "- Keep deny-by-default behavior: if a capability is denied, do not route to MCP fallback",
-            "- Use deterministic fallback only for allowed capability gaps or exhausted native retries",
-            "- Never execute destructive git operations or secret exfiltration flows",
+            "- All tool invocations validated against policy before execution",
+            "- If a tool is not in the ALLOWED list above, it WILL BE BLOCKED",
+            "- Do NOT attempt to work around policy via skill definitions",
+            "- Prioritize native tools over any MCP fallback",
             "",
-            "SKILL USAGE HINTS:",
-            "- For debugging and incidents: systematic-debugging + verification-before-completion",
-            "- For feature delivery: spec-driven-development + test-driven-development",
-            "- For review cycles: code-review-discipline + receiving-code-review/requesting-code-review",
+            "WORKFLOW GUIDANCE:",
+            "- For debugging: use systematic-debugging + verification-before-completion",
+            "- For feature delivery: use spec-driven-development + test-driven-development",
+            "- For code review: use code-review-discipline + receiving-code-review",
+            "- For branch completion: use finishing-a-development-branch",
             "",
-            "DOMAIN GUARDRAILS:",
-            "- Validate patches with targeted tests before concluding",
-            "- Keep edits scoped to requested files and approved workspace boundaries",
-            "- Block fallback on denied policy paths, destructive actions, and secret-sensitive operations",
+            "SAFETY GUARDRAILS:",
+            "- git reset --hard, force push, secret export: ALL DENIED",
+            "- apply_patch: Scope to requested files only",
+            "- bash: Execute only build/test/non-destructive git commands",
+            "- All destructive operations require explicit user approval",
             "",
           ].join("\n")
         } else if (agencyContext.agencyId === "agency-nba") {
@@ -1460,6 +1477,23 @@ export namespace SessionPrompt {
     const blockedTools: string[] = []
     const allowedTools: string[] = []
 
+    // FIX 7: Log telemetry for policy enforcement (BLOCKER 5)
+    log.info("tool policy applied", {
+      sessionID: input.session.id,
+      agencyId: enabledAgency ?? "none",
+      agencyConfidence: input.agencyContext?.confidence,
+      policyEnabled: agencyTools.enabled,
+      policyEnforced: agencyTools.enabled, // NUOVO - matches DEVELOPMENT_TOOL_POLICY_LEVELS
+      allowedToolCount: agencyTools.allowedTools.length,
+      allowedTools: agencyTools.allowedTools.slice(0, 20).join(","), // Max 20 for log readability
+      blockedToolCount: 0, // Will update later
+      blockedTools: "", // Will update later
+      capabilitiesL1: input.agencyContext?.layers?.L1?.capabilities?.join(",") ?? "none",
+      routeSource: input.agencyContext?.routeSource ?? "none",
+      fallbackUsed: input.agencyContext?.fallbackUsed ?? false,
+      fallbackReason: input.agencyContext?.fallbackReason ?? "none",
+    })
+
     // kilocode_change start - pass routeResult to tool context for telemetry correlation
     // routeResult contains the L1 routing decision (type: "skill" | "chain" | "agent", skill, confidence, etc.)
     // Filter out null to match RouteResult | undefined type
@@ -1700,6 +1734,14 @@ export namespace SessionPrompt {
         policyEnforced: agencyTools.enabled,
         allowedTools,
         blockedTools,
+      })
+    }
+
+    // FIX 7: Validate non-intersection of allowed/blocked (BLOCKER 5)
+    const intersection = allowedTools.filter((t) => blockedTools.includes(t))
+    if (intersection.length > 0) {
+      log.error("policy violation: tool in both allowed and blocked", {
+        intersection,
       })
     }
 

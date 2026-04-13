@@ -79,14 +79,56 @@ const agencyDefinitions: AgencyDefinition[] = [
     name: "Development Agency",
     domain: "development",
     policies: {
-      allowedCapabilities: ["coding", "debugging", "refactoring", "code-generation", "code-review", "testing", "tdd"],
-      deniedCapabilities: [],
+      allowedCapabilities: [
+        "coding",
+        "code-generation",
+        "code-review",
+        "refactoring",
+        "debugging",
+        "testing",
+        "tdd",
+        "planning",
+        "document_analysis",
+        "comparison",
+      ],
+      deniedCapabilities: [
+        "destructive_git", // git reset --hard, force push
+        "secret_export", // export API keys, credentials
+        "auto_execute", // auto-run without user approval
+      ],
       maxRetries: 3,
-      requiresApproval: false,
+      requiresApproval: false, // Skills may override per-operation
       dataClassification: "internal",
+      // Policy level mapping - NUOVO
+      policyMapping: {
+        // Read-only operations (SAFE)
+        read: "SAFE",
+        glob: "SAFE",
+        grep: "SAFE",
+        codesearch: "SAFE",
+        // Reversible write operations (NOTIFY)
+        apply_patch: "NOTIFY",
+        bash: "NOTIFY", // execute build/test scripts
+        // Skills (variable based on skill config)
+        skill: "NOTIFY",
+      },
     },
-    providers: [],
-    metadata: { wave: 1, description: "Coding, review, and delivery assistance" },
+    providers: [
+      "native", // Native file/git/bash operations (preferred)
+      "firecrawl", // Fallback for web research in development context
+    ],
+    metadata: {
+      wave: 1,
+      description: "Coding, review, and delivery assistance",
+      nativeAdapters: ["NativeFileAdapter", "NativeGitAdapter", "NativeBuildAdapter"],
+      policyEnforced: true,
+      contextFootprint: {
+        toolsExposed: 9,
+        schemaSizeEstimate: "~2.5KB",
+        lazyLoadingStrategy: "skills loaded on-demand via execution-bridge",
+        budgetContextPerStep: "4KB (tokens ~500)",
+      },
+    },
   },
   {
     id: "agency-nutrition",

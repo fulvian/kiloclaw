@@ -162,13 +162,44 @@ export function mapGWorkspaceCapabilitiesToTools(capabilities: string[]) {
 
 export function mapDevelopmentCapabilitiesToTools(capabilities: string[]) {
   const tools = capabilities.flatMap((cap) => {
-    if (["coding", "code-generation", "code-review", "refactoring"].includes(cap))
-      return ["read", "glob", "grep", "apply_patch"]
-    if (["debugging", "testing", "tdd"].includes(cap)) return ["bash", "read", "glob"]
-    if (["planning", "document_analysis"].includes(cap)) return ["read", "glob", "grep"]
+    // Code understanding & analysis (SAFE reads)
+    if (["coding", "code-generation", "code-review", "refactoring", "comparison", "document_analysis"].includes(cap))
+      return ["read", "glob", "grep", "codesearch"]
+
+    // Debugging & diagnosis (read + execute)
+    if (["debugging", "troubleshooting"].includes(cap)) return ["bash", "read", "glob", "grep"]
+
+    // Test-driven development (execution + read)
+    if (["testing", "tdd"].includes(cap)) return ["bash", "read", "glob"]
+
+    // Planning & architecture (read + doc)
+    if (["planning", "code-planning", "architecture"].includes(cap)) return ["read", "glob", "grep"]
+
+    // Patch & refactoring (read + write)
+    if (["patching", "refactoring"].includes(cap)) return ["read", "glob", "apply_patch"]
+
+    // Git operations
+    if (["git_ops", "git-workflow"].includes(cap)) return ["bash", "read"] // controlled git calls
+
     return []
   })
+
   return Array.from(new Set(tools))
+}
+
+/**
+ * Policy level for each development tool (FIX 5)
+ */
+export const DEVELOPMENT_TOOL_POLICY_LEVELS: Record<string, "SAFE" | "NOTIFY" | "CONFIRM" | "HITL" | "DENY"> = {
+  read: "SAFE",
+  glob: "SAFE",
+  grep: "SAFE",
+  codesearch: "SAFE",
+  apply_patch: "NOTIFY", // Writes to filesystem
+  bash: "NOTIFY", // Executes scripts (could have side effects)
+  skill: "NOTIFY", // Skills may execute operations
+  websearch: "NOTIFY", // External network call
+  webfetch: "NOTIFY", // External network call
 }
 
 export function mapFinanceCapabilitiesToTools(capabilities: string[]) {

@@ -1,8 +1,24 @@
 import z from "zod"
+import { Log } from "@/util/log"
 import { PolicyDecision, RouteReason } from "./capability-registry"
+import type { PolicyLevel } from "@/kiloclaw/agency/types"
+
+const log = Log.create({ service: "kiloclaw.fallback-policy" })
 
 export const NativeErrorKind = z.enum(["none", "timeout", "transient", "permanent"])
 export type NativeErrorKind = z.infer<typeof NativeErrorKind>
+
+// New PolicyLevel-based API for FallbackDecision
+export type FallbackDecision = "native" | "mcp" | "deny"
+
+export interface FallbackInput {
+  nativeAvailable: boolean
+  nativeError?: Error | null
+  retryCount?: number
+  capability: string
+  policyLevel: PolicyLevel
+  isDestructive: boolean
+}
 
 export const PolicyInput = z.object({
   deny: z.boolean().default(false),
@@ -119,5 +135,102 @@ export namespace NativeFallbackPolicy {
       execute_native: false,
       allow_fallback: true,
     }
+  }
+}
+
+/**
+ * Deterministic fallback policy for native-first adapter strategy (FIX 3)
+ */
+export function decideFallback(input: FallbackInput): FallbackDecision {
+  const { nativeAvailable, nativeError, retryCount = 0, policyLevel, isDestructive, capability } = input
+
+  // Hard deny cases
+  if (policyLevel === "DENY") {
+    log.warn("fallback blocked by policy", { capability, policyLevel })
+    return "deny"
+  }
+
+  // Destructive operations never fallback to MCP
+  if (isDestructive && policyLevel !== "SAFE") {
+    log.warn("fallback blocked for destructive operation", { capability, isDestructive })
+    return "deny"
+  }
+
+  // If native is available and healthy, always use it
+  if (nativeAvailable && !nativeError) {
+    return "native"
+  }
+
+  // If native errored, check retry count and error type
+  if (nativeError) {
+    const isTransient = isTransientError(nativeError)
+
+    // Transient errors get retry attempt
+    if (isTransient && retryCount < 2) {
+      log.warn("native transient error, will retry", { capability, error: nativeError.message, retryCount })
+      return "native" // Will retry
+    }
+
+    // Permanent errors allowed to fallback IF policy permits
+    if (policyLevel === "SAFE" || policyLevel === "NOTIFY") {
+      log.warn("native permanent error, falling back to MCP", {
+        capability,
+        error: nativeError.message,
+        policyLevel,
+      })
+      return "mcp"
+    }
+
+    // Higher policy levels don't fallback on error
+    log.error("native error prevents fallback", { capability, policyLevel, error: nativeError.message })
+    return "deny"
+  }
+
+  // Capability gap - MCP allowed for SAFE/NOTIFY, denied for higher levels
+  if (policyLevel === "SAFE" || policyLevel === "NOTIFY") {
+    log.info("capability not implemented natively, using MCP", { capability })
+    return "mcp"
+  }
+
+  // No native, no error, but high policy - deny
+  log.error("capability gap prevents MCP fallback due to policy", { capability, policyLevel })
+  return "deny"
+}
+
+function isTransientError(err: Error): boolean {
+  const msg = err.message.toLowerCase()
+  return (
+    msg.includes("timeout") ||
+    msg.includes("econnrefused") ||
+    msg.includes("enotfound") ||
+    msg.includes("network") ||
+    msg.includes("temporary")
+  )
+}
+
+/**
+ * Build fallback chain metadata for telemetry
+ */
+export interface FallbackChainMetadata {
+  providersTried: string[]
+  errorsByProvider: Record<string, string>
+  finalDecision: FallbackDecision
+  totalRetries: number
+  durationMs: number
+}
+
+export function createFallbackMetadata(providers: string[], errors: Record<string, Error>): FallbackChainMetadata {
+  return {
+    providersTried: providers,
+    errorsByProvider: Object.entries(errors).reduce(
+      (acc, [provider, err]) => {
+        acc[provider] = err.message
+        return acc
+      },
+      {} as Record<string, string>,
+    ),
+    finalDecision: "mcp",
+    totalRetries: 0,
+    durationMs: 0,
   }
 }
