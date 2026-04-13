@@ -14,11 +14,15 @@ export interface Alert {
   readonly effective: string
   readonly expires: string
   readonly areas: readonly string[]
+  readonly certainty?: "observed" | "likely" | "possible"
+  readonly urgency?: "immediate" | "expected" | "future"
+  readonly source: string
 }
 
 // Weather alerts input
 interface WeatherAlertsInput {
   location: string
+  severityFilter?: Array<"advisory" | "watch" | "warning" | "emergency">
 }
 
 // Weather alerts output
@@ -27,97 +31,127 @@ interface WeatherAlertsOutput {
   severity: "none" | "low" | "medium" | "high" | "severe"
   activeCount: number
   lastUpdated: string
+
+  // Provenance
+  provider: {
+    id: string
+    name: string
+    attribution?: string
+  }
+  fallbackChain: string[]
+  errors: Array<{
+    provider: string
+    error: string
+    timestamp: string
+  }>
 }
 
-// Mock severe weather alerts
-// In production, this would integrate with National Weather Service API or OpenWeather
-const MOCK_ALERTS: Alert[] = [
-  {
-    id: "NWS-W-2026-001",
-    type: "Heat Warning",
-    severity: "warning",
-    headline: "Excessive Heat Warning in Effect",
-    description:
-      "Dangerously hot conditions with temperatures up to 105°F (40°C). Heat index values may reach 115°F. This is a dangerous situation.",
-    instruction: "Stay in air-conditioned rooms. Check on relatives and neighbors. Drink plenty of fluids.",
-    effective: "2026-04-02T10:00:00Z",
-    expires: "2026-04-03T00:00:00Z",
-    areas: ["Downtown", "Midtown", "Eastside"],
-  },
-  {
-    id: "NWS-T-2026-002",
-    type: "Severe Thunderstorm Watch",
-    severity: "watch",
-    headline: "Severe Thunderstorm Watch Issued",
-    description:
-      "Conditions favorable for severe thunderstorms capable of producing large hail, damaging winds, and heavy rainfall.",
-    instruction: "Stay informed and be prepared to seek shelter if storms develop.",
-    effective: "2026-04-02T14:00:00Z",
-    expires: "2026-04-02T22:00:00Z",
-    areas: ["Northern County", "Western Valley"],
-  },
-  {
-    id: "NWS-F-2026-003",
-    type: "Flood Advisory",
-    severity: "advisory",
-    headline: "Urban Flood Advisory",
-    description: "Minor flooding in low-lying areas and poor drainage locations due to heavy rainfall.",
-    instruction: "Do not attempt to cross flooded roads. Turn around, don't drown.",
-    effective: "2026-04-02T08:00:00Z",
-    expires: "2026-04-02T14:00:00Z",
-    areas: ["Riverside", "Lowlands", "Central District"],
-  },
-  {
-    id: "NWS-W-2025-048",
-    type: "Winter Storm Warning",
-    severity: "warning",
-    headline: "Winter Storm Warning Expires",
-    description: "Heavy snow expected with accumulations of 8-12 inches. Travel will be difficult.",
-    instruction: "Avoid travel if possible. If you must travel, carry emergency supplies.",
-    effective: "2026-01-15T18:00:00Z",
-    expires: "2026-01-16T12:00:00Z",
-    areas: ["Mountain Region", "Northern Pass"],
-  },
-]
+// Geocode location using Nominatim (OpenStreetMap)
+async function geocode(
+  location: string,
+): Promise<{ latitude: number; longitude: number; countryCode?: string; displayName: string } | null> {
+  const geoResponse = await fetch(
+    `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(location)}&format=json&limit=1`,
+    { headers: { "User-Agent": "Kiloclaw-Weather/1.0" } },
+  )
 
-// Search alerts by location
-function searchAlerts(location: string): Alert[] {
-  const normalizedLocation = location.toLowerCase().trim()
+  if (!geoResponse.ok) {
+    throw new Error(`Geocoding failed: ${geoResponse.status}`)
+  }
 
-  // Return only currently active alerts
-  const now = new Date()
+  const geoData = await geoResponse.json()
 
-  return MOCK_ALERTS.filter((alert) => {
-    const effectiveDate = new Date(alert.effective)
-    const expiresDate = new Date(alert.expires)
-    const isActive = effectiveDate <= now && expiresDate > now
+  if (!geoData.length) {
+    return null
+  }
 
-    if (!isActive) return false
+  const result = geoData[0]
+  return {
+    latitude: parseFloat(result.lat),
+    longitude: parseFloat(result.lon),
+    countryCode: result.address?.country_code?.toUpperCase(),
+    displayName: result.display_name,
+  }
+}
 
-    // Match by location
-    const areaMatch = alert.areas.some(
-      (area) => area.toLowerCase().includes(normalizedLocation) || normalizedLocation.includes(area.toLowerCase()),
-    )
-
-    // Also match if location is in the general area name
-    const locationKeywords = normalizedLocation.split(/\s+/)
-    const keywordMatch = locationKeywords.some(
-      (keyword) =>
-        keyword.length > 2 &&
-        (alert.areas.some((area) => area.toLowerCase().includes(keyword)) ||
-          alert.description.toLowerCase().includes(keyword)),
-    )
-
-    return areaMatch || keywordMatch
+// Fetch alerts from NWS
+async function fetchNWSAlerts(lat: number, lon: number): Promise<any[]> {
+  // Get NWS grid point
+  const pointsResponse = await fetch(`https://api.weather.gov/points/${lat},${lon}`, {
+    headers: { "User-Agent": "Kiloclaw-Weather/1.0" },
   })
+
+  if (!pointsResponse.ok) {
+    throw new Error(`NWS points API error: ${pointsResponse.status}`)
+  }
+
+  const pointsData = await pointsResponse.json()
+  const forecastZone = pointsData.properties?.forecastZone
+
+  if (!forecastZone) {
+    throw new Error("No forecast zone found")
+  }
+
+  const zoneId = forecastZone.split("/").pop()
+
+  // Get active alerts for this zone
+  const alertsResponse = await fetch(`https://api.weather.gov/alerts/active?zone=${zoneId}`, {
+    headers: { "User-Agent": "Kiloclaw-Weather/1.0" },
+  })
+
+  if (!alertsResponse.ok) {
+    throw new Error(`NWS alerts API error: ${alertsResponse.status}`)
+  }
+
+  const alertsData = await alertsResponse.json()
+  return alertsData.features || []
+}
+
+// Fetch alerts from OpenWeatherMap (global)
+async function fetchOWMAlerts(location: string): Promise<any[]> {
+  const apiKey = process.env.OPENWEATHERMAP_API_KEY
+  if (!apiKey) {
+    throw new Error("OPENWEATHERMAP_API_KEY not configured")
+  }
+
+  // Geocode
+  const geoResponse = await fetch(
+    `https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(location)}&limit=1&appid=${apiKey}`,
+  )
+  const geoData = await geoResponse.json()
+
+  if (!geoData.length) {
+    throw new Error("Location not found")
+  }
+
+  const { lat, lon } = geoData[0]
+
+  // Get weather (includes alerts in One Call API)
+  const weatherResponse = await fetch(
+    `https://api.openweathermap.org/data/2.5/onecall?lat=${lat}&lon=${lon}&exclude=minutely,hourly,daily&appid=${apiKey}`,
+  )
+
+  if (!weatherResponse.ok) {
+    throw new Error(`OpenWeatherMap API error: ${weatherResponse.status}`)
+  }
+
+  const weatherData = await weatherResponse.json()
+  return weatherData.alerts || []
+}
+
+// Severity weights for determining overall severity
+const SEVERITY_WEIGHTS: Record<string, number> = {
+  advisory: 1,
+  watch: 2,
+  warning: 3,
+  emergency: 4,
 }
 
 // Determine overall severity level
 function determineOverallSeverity(alerts: Alert[]): "none" | "low" | "medium" | "high" | "severe" {
   if (alerts.length === 0) return "none"
 
-  const severityWeights = { advisory: 1, watch: 2, warning: 3, emergency: 4 }
-  const maxSeverity = Math.max(...alerts.map((a) => severityWeights[a.severity]))
+  const maxSeverity = Math.max(...alerts.map((a) => SEVERITY_WEIGHTS[a.severity] ?? 0))
 
   const severityMap: Record<number, "none" | "low" | "medium" | "high" | "severe"> = {
     0: "none",
@@ -130,14 +164,69 @@ function determineOverallSeverity(alerts: Alert[]): "none" | "low" | "medium" | 
   return severityMap[maxSeverity] || "low"
 }
 
+// Parse NWS alert to our format
+function parseNWSAlert(nwsAlert: any): Alert {
+  const props = nwsAlert.properties || {}
+
+  // Parse areas
+  const areas = [props.AreaDesc || ""].filter(Boolean)
+
+  return {
+    id: nwsAlert.id || `nws-${Date.now()}`,
+    type: props.Event || "Unknown Alert",
+    severity: (props.Severity?.toLowerCase() as Alert["severity"]) || "advisory",
+    headline: props.Headline || props.Event || "",
+    description: props.Description || "",
+    instruction: props.Instruction,
+    effective: props.Effective || new Date().toISOString(),
+    expires: props.Expires || new Date().toISOString(),
+    areas,
+    certainty: props.Certainty?.toLowerCase() as Alert["certainty"],
+    urgency: props.Urgency?.toLowerCase() as Alert["urgency"],
+    source: "NWS",
+  }
+}
+
+// Parse OWM alert to our format
+function parseOWMAlert(owmAlert: any): Alert {
+  return {
+    id: `owm-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    type: owmAlert.event || "Weather Alert",
+    severity: mapOWMSeverity(owmAlert.severity),
+    headline: owmAlert.event || "",
+    description: owmAlert.description || "",
+    instruction: owmAlert.sender_name ? `Source: ${owmAlert.sender_name}` : undefined,
+    effective: owmAlert.start ? new Date(owmAlert.start * 1000).toISOString() : new Date().toISOString(),
+    expires: owmAlert.end ? new Date(owmAlert.end * 1000).toISOString() : new Date().toISOString(),
+    areas: [owmAlert.sender_name || "Unknown"].filter(Boolean),
+    source: "OpenWeatherMap",
+  }
+}
+
+// Map OpenWeatherMap severity to our format
+function mapOWMSeverity(severity?: string): Alert["severity"] {
+  const map: Record<string, Alert["severity"]> = {
+    minor: "advisory",
+    moderate: "watch",
+    severe: "warning",
+    extreme: "emergency",
+  }
+  return map[severity?.toLowerCase() || ""] || "advisory"
+}
+
 export const WeatherAlertsSkill: Skill = {
   id: "weather-alerts" as SkillId,
-  version: "1.0.0",
+  version: "2.0.0", // Breaking change from mock → real API
   name: "Weather Alerts",
   inputSchema: {
     type: "object",
     properties: {
       location: { type: "string", description: "City or location to check for alerts" },
+      severityFilter: {
+        type: "array",
+        items: { type: "string", enum: ["advisory", "watch", "warning", "emergency"] },
+        description: "Filter alerts by minimum severity",
+      },
     },
     required: ["location"],
   },
@@ -151,31 +240,49 @@ export const WeatherAlertsSkill: Skill = {
           properties: {
             id: { type: "string" },
             type: { type: "string" },
-            severity: { type: "string" },
+            severity: { type: "string", enum: ["advisory", "watch", "warning", "emergency"] },
             headline: { type: "string" },
             description: { type: "string" },
             instruction: { type: "string" },
             effective: { type: "string" },
             expires: { type: "string" },
             areas: { type: "array", items: { type: "string" } },
+            certainty: { type: "string" },
+            urgency: { type: "string" },
+            source: { type: "string" },
           },
         },
       },
       severity: { type: "string", enum: ["none", "low", "medium", "high", "severe"] },
       activeCount: { type: "number" },
       lastUpdated: { type: "string" },
+      provider: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          name: { type: "string" },
+          attribution: { type: "string" },
+        },
+      },
+      fallbackChain: { type: "array", items: { type: "string" } },
+      errors: { type: "array" },
     },
   },
-  capabilities: ["warning_detection", "notification", "safety_alerts"],
+  capabilities: [
+    "alerts_severe",
+    "alerts_advisory",
+    "alerts_summary",
+    "warning_detection",
+    "notification",
+    "safety_alerts",
+  ],
   tags: ["weather", "alerts", "safety", "emergency"],
   async execute(input: unknown, context: SkillContext): Promise<WeatherAlertsOutput> {
     const log = Log.create({ service: "kiloclaw.skill.weather-alerts" })
-    log.info("checking weather alerts", {
-      correlationId: context.correlationId,
-      location: (input as WeatherAlertsInput).location,
-    })
 
-    const { location } = input as WeatherAlertsInput
+    const { location, severityFilter } = input as WeatherAlertsInput
+    const errors: Array<{ provider: string; error: string; timestamp: string }> = []
+    const fallbackChain: string[] = []
 
     if (!location || location.trim().length === 0) {
       log.warn("empty location provided for alerts check")
@@ -184,24 +291,109 @@ export const WeatherAlertsSkill: Skill = {
         severity: "none",
         activeCount: 0,
         lastUpdated: new Date().toISOString(),
+        provider: { id: "none", name: "None", attribution: "No provider available" },
+        fallbackChain: [],
+        errors: [],
       }
     }
 
-    const alerts = searchAlerts(location)
-    const severity = determineOverallSeverity(alerts)
+    log.info("checking weather alerts", {
+      correlationId: context.correlationId,
+      location,
+    })
+
+    let allAlerts: Alert[] = []
+
+    // Try NWS first (for US locations)
+    try {
+      fallbackChain.push("nws")
+
+      const geoResult = await geocode(location)
+
+      if (!geoResult) {
+        throw new Error("Location not found")
+      }
+
+      if (geoResult.countryCode === "US") {
+        // US location - use NWS
+        const nwsAlerts = await fetchNWSAlerts(geoResult.latitude, geoResult.longitude)
+        allAlerts = nwsAlerts.map(parseNWSAlert)
+
+        log.info("weather alerts fetched from NWS", {
+          correlationId: context.correlationId,
+          location,
+          alertCount: allAlerts.length,
+          provider: "nws",
+        })
+      } else {
+        // Non-US location - try OpenWeatherMap
+        fallbackChain.push("openweathermap")
+        const owmAlerts = await fetchOWMAlerts(location)
+        allAlerts = owmAlerts.map(parseOWMAlert)
+
+        log.info("weather alerts fetched from OWM", {
+          correlationId: context.correlationId,
+          location,
+          alertCount: allAlerts.length,
+          provider: "openweathermap",
+        })
+      }
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err)
+      log.warn("primary alerts fetch failed, trying fallback", {
+        correlationId: context.correlationId,
+        location,
+        error: errorMsg,
+      })
+      errors.push({
+        provider: fallbackChain[fallbackChain.length - 1] || "nws",
+        error: errorMsg,
+        timestamp: new Date().toISOString(),
+      })
+
+      // Try OpenWeatherMap as fallback
+      if (!fallbackChain.includes("openweathermap")) {
+        try {
+          fallbackChain.push("openweathermap")
+          const owmAlerts = await fetchOWMAlerts(location)
+          allAlerts = owmAlerts.map(parseOWMAlert)
+        } catch (owmErr) {
+          const owmErrorMsg = owmErr instanceof Error ? owmErr.message : String(owmErr)
+          errors.push({ provider: "openweathermap", error: owmErrorMsg, timestamp: new Date().toISOString() })
+        }
+      }
+    }
+
+    // Apply severity filter if specified
+    if (severityFilter && severityFilter.length > 0) {
+      const minSeverity = Math.min(...severityFilter.map((s) => SEVERITY_WEIGHTS[s] ?? 0))
+      allAlerts = allAlerts.filter((a) => (SEVERITY_WEIGHTS[a.severity] ?? 0) >= minSeverity)
+    }
+
+    const severity = determineOverallSeverity(allAlerts)
 
     log.info("weather alerts check completed", {
       correlationId: context.correlationId,
       location,
-      alertCount: alerts.length,
+      alertCount: allAlerts.length,
       severity,
     })
 
     return {
-      alerts,
+      alerts: allAlerts,
       severity,
-      activeCount: alerts.length,
+      activeCount: allAlerts.length,
       lastUpdated: new Date().toISOString(),
+      provider: {
+        id: fallbackChain[fallbackChain.length - 1] || "none",
+        name: fallbackChain[fallbackChain.length - 1] === "nws" ? "NWS/NOAA" : "OpenWeatherMap",
+        attribution:
+          fallbackChain[fallbackChain.length - 1] === "nws"
+            ? "Weather data from [National Weather Service](https://weather.gov/)"
+            : "Weather data from [OpenWeatherMap](https://openweathermap.org/)",
+      },
+      fallbackChain,
+      errors,
     }
   },
 }
