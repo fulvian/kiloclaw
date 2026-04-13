@@ -73,7 +73,7 @@ describe("G5 Verification - Telemetry Logging (9/9 Criteria)", () => {
         agencyId: undefined,
       }
       // Should log 'none' or similar placeholder
-      const agencyIdOrNone = (logWithNull.agencyId as string) ?? "none"
+      const agencyIdOrNone = (logWithNull.agencyId ?? "none") as string
       expect(agencyIdOrNone).toBe("none")
     })
 

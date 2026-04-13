@@ -225,7 +225,14 @@ KILOCLAW_PROACTIVE_DAILY_BUDGET=100
 
 # Risk thresholds (JSON)
 KILOCLAW_RISK_THRESHOLDS='{"low":0.2,"medium":0.5,"high":0.75,"critical":0.9}'
+
+# Dev-local profile (optional, for trusted personal workspace)
+KILO_POLICY_LEVEL=dev-local
+KILO_TRUSTED_WORKSPACE=true
+KILO_TRUSTED_WORKSPACE_ONLY=true
 ```
+
+See `DEV_LOCAL_PROFILE.md` for exact behavior changes, safety boundaries, and rollback.
 
 ## Testing
 

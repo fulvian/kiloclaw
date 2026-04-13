@@ -2,6 +2,8 @@
 // P0: Stabilizza identità tool e policy binding
 // These canonical IDs map to actual runtime keys via ToolIdentityResolver
 
+import { Flag } from "@/flag/flag"
+
 export type CanonicalToolId =
   // Knowledge/NBA
   | "websearch"
@@ -119,6 +121,33 @@ export const DEVELOPMENT_TOOL_ALLOWLIST = [
 
 export const FINANCE_TOOL_ALLOWLIST = ["finance-api", "skill", "websearch", "webfetch"] as const
 export const WEATHER_TOOL_ALLOWLIST = ["weather-api", "skill"] as const
+
+export type PolicyProfile = "strict" | "balanced" | "dev-local"
+
+function resolvePolicyProfile(): PolicyProfile {
+  const raw = (Flag.KILO_POLICY_LEVEL ?? "").toLowerCase()
+  if (raw === "dev-local") return "dev-local"
+  if (raw === "strict") return "strict"
+  return "balanced"
+}
+
+function isDevLocalEnabled(input?: { profile?: PolicyProfile; trustedWorkspace?: boolean }): boolean {
+  const profile = input?.profile ?? resolvePolicyProfile()
+  if (profile !== "dev-local") return false
+
+  const trustedOnly = Flag.KILO_TRUSTED_WORKSPACE_ONLY
+  if (!trustedOnly) return true
+
+  const trusted = input?.trustedWorkspace ?? Flag.KILO_TRUSTED_WORKSPACE
+  return trusted
+}
+
+function getDevelopmentAllowlist(input?: { profile?: PolicyProfile; trustedWorkspace?: boolean }) {
+  const devLocal = isDevLocalEnabled(input)
+  if (!devLocal) return [...DEVELOPMENT_TOOL_ALLOWLIST]
+
+  return Array.from(new Set([...DEVELOPMENT_TOOL_ALLOWLIST, "task"]))
+}
 
 export function mapKnowledgeCapabilitiesToTools(capabilities: string[]) {
   const tools = capabilities.flatMap((cap) => {
@@ -288,6 +317,8 @@ export function resolveAgencyAllowedTools(input: {
   agencyId?: string | null
   enabled: boolean
   capabilities?: string[]
+  profile?: PolicyProfile
+  trustedWorkspace?: boolean
 }) {
   if (!input.enabled || !input.agencyId) {
     return {
@@ -325,7 +356,11 @@ export function resolveAgencyAllowedTools(input: {
 
   if (input.agencyId === "agency-development") {
     const mapped = mapDevelopmentCapabilitiesToTools(input.capabilities ?? [])
-    const allowedTools = Array.from(new Set([...DEVELOPMENT_TOOL_ALLOWLIST, ...mapped]))
+    const allowlist = getDevelopmentAllowlist({
+      profile: input.profile,
+      trustedWorkspace: input.trustedWorkspace,
+    })
+    const allowedTools = Array.from(new Set([...allowlist, ...mapped]))
     return {
       enabled: true,
       allowedTools,

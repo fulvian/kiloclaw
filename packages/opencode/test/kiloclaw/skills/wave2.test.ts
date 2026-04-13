@@ -457,7 +457,7 @@ describe("WP4.3 Wave 2: Weather Agency Skills", () => {
       const result = (await WeatherCurrentSkill.execute({ location: "Miami" }, SKILL_CONTEXT)) as WeatherCurrentResult
       expect(result).toHaveProperty("conditions")
       expect(result).toHaveProperty("location")
-      expect(result).toHaveProperty("temp")
+      expect(result).toHaveProperty("tempF")
       expect(result).toHaveProperty("localTime")
       expect(result).toHaveProperty("observationTime")
       expect(result.conditions).toHaveProperty("temperature")
@@ -470,9 +470,9 @@ describe("WP4.3 Wave 2: Weather Agency Skills", () => {
         { location: "Phoenix", units: "imperial" },
         SKILL_CONTEXT,
       )) as WeatherCurrentResult
-      // Check if temp is in reasonable Fahrenheit range (32-120 F)
-      expect(result.temp).toBeGreaterThanOrEqual(32)
-      expect(result.temp).toBeLessThanOrEqual(120)
+      // Check if tempF is in reasonable Fahrenheit range (32-120 F)
+      expect(result.tempF).toBeGreaterThanOrEqual(32)
+      expect(result.tempF).toBeLessThanOrEqual(120)
     })
 
     it("should include wind information", async () => {

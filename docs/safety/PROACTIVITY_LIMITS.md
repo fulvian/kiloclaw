@@ -259,4 +259,11 @@ KILOCLAW_PROACTIVE_MAX_LOW_RISK=10
 
 # Confirmation mode
 KILOCLAW_PROACTIVE_CONFIRMATION_MODE=suggest_then_act
+
+# Optional trusted local profile
+KILO_POLICY_LEVEL=dev-local
+KILO_TRUSTED_WORKSPACE=true
+KILO_TRUSTED_WORKSPACE_ONLY=true
 ```
+
+When trusted `dev-local` is active, proactive gate defaults are relaxed (`riskThreshold=critical`, `allowOverBudget=true`) unless explicitly overridden in code configuration.

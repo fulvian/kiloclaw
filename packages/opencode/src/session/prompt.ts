@@ -1526,6 +1526,8 @@ export namespace SessionPrompt {
       agencyId: enabledAgency,
       enabled: Flag.KILO_ROUTING_AGENCY_CONTEXT_ENABLED,
       capabilities: agencyCapabilities,
+      profile: (Flag.KILO_POLICY_LEVEL as "strict" | "balanced" | "dev-local" | undefined) ?? undefined,
+      trustedWorkspace: Flag.KILO_TRUSTED_WORKSPACE,
     })
     const blockedTools: string[] = []
     const allowedTools: string[] = []

@@ -20,27 +20,27 @@ describe("Development Agency Tool Policy Enforcement (G4 Phase 2 Integration)", 
         "websearch",
         "webfetch",
       ]
-      expect(DEVELOPMENT_TOOL_ALLOWLIST).toEqual(expectedTools)
+      expect([...DEVELOPMENT_TOOL_ALLOWLIST]).toEqual(expectedTools as any)
     })
 
     it("includes SAFE tools (read-only)", () => {
-      const safeTools = ["read", "glob", "grep", "codesearch"]
+      const safeTools = ["read", "glob", "grep", "codesearch"] as const
       for (const tool of safeTools) {
-        expect(DEVELOPMENT_TOOL_ALLOWLIST).toContain(tool)
+        expect([...DEVELOPMENT_TOOL_ALLOWLIST]).toContain(tool as any)
       }
     })
 
     it("includes NOTIFY tools (reversible operations)", () => {
-      const notifyTools = ["apply_patch", "bash", "skill"]
+      const notifyTools = ["apply_patch", "bash", "skill"] as const
       for (const tool of notifyTools) {
-        expect(DEVELOPMENT_TOOL_ALLOWLIST).toContain(tool)
+        expect([...DEVELOPMENT_TOOL_ALLOWLIST]).toContain(tool as any)
       }
     })
 
     it("includes fallback tools for research", () => {
-      const fallbackTools = ["websearch", "webfetch"]
+      const fallbackTools = ["websearch", "webfetch"] as const
       for (const tool of fallbackTools) {
-        expect(DEVELOPMENT_TOOL_ALLOWLIST).toContain(tool)
+        expect([...DEVELOPMENT_TOOL_ALLOWLIST]).toContain(tool as any)
       }
     })
 
@@ -344,7 +344,7 @@ describe("Development Agency Tool Policy Enforcement (G4 Phase 2 Integration)", 
 
       // Only development-allowed tools present
       for (const tool of result.allowedTools) {
-        expect(DEVELOPMENT_TOOL_ALLOWLIST).toContain(tool)
+        expect([...DEVELOPMENT_TOOL_ALLOWLIST]).toContain(tool as any)
       }
     })
 

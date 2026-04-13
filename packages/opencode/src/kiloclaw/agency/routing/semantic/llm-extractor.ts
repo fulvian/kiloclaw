@@ -391,3 +391,5 @@ export async function extractCapabilitiesWithFallback(intent: SemanticIntent): P
 
   return { capabilities: llmMatches, method: "llm" }
 }
+
+export { extractCapabilitiesFromKeywords }

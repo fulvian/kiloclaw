@@ -61,31 +61,9 @@ export const AgencyPoliciesSchema = z.object({
   maxRetries: z.number().int().nonnegative().default(3),
   requiresApproval: z.boolean().default(false),
   dataClassification: z.enum(["public", "internal", "confidential", "restricted"]).default("internal"),
-  // FIX 2: Policy level mapping (optional, for policy enforcement)
-  policyMapping: z.record(z.string(), z.string()).optional(),
 })
 
 export type AgencyPolicies = z.infer<typeof AgencyPoliciesSchema>
-
-// AgencyMetadata - metadata for agency (allows any structure but documents known keys)
-export const AgencyMetadataSchema = z
-  .object({
-    wave: z.number().optional(),
-    description: z.string().optional(),
-    nativeAdapters: z.array(z.string()).optional(),
-    policyEnforced: z.boolean().optional(),
-    contextFootprint: z
-      .object({
-        toolsExposed: z.number().optional(),
-        schemaSizeEstimate: z.string().optional(),
-        lazyLoadingStrategy: z.string().optional(),
-        budgetContextPerStep: z.string().optional(),
-      })
-      .optional(),
-  })
-  .passthrough() // Allow any additional properties
-
-export type AgencyMetadata = z.infer<typeof AgencyMetadataSchema>
 
 // AgencyDefinition - flexible domain agency with governance
 export const AgencyDefinitionSchema = z.object({
@@ -94,7 +72,7 @@ export const AgencyDefinitionSchema = z.object({
   domain: z.string(), // Flexible domain - "knowledge", "development", "nutrition", "custom:anything"
   policies: AgencyPoliciesSchema,
   providers: z.array(z.string()).default([]),
-  metadata: AgencyMetadataSchema.optional(),
+  metadata: z.record(z.string(), z.unknown()).default({}),
 })
 
 export type AgencyDefinition = z.infer<typeof AgencyDefinitionSchema>

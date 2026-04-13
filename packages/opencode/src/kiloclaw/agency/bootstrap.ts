@@ -99,19 +99,6 @@ const agencyDefinitions: AgencyDefinition[] = [
       maxRetries: 3,
       requiresApproval: false, // Skills may override per-operation
       dataClassification: "internal",
-      // Policy level mapping - NUOVO
-      policyMapping: {
-        // Read-only operations (SAFE)
-        read: "SAFE",
-        glob: "SAFE",
-        grep: "SAFE",
-        codesearch: "SAFE",
-        // Reversible write operations (NOTIFY)
-        apply_patch: "NOTIFY",
-        bash: "NOTIFY", // execute build/test scripts
-        // Skills (variable based on skill config)
-        skill: "NOTIFY",
-      },
     },
     providers: [
       "native", // Native file/git/bash operations (preferred)

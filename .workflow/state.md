@@ -865,4 +865,37 @@ Tailscale SSH interactive auth required once:
 
 ```
 
+## Weather Agency Enhancement - COMPLETED ✅ (2026-04-13)
+
+| Area | Status | Evidence |
+|------|--------|----------|
+| G1-G3: Discovery, TDR, Manifest | ✅ DONE | `docs/agencies/weather/` |
+| G4.1: tool-policy.ts agency-weather branch | ✅ DONE | `tool-policy.ts` |
+| G4.2: prompt.ts weather context block | ✅ DONE | `prompt.ts` |
+| G4.3: Router keyword expansion (~80+ keywords) | ✅ DONE | `router.ts`, `llm-extractor.ts`, `bootstrap.ts` |
+| G4.4: Agency catalog providers (Open-Meteo, OWM, NWS) | ✅ DONE | `catalog.ts` |
+| G4.5: Weather skills refactored to real APIs | ✅ DONE | `weather-current.ts`, `weather-forecast.ts`, `weather-alerts.ts` |
+| G5: Test fixes (6 tests corrected) | ✅ DONE | `wave2.test.ts` - 43 pass |
+| G6: Runbook created | ✅ DONE | `docs/agencies/weather/WEATHER_PROVIDER_RUNBOOK.md` |
+
+### Skills Upgraded to Production
+
+| Skill | Version | Provider | Status |
+|-------|---------|----------|--------|
+| weather-current | 2.0.0 | Open-Meteo | ✅ Real API |
+| weather-forecast | 2.0.0 | Open-Meteo | ✅ Real API |
+| weather-alerts | 2.0.0 | OpenWeatherMap/NWS | ✅ Real API |
+
+### Key Changes
+
+1. **Policy**: Deny-by-default via `WEATHER_TOOL_ALLOWLIST = ["weather-api", "skill"]`
+2. **Routing**: 80+ keywords across EN/IT/ES/FR/DE/PT
+3. **Provenance**: All responses include `provider`, `fallbackChain`, `errors`
+4. **No API key required**: Open-Meteo is primary (no auth)
+
+### Verification
+
+- `bun test test/kiloclaw/skills/wave2.test.ts` → **43 pass, 0 fail**
+- Weather tests specifically: **8 pass** (3 forecast + 2 alerts + 3 current)
+
 ```

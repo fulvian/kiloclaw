@@ -5,6 +5,7 @@
 
 import { Log } from "@/util/log"
 import { fn } from "@/util/fn"
+import { Flag } from "@/flag/flag"
 import z from "zod"
 import { BudgetManager, type BudgetStats } from "./budget"
 import { ProactivityLimitsManager, type ProactivityLimitsConfig } from "./limits"
@@ -104,15 +105,22 @@ export class ProactivePolicyGate {
     this.log = Log.create({ service: "kilocclaw.proactive.policy_gate" })
     this.budgetManager = config?.budgetManager ?? null
     this.limitsManager = config?.limitsManager ?? null
-    this.hitlEnabled = config?.hitlEnabled ?? false
-    this.riskThreshold = config?.riskThreshold ?? "high"
-    this.allowOverBudget = config?.allowOverBudget ?? false
+    const profile = (Flag.KILO_POLICY_LEVEL ?? "balanced").toLowerCase()
+    const trustedOnly = Flag.KILO_TRUSTED_WORKSPACE_ONLY
+    const trusted = Flag.KILO_TRUSTED_WORKSPACE
+    const devLocal = profile === "dev-local" && (!trustedOnly || trusted)
+
+    this.hitlEnabled = config?.hitlEnabled ?? (devLocal ? false : false)
+    this.riskThreshold = config?.riskThreshold ?? (devLocal ? "critical" : "high")
+    this.allowOverBudget = config?.allowOverBudget ?? (devLocal ? true : false)
 
     this.log.info("policy gate initialized", {
       hasBudgetManager: !!this.budgetManager,
       hasLimitsManager: !!this.limitsManager,
       hitlEnabled: this.hitlEnabled,
       riskThreshold: this.riskThreshold,
+      policyProfile: profile,
+      devLocal,
     })
   }
 

@@ -70,6 +70,13 @@ export namespace Flag {
   export const KILO_MODELS_PATH = process.env["KILO_MODELS_PATH"]
   export const KILO_SKIP_MIGRATIONS = truthy("KILO_SKIP_MIGRATIONS")
 
+  // Runtime policy profile (strict | balanced | dev-local)
+  export const KILO_POLICY_LEVEL = process.env["KILO_POLICY_LEVEL"]
+  // Marks current workspace as explicitly trusted for dev-local profile
+  export const KILO_TRUSTED_WORKSPACE = truthy("KILO_TRUSTED_WORKSPACE")
+  // When true (default), dev-local only activates on trusted workspace
+  export const KILO_TRUSTED_WORKSPACE_ONLY = !falsy("KILO_TRUSTED_WORKSPACE_ONLY")
+
   function number(key: string) {
     const value = process.env[key]
     if (!value) return undefined

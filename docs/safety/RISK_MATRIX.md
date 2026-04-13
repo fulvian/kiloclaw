@@ -143,4 +143,5 @@ Actions are considered safe to proceed when:
 
 - `SAFETY_POLICY.md` - Safety architecture documentation
 - `PROACTIVITY_LIMITS.md` - Proactivity framework documentation
+- `DEV_LOCAL_PROFILE.md` - Trusted local profile with controlled relaxations
 - `ADR-003_Safety_Guardrails_Proactivity.md` - Architecture decision record

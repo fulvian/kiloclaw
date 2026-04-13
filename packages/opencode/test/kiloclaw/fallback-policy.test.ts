@@ -1,10 +1,6 @@
 import { describe, it, expect } from "bun:test"
-import {
-  decideFallback,
-  FallbackInput,
-  FallbackDecision,
-  createFallbackMetadata,
-} from "@/kiloclaw/tooling/native/fallback-policy"
+import { decideFallback, createFallbackMetadata } from "@/kiloclaw/tooling/native/fallback-policy"
+import type { FallbackInput, FallbackDecision } from "@/kiloclaw/tooling/native/fallback-policy"
 import type { PolicyLevel } from "@/kiloclaw/agency/types"
 
 describe("Fallback Policy - Native-First Adapter Strategy", () => {

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "bun:test"
-import { PolicyLevel, PolicyLevelOrder, isMoreRestrictive, enforcePolicy } from "@/kiloclaw/agency/types"
+import { PolicyLevelOrder, isMoreRestrictive, enforcePolicy } from "@/kiloclaw/agency/types"
+import type { PolicyLevel } from "@/kiloclaw/agency/types"
 
 describe("PolicyLevel enum and utilities", () => {
   describe("PolicyLevel type", () => {
@@ -120,8 +121,11 @@ describe("PolicyLevel enum and utilities", () => {
       ]
 
       for (const [level, requiresApproval, expected] of tests) {
-        const result = enforcePolicy(level, requiresApproval)
-        expect(result).toBe(expected)
+        const result = enforcePolicy(
+          level as any as "SAFE" | "NOTIFY" | "CONFIRM" | "HITL" | "DENY",
+          requiresApproval as any as boolean,
+        )
+        expect(result).toBe(expected as any)
       }
     })
   })

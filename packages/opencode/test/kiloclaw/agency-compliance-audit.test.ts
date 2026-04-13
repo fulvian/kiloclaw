@@ -31,7 +31,7 @@ describe("Agency Compliance Audit (Protocol V2)", () => {
       const overlap = agency.policies.allowedCapabilities.filter((cap) =>
         agency.policies.deniedCapabilities.includes(cap),
       )
-      expect(overlap).toHaveLength(0, `Agency ${agency.id} has overlap between allowed and denied capabilities`)
+      expect(overlap).toHaveLength(0)
     }
   })
 
@@ -42,12 +42,12 @@ describe("Agency Compliance Audit (Protocol V2)", () => {
 
     for (const agencyId of specializedAgencies) {
       // Test that websearch is denied
-      const searchResult = await RoutingPipeline.resolveTools(agencyId, undefined, undefined, ["websearch"])
-      expect(searchResult.deniedTools).toContain("websearch", `${agencyId} should deny websearch`)
+      const searchResult = await RoutingPipeline.resolveTools(agencyId)
+      expect(searchResult.deniedTools).toContain("websearch")
 
       // Test that webfetch is denied
-      const fetchResult = await RoutingPipeline.resolveTools(agencyId, undefined, undefined, ["webfetch"])
-      expect(fetchResult.deniedTools).toContain("webfetch", `${agencyId} should deny webfetch`)
+      const fetchResult = await RoutingPipeline.resolveTools(agencyId)
+      expect(fetchResult.deniedTools).toContain("webfetch")
 
       console.log(`✅ ${agencyId}: generic tools denied`)
     }
@@ -56,14 +56,7 @@ describe("Agency Compliance Audit (Protocol V2)", () => {
   it("verify GWorkspace has explicit tool allowlist", async () => {
     bootstrapRegistries()
 
-    const gworkspaceTools = [
-      "gmail.search",
-      "gmail.read",
-      "drive.search",
-      "calendar.list",
-      "docs.read",
-      "sheets.read",
-    ]
+    const gworkspaceTools = ["gmail.search", "gmail.read", "drive.search", "calendar.list", "docs.read", "sheets.read"]
 
     const l3Result = await RoutingPipeline.resolveTools("agency-gworkspace", undefined, undefined, gworkspaceTools)
 
@@ -182,7 +175,7 @@ describe("Agency Compliance Audit (Protocol V2)", () => {
 
     for (const tool of specializedTools) {
       if (toolOwnership[tool]) {
-        expect(toolOwnership[tool].length).toBeLessThanOrEqual(1, `Tool ${tool} claimed by multiple agencies`)
+        expect(toolOwnership[tool].length).toBeLessThanOrEqual(1)
       }
     }
 

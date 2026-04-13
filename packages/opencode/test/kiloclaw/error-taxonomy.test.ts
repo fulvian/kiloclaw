@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "bun:test"
-import { classifyError, ErrorCategory, ErrorSeverity, ClassifiedError } from "@/kiloclaw/runtime/error-taxonomy"
+import { classifyError } from "@/kiloclaw/runtime/error-taxonomy"
+import type { ErrorCategory, ErrorSeverity, ClassifiedError } from "@/kiloclaw/runtime/error-taxonomy"
 
 describe("Error Taxonomy - Classification and Severity", () => {
   let correlationId: string
@@ -280,7 +281,7 @@ describe("Error Taxonomy - Classification and Severity", () => {
       for (const { msg, expected } of errors) {
         const err = new Error(msg)
         const classified = classifyError(err, correlationId)
-        expect(classified.severity).toBe(expected)
+        expect((classified as any).severity).toBe(expected)
       }
     })
   })
