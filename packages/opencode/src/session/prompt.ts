@@ -53,6 +53,8 @@ import { RoutingPipeline, type PipelineResult } from "@/kiloclaw/agency/routing/
 import { resolveAgencyAllowedTools, getAgencyCanonicalToolIds, isCanonicalAlias } from "./tool-policy"
 import { ToolIdentityResolver } from "./tool-identity-resolver"
 import { RuntimeRemediationMetrics } from "@/kiloclaw/telemetry/runtime-remediation.metrics"
+import { executeSkill, executeSkillChain } from "@/kiloclaw/agency/execution-bridge"
+import { SESSION_EXECUTION_BRIDGE_ENABLED } from "./runtime-flags"
 
 // @ts-ignore
 globalThis.AI_SDK_LOG_WARNINGS = false
@@ -76,6 +78,52 @@ export namespace SessionPrompt {
     fallbackUsed?: boolean
     fallbackReason?: string
     layers?: PipelineResult["layers"]
+  }
+
+  const runBridge = async (input: { ctx: AgencyContext; text: string; sessionID: string }) => {
+    if (!SESSION_EXECUTION_BRIDGE_ENABLED()) return
+    const route = input.ctx.layers?.L1?.routeResult
+    if (!route) return
+    if (route.type !== "skill" && route.type !== "chain") return
+
+    const corr = input.sessionID
+    const cfg = {
+      maxSteps: 10,
+      timeoutMs: 60_000,
+      correlationId: corr,
+      agencyId: input.ctx.agencyId,
+    }
+    const payload = {
+      query: input.text,
+      routeReason: route.reason,
+      routeConfidence: route.confidence,
+      routeType: route.type,
+    }
+
+    if (route.type === "skill" && route.skill) {
+      const out = await executeSkill(route.skill, payload, cfg)
+      if (!out.success) {
+        log.warn("session bridge skill execution failed", {
+          sessionID: input.sessionID,
+          agencyId: input.ctx.agencyId,
+          skill: route.skill,
+          error: out.error,
+        })
+      }
+      return
+    }
+
+    if (route.type === "chain" && route.chain) {
+      const out = await executeSkillChain(route.chain, payload, cfg)
+      if (!out.success) {
+        log.warn("session bridge chain execution failed", {
+          sessionID: input.sessionID,
+          agencyId: input.ctx.agencyId,
+          chain: route.chain,
+          error: out.error,
+        })
+      }
+    }
   }
 
   // kilocode_change start - share follow-up trigger logic with tests
@@ -566,6 +614,13 @@ export namespace SessionPrompt {
                     fallbackUsed: agencyContext.layers.L3.fallbackUsed,
                   }
                 : undefined,
+            })
+
+            // P1 remediation: routing -> execution bridge in session loop
+            await runBridge({
+              ctx: agencyContext,
+              text: userText,
+              sessionID,
             })
           }
         } catch (err) {
@@ -1500,7 +1555,10 @@ export namespace SessionPrompt {
       })
     }
 
-    for (const [key, item] of Object.entries(await MCP.tools())) {
+    const mcpToolsMap = await MCP.tools()
+    const knownMcpKeys = new Set(Object.keys(mcpToolsMap))
+
+    for (const [key, item] of Object.entries(mcpToolsMap)) {
       const execute = item.execute
       if (!execute) continue
       // P0: Use ToolIdentityResolver for policy binding
@@ -1514,7 +1572,7 @@ export namespace SessionPrompt {
         if (!isAllowed && enabledAgency) {
           // Check if any allowed alias maps to this MCP key
           for (const alias of agencyTools.allowedTools) {
-            const result = ToolIdentityResolver.resolve(alias, enabledAgency)
+            const result = ToolIdentityResolver.resolve(alias, enabledAgency, knownMcpKeys)
             if (result.resolved && result.runtimeKey === key) {
               isAllowed = true
               break
