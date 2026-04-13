@@ -33,6 +33,9 @@ import { WeatherForecastSkill } from "../skills/weather/weather-forecast"
 import { WeatherAlertsSkill } from "../skills/weather/weather-alerts"
 import { WeatherCurrentSkill } from "../skills/weather/weather-current"
 
+// NBA Betting Agency skills
+import { NbaAnalysisSkill } from "../skills/nba/nba-analysis"
+
 const log = Log.create({ service: "kiloclaw.chain-executor" })
 
 // Chain execution result
@@ -77,6 +80,8 @@ const skillRegistry: Record<string, Skill> = {
   "weather-forecast": WeatherForecastSkill,
   "weather-alerts": WeatherAlertsSkill,
   "weather-current": WeatherCurrentSkill,
+  // NBA Betting Agency skills
+  "nba-analysis": NbaAnalysisSkill,
 }
 
 // Get a skill by ID (exported for use by execution-bridge)

@@ -272,7 +272,36 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
                 .map((p: any) => p.text)
                 .join(" ")
                 .trim()
-              userInput = { query: textParts, sources: 5 }
+
+              // For weather skills, extract location from query text
+              // Pattern: "weather in/at/city_name" or "tempo a/in city_name"
+              if (agencySkill.id.startsWith("weather-")) {
+                const locationPatterns = [
+                  /(?:a|ad|at|in|da|della|di)\s+([A-Za-zÀ-ÿ\.\-\'\s]+?)(?:\s+d[aei]|\s+da\s+gioved|\s+da\s+vener|\s+per|\s+dal|$)/i,
+                  /(?:tempo|meteo|previsioni|forecast)\s+(?:a|ad|at|in|da|della|di)\s+([A-Za-zÀ-ÿ\.\-\'\s]+?)(?:\s+d[aei]|\s+da\s+gioved|\s+da\s+vener|\s+per|\s+dal|$)/i,
+                ]
+                let location = ""
+                for (const pattern of locationPatterns) {
+                  const match = textParts.match(pattern)
+                  if (match && match[1]) {
+                    location = match[1].trim()
+                    break
+                  }
+                }
+                // Default to common Italian cities if no location found
+                if (!location) {
+                  location = "Roma" // default
+                }
+
+                // Extract days if mentioned
+                const daysMatch = textParts.match(/(\d+)\s*giorn[oi]|(\d+)\s*days?/i)
+                const days = daysMatch ? parseInt(daysMatch[1] || daysMatch[2]) : 7
+
+                userInput = { location, days }
+              } else {
+                // Non-weather skills use query format
+                userInput = { query: textParts, sources: 5 }
+              }
             }
           } catch (err) {
             // If we can't get user message, use empty input
@@ -291,9 +320,17 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
 
           if (bridgeResult.success) {
             // Return the actual execution result
+            // Format object outputs as JSON, scalar outputs as-is
+            const formattedOutput =
+              bridgeResult.output !== undefined
+                ? typeof bridgeResult.output === "object"
+                  ? JSON.stringify(bridgeResult.output, null, 2)
+                  : String(bridgeResult.output)
+                : "Skill executed successfully"
+
             return {
               title: `Executed skill: ${agencySkill.id}`,
-              output: bridgeResult.output !== undefined ? String(bridgeResult.output) : "Skill executed successfully",
+              output: formattedOutput,
               metadata: {
                 name: skillName,
                 dir: BUILTIN,
