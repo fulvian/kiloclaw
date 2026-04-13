@@ -83,6 +83,7 @@ export function isCanonicalAlias(toolId: string): boolean {
 export const KNOWLEDGE_TOOL_ALLOWLIST = ["websearch", "webfetch", "skill"] as const
 export const NBA_TOOL_ALLOWLIST = ["websearch", "webfetch", "skill"] as const
 export const GWORKSPACE_TOOL_ALLOWLIST = [
+  "task",
   "gmail.search",
   "gmail.read",
   "gmail.draft",
