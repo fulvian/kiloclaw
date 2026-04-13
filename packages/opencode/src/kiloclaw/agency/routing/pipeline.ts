@@ -269,15 +269,17 @@ export namespace RoutingPipeline {
     const capabilities = agency.policies.allowedCapabilities
 
     // Capability → Tool mapping per agency-domain
-    // NBA agency uses native adapters, not generic web tools
+    // Specialized agencies use native adapters, not generic web tools
     const isNbaAgency = agencyId === "agency-nba"
+    const isFinanceAgency = agencyId === "agency-finance"
+
     const nbaCapabilityToTools: Record<string, string[]> = {
       schedule_live: ["balldontlie.getGames", "espn.getScoreboard"],
       team_player_stats: ["balldontlie.getStats", "espn.getStandings"],
       injury_status: ["balldontlie.getInjuries", "espn.getInjuries"],
       odds_markets: ["odds_bet365.getOdds", "odds_api.getOdds", "parlay.getOdds", "polymarket.getOdds"],
-      game_preview: ["skill"], // Derived from game + odds data
-      probability_estimation: ["skill"], // Computed by NbaRuntime
+      game_preview: ["skill"],
+      probability_estimation: ["skill"],
       vig_removal: ["skill"],
       edge_detection: ["skill"],
       calibration_monitoring: ["skill"],
@@ -286,18 +288,49 @@ export namespace RoutingPipeline {
       stake_sizing: ["skill"],
     }
 
+    const financeCapabilityToTools: Record<string, string[]> = {
+      "price.current": ["twelve_data.prices", "polygon.quotes", "finnhub.quote"],
+      "price.historical": ["twelve_data.history", "polygon.history", "alpha_vantage.history"],
+      orderbook: ["polygon.orderbook", "finnhub.orderbook"],
+      fundamentals: ["fmp.fundamentals", "finnhub.fundamentals"],
+      macro: ["fred.data", "fmp.macro"],
+      filings: ["fmp.filings"],
+      news: ["finnhub.news", "fmp.news"],
+      "technical.indicators": ["skill"], // Computed by analytics engine
+      "chart.patterns": ["skill"],
+      "factor.analysis": ["skill"],
+      "stress.test": ["skill"],
+      correlation: ["skill"],
+      sentiment: ["skill"],
+      "signal.generation": ["skill"],
+      "paper.trade": ["skill"],
+      "order.simulation": ["skill"],
+      "execution.assist": ["skill"],
+      "portfolio.rebalance": ["skill"],
+      "alert.risk": ["skill"],
+      "watchlist.view": ["skill"],
+      "journal.entry": ["skill"],
+      "report.generate": ["skill"],
+    }
+
     const mapped = capabilities.flatMap((cap) => {
       // NBA-specific capability mapping
       if (isNbaAgency && cap in nbaCapabilityToTools) {
         return nbaCapabilityToTools[cap as keyof typeof nbaCapabilityToTools]
       }
 
-      // Generic capability mapping (for non-NBA agencies)
+      // Finance-specific capability mapping
+      if (isFinanceAgency && cap in financeCapabilityToTools) {
+        return financeCapabilityToTools[cap as keyof typeof financeCapabilityToTools]
+      }
+
+      // Generic capability mapping (for non-specialized agencies)
       if (["search", "web-search", "academic-research"].includes(cap)) return ["websearch"]
       if (["fact-checking", "verification", "source_grounding"].includes(cap)) return ["webfetch"]
       if (["synthesis", "information_gathering"].includes(cap)) return ["skill"]
+      // Don't use generic tools for specialized agencies
       if (["schedule_live", "team_player_stats", "injury_status", "odds_markets", "game_preview"].includes(cap)) {
-        return isNbaAgency ? [] : ["websearch", "webfetch", "skill"]
+        return isNbaAgency || isFinanceAgency ? [] : ["websearch", "webfetch", "skill"]
       }
       if (
         [
@@ -310,7 +343,7 @@ export namespace RoutingPipeline {
           "stake_sizing",
         ].includes(cap)
       ) {
-        return isNbaAgency ? [] : ["skill", "webfetch"]
+        return isNbaAgency || isFinanceAgency ? [] : ["skill", "webfetch"]
       }
       return []
     })
@@ -337,27 +370,50 @@ export namespace RoutingPipeline {
                 "polymarket.getOdds",
                 ...mapped,
               ]
-            : agencyId === "agency-gworkspace"
+            : agencyId === "agency-finance"
               ? [
-                  "gmail.search",
-                  "gmail.read",
-                  "gmail.draft",
-                  "gmail.send",
-                  "drive.search",
-                  "drive.list",
-                  "drive.read",
-                  "drive.share",
-                  "calendar.list",
-                  "calendar.read",
-                  "calendar.create",
-                  "calendar.update",
-                  "docs.read",
-                  "docs.update",
-                  "sheets.read",
-                  "sheets.update",
+                  // Finance skill executes internally, tools are provider adapters
+                  "skill",
+                  // Price/Market data adapters
+                  "twelve_data.prices",
+                  "twelve_data.history",
+                  "polygon.quotes",
+                  "polygon.history",
+                  "polygon.orderbook",
+                  "alpha_vantage.history",
+                  // Fundamental/Macro data
+                  "finnhub.quote",
+                  "finnhub.fundamentals",
+                  "finnhub.orderbook",
+                  "finnhub.news",
+                  "fmp.fundamentals",
+                  "fmp.filings",
+                  "fmp.macro",
+                  "fmp.news",
+                  "fred.data",
                   ...mapped,
                 ]
-              : agencyId === "agency-development"
+              : agencyId === "agency-gworkspace"
+                ? [
+                    "gmail.search",
+                    "gmail.read",
+                    "gmail.draft",
+                    "gmail.send",
+                    "drive.search",
+                    "drive.list",
+                    "drive.read",
+                    "drive.share",
+                    "calendar.list",
+                    "calendar.read",
+                    "calendar.create",
+                    "calendar.update",
+                    "docs.read",
+                    "docs.update",
+                    "sheets.read",
+                    "sheets.update",
+                    ...mapped,
+                  ]
+                : agencyId === "agency-development"
                 ? [
                     "read",
                     "glob",
