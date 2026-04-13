@@ -267,12 +267,37 @@ export namespace RoutingPipeline {
     }
 
     const capabilities = agency.policies.allowedCapabilities
+
+    // Capability → Tool mapping per agency-domain
+    // NBA agency uses native adapters, not generic web tools
+    const isNbaAgency = agencyId === "agency-nba"
+    const nbaCapabilityToTools: Record<string, string[]> = {
+      schedule_live: ["balldontlie.getGames", "espn.getScoreboard"],
+      team_player_stats: ["balldontlie.getStats", "espn.getStandings"],
+      injury_status: ["balldontlie.getInjuries", "espn.getInjuries"],
+      odds_markets: ["odds_bet365.getOdds", "odds_api.getOdds", "parlay.getOdds", "polymarket.getOdds"],
+      game_preview: ["skill"], // Derived from game + odds data
+      probability_estimation: ["skill"], // Computed by NbaRuntime
+      vig_removal: ["skill"],
+      edge_detection: ["skill"],
+      calibration_monitoring: ["skill"],
+      value_watchlist: ["skill"],
+      recommendation_report: ["skill"],
+      stake_sizing: ["skill"],
+    }
+
     const mapped = capabilities.flatMap((cap) => {
+      // NBA-specific capability mapping
+      if (isNbaAgency && cap in nbaCapabilityToTools) {
+        return nbaCapabilityToTools[cap as keyof typeof nbaCapabilityToTools]
+      }
+
+      // Generic capability mapping (for non-NBA agencies)
       if (["search", "web-search", "academic-research"].includes(cap)) return ["websearch"]
       if (["fact-checking", "verification", "source_grounding"].includes(cap)) return ["webfetch"]
       if (["synthesis", "information_gathering"].includes(cap)) return ["skill"]
       if (["schedule_live", "team_player_stats", "injury_status", "odds_markets", "game_preview"].includes(cap)) {
-        return ["websearch", "webfetch", "skill"]
+        return isNbaAgency ? [] : ["websearch", "webfetch", "skill"]
       }
       if (
         [
@@ -285,7 +310,7 @@ export namespace RoutingPipeline {
           "stake_sizing",
         ].includes(cap)
       ) {
-        return ["skill", "webfetch"]
+        return isNbaAgency ? [] : ["skill", "webfetch"]
       }
       return []
     })
@@ -294,7 +319,24 @@ export namespace RoutingPipeline {
         agencyId === "agency-knowledge"
           ? ["websearch", "webfetch", "skill", ...mapped]
           : agencyId === "agency-nba"
-            ? ["websearch", "webfetch", "skill", ...mapped]
+            ? [
+                // NBA skill executes internally, other tools are adapters
+                "skill",
+                // Games/Schedule adapters
+                "balldontlie.getGames",
+                "balldontlie.getStats",
+                "balldontlie.getInjuries",
+                "espn.getScoreboard",
+                "espn.getStandings",
+                "espn.getInjuries",
+                "nba_api.getStats",
+                // Odds adapters
+                "odds_bet365.getOdds",
+                "odds_api.getOdds",
+                "parlay.getOdds",
+                "polymarket.getOdds",
+                ...mapped,
+              ]
             : agencyId === "agency-gworkspace"
               ? [
                   "gmail.search",

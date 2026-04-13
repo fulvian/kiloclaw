@@ -31,6 +31,7 @@ export interface Skill {
   execute(input: unknown, context: SkillContext): Promise<unknown>
   readonly capabilities: string[]
   readonly tags: string[]
+  readonly requiredTools?: string[] // Tools/adapters this skill requires (for policy validation)
 }
 
 // Skill namespace with factory

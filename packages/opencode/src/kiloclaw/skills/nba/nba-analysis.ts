@@ -103,6 +103,21 @@ export const NbaAnalysisSkill: Skill = {
   id: "nba-analysis" as SkillId,
   version: "1.0.0",
   name: "NBA Betting Analysis",
+  // Required tools/adapters that this skill invokes internally
+  // Used for policy validation and routing verification
+  requiredTools: [
+    "balldontlie.getGames",
+    "balldontlie.getInjuries",
+    "balldontlie.getStats",
+    "espn.getScoreboard",
+    "espn.getInjuries",
+    "espn.getStandings",
+    "nba_api.getStats",
+    "odds_bet365.getOdds",
+    "odds_api.getOdds",
+    "parlay.getOdds",
+    "polymarket.getOdds",
+  ],
   inputSchema: {
     type: "object",
     properties: {
