@@ -99,7 +99,21 @@ export const NbaGamesTool = Tool.define("nba-games", async () => {
       })
 
       // Default to today's date if none provided (BDL API returns ALL games without date)
-      const dates = params.date ? [params.date] : [new Date().toISOString().split("T")[0]]
+      // NBA games for "tonight" in local time may be scheduled on the next calendar day in UTC
+      // (US evening games start ~11PM UTC). When no date specified, fetch both today and tomorrow
+      // to capture all relevant games.
+      let dates: string[]
+      if (params.date) {
+        dates = [params.date]
+      } else {
+        const today = new Date()
+        const tomorrow = new Date(today)
+        tomorrow.setDate(tomorrow.getDate() + 1)
+        dates = [
+          today.toLocaleDateString("en-CA"), // YYYY-MM-DD in local timezone
+          tomorrow.toLocaleDateString("en-CA"),
+        ]
+      }
 
       const result = await NbaOrchestrator.getGames({
         dates,

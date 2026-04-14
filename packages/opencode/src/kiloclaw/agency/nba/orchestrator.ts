@@ -146,6 +146,7 @@ export namespace NbaOrchestrator {
   // Fetch odds with fallback chain - tries primary odds sources first
   export async function getOdds(options?: {
     gameIds?: string[]
+    date?: string
     markets?: string[]
     bookmakers?: string[]
     regions?: string[]

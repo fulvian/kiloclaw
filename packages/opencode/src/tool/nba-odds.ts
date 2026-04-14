@@ -22,7 +22,7 @@ function formatOdds(odds: Odds): string {
 
   const marketLabel = odds.market === "h2h" ? "Moneyline" : odds.market === "spreads" ? "Spread" : "Over/Under"
 
-  return `${freshness} [${odds.bookmaker_or_exchange}] ${marketLabel} (vig: ${(odds.vig_percent * 100).toFixed(2)}%)\n${outcomes}`
+  return `${freshness} [${odds.bookmaker_or_exchange}] ${marketLabel} (vig: ${odds.vig_percent.toFixed(2)}%)\n${outcomes}`
 }
 
 function formatOddsMarkdown(odds: Odds[], provider: string, freshnessSeconds: number): string {
@@ -116,6 +116,7 @@ export const NbaOddsTool = Tool.define("nba-odds", async () => {
 
       const result = await NbaOrchestrator.getOdds({
         gameIds: params.gameIds,
+        date: params.date,
         markets: params.markets as string[] | undefined,
         bookmakers: params.bookmakers,
         regions: params.regions as string[] | undefined,
