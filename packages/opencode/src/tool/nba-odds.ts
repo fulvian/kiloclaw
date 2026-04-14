@@ -85,6 +85,10 @@ export const NbaOddsTool = Tool.define("nba-odds", async () => {
 
     parameters: z.object({
       gameIds: z.array(z.string()).optional().describe("Game IDs from nba-games output (e.g. ['12345'])."),
+      date: z
+        .string()
+        .optional()
+        .describe("Filter odds by date (YYYY-MM-DD). Use when gameIds not available. Defaults to today."),
       markets: z
         .array(z.enum(["h2h", "spreads", "totals"]))
         .optional()
