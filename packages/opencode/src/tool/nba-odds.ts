@@ -81,7 +81,9 @@ export const NbaOddsTool = Tool.define("nba-odds", async () => {
       "Get NBA betting odds from multiple bookmakers (Bet365, Odds API, Parlay, Polymarket). " +
       "Returns moneyline, spread, and over/under odds with implied probabilities and vig removal. " +
       "Use this for odds comparison, value detection, and betting analysis. " +
-      "Use game IDs from nba-games output. If no gameIds provided, returns odds for all today's games.",
+      "NOTE: Game IDs from nba-games (BallDontLie format like '21681576') cannot be used directly - " +
+      "the Odds API uses different ID formats. If gameIds are provided but no odds are returned, " +
+      "try without gameIds to get all available odds. Without gameIds, returns odds for all active games.",
 
     parameters: z.object({
       gameIds: z.array(z.string()).optional().describe("Game IDs from nba-games output (e.g. ['12345'])."),

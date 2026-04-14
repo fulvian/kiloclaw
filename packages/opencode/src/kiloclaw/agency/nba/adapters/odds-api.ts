@@ -199,8 +199,16 @@ export class OddsApiAdapter implements OddsAdapter {
       }
 
       // Event ID filter (specific games)
+      // NOTE: BallDontLie game IDs (numeric like "21681576") do NOT work with Odds API event IDs
+      // (which are hashed like "25f53495c4044a1d8fb682e3715eb7b3").
+      // Only pass gameIds if they look like Odds API event IDs (hex string), not BDL numeric IDs.
       if (options?.gameIds?.length) {
-        params.set("eventIds", options.gameIds.join(","))
+        const isBdlId = (id: string) => /^\d+$/.test(id)
+        const oddsApiIds = options.gameIds.filter((id) => !isBdlId(id))
+        if (oddsApiIds.length > 0) {
+          params.set("eventIds", oddsApiIds.join(","))
+        }
+        // If all gameIds are BDL format, skip eventIds filter and rely on date/default
       }
 
       const response = await this.fetch<OddsApiResponse[]>(`${BASE_URL}/sports/${SPORT_KEY}/odds?${params}`)

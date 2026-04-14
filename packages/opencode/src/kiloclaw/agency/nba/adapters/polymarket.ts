@@ -137,10 +137,18 @@ export class PolymarketAdapter implements NbaAdapter {
       searchParams.set("closed", "false")
 
       if (options?.gameIds?.length) {
-        // Filter by specific condition IDs
-        searchParams.set("condition_id", options.gameIds.join(","))
-      } else {
-        // Search for NBA markets
+        // NOTE: BallDontLie game IDs (numeric) do NOT work with Polymarket condition IDs.
+        // Only pass if they look like Polymarket condition IDs (not pure numeric).
+        const isBdlId = (id: string) => /^\d+$/.test(id)
+        const polyIds = options.gameIds.filter((id) => !isBdlId(id))
+        if (polyIds.length > 0) {
+          searchParams.set("condition_id", polyIds.join(","))
+        }
+        // If all are BDL IDs, fall through to search by question
+      }
+
+      // Only search by question if no valid condition IDs were provided
+      if (!searchParams.get("condition_id")) {
         searchParams.set("question", "NBA")
       }
 

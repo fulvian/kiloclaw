@@ -188,7 +188,13 @@ export class OddsBet365Adapter implements OddsAdapter {
       params.set("oddsFormat", "decimal")
 
       if (options?.gameIds?.length) {
-        params.set("eventIds", options.gameIds.join(","))
+        // NOTE: BallDontLie game IDs (numeric) do NOT work with Bet365 event IDs (hashed).
+        // Only pass if they look like Bet365 event IDs (not pure numeric).
+        const isBdlId = (id: string) => /^\d+$/.test(id)
+        const oddsApiIds = options.gameIds.filter((id) => !isBdlId(id))
+        if (oddsApiIds.length > 0) {
+          params.set("eventIds", oddsApiIds.join(","))
+        }
       }
 
       const response = await this.fetch<OddsApiResponse[]>(`${BASE_URL}/sports/${SPORT_KEY}/odds?${params}`)
