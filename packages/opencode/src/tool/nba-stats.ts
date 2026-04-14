@@ -95,7 +95,8 @@ export const NbaStatsTool = Tool.define("nba-stats", async () => {
       "- 'player_season_averages': Season averages for specific players\n" +
       "- 'team_stats': Team season statistics\n" +
       "- 'recent_games': Last N games for a specific team\n" +
-      "Uses BallDontLie API. Requires player/team IDs (use nba-games to find teams).",
+      "Use team/player IDs from nba-games output (BallDontLie numeric format). " +
+      "For team_stats and recent_games, pass teamIds. For player queries, pass playerIds.",
 
     parameters: z.object({
       type: z
@@ -104,8 +105,13 @@ export const NbaStatsTool = Tool.define("nba-stats", async () => {
       playerIds: z
         .array(z.string())
         .optional()
-        .describe("Player IDs for stats (use with player_stats or player_season_averages)."),
-      teamIds: z.array(z.string()).optional().describe("Team IDs for stats (use with team_stats or recent_games)."),
+        .describe(
+          "Player IDs for stats (BallDontLie numeric format, use with player_stats or player_season_averages).",
+        ),
+      teamIds: z
+        .array(z.string())
+        .optional()
+        .describe("BallDontLie team IDs (numeric 1-30, from nba-games output. Use with team_stats or recent_games)."),
       season: z
         .number()
         .optional()

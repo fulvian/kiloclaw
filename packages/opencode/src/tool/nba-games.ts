@@ -17,9 +17,21 @@ function formatGame(game: Game): string {
 
   const home = game.home_team.name
   const away = game.away_team.name
+  const homeId = game.home_team.id
+  const awayId = game.away_team.id
   const freshness = game.freshness_state === "fresh" ? "✓" : game.freshness_state === "stale" ? "⚠" : "?"
 
-  return `${freshness} ${status}${score} | ${away} @ ${home}`
+  const startTime = game.start_time_utc
+    ? new Date(game.start_time_utc).toLocaleString("en-US", {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZoneName: "short",
+      })
+    : ""
+
+  return `${freshness} ${status}${score} | ${away} (ID:${awayId}) @ ${home} (ID:${homeId}) | Game:${game.game_id}${startTime ? ` | ${startTime}` : ""}`
 }
 
 function formatGamesMarkdown(games: Game[], provider: string, freshnessSeconds: number): string {
@@ -33,9 +45,26 @@ function formatGamesMarkdown(games: Game[], provider: string, freshnessSeconds: 
     "",
     ...games.map((g) => formatGame(g)),
     "",
-    `---`,
-    `*Data from ${provider} via NBA Agency orchestrator*`,
   ]
+
+  // Add tool chaining guidance with IDs from the games
+  const allTeamIds = new Set<string>()
+  const allGameIds: string[] = []
+  for (const g of games) {
+    allTeamIds.add(g.home_team.id)
+    allTeamIds.add(g.away_team.id)
+    allGameIds.push(g.game_id)
+  }
+  const teamIdsStr = [...allTeamIds].join(",")
+  const gameIdsStr = allGameIds.join(",")
+
+  lines.push("---")
+  lines.push(`*Data from ${provider} via NBA Agency orchestrator*`)
+  lines.push("")
+  lines.push("💡 **Next steps — use the IDs above with other NBA tools:**")
+  lines.push(`- \`nba-stats\` (teamIds: [${teamIdsStr}]) → team/player statistics, season averages, recent games`)
+  lines.push(`- \`nba-injuries\` (teamIds: [${teamIdsStr}]) → injury reports for these teams`)
+  lines.push(`- \`nba-odds\` (gameIds: [${gameIdsStr}]) → betting odds for these games`)
 
   return lines.join("\n")
 }
@@ -45,7 +74,7 @@ export const NbaGamesTool = Tool.define("nba-games", async () => {
     description:
       "Get NBA games, scores, and schedule from BallDontLie API with ESPN and NBA API fallback. " +
       "Returns live scores, game status, team information with freshness tracking. " +
-      "Use this to get today's games, live scores, or schedule information. " +
+      "Each game shows team IDs (BallDontLie numeric format, e.g. 1-30) and game ID — use these with nba-stats, nba-injuries, and nba-odds. " +
       "Supports filtering by date (YYYY-MM-DD) and team IDs.",
 
     parameters: z.object({
@@ -53,7 +82,7 @@ export const NbaGamesTool = Tool.define("nba-games", async () => {
       teamIds: z
         .array(z.string())
         .optional()
-        .describe("Filter by specific team IDs (e.g., ['1610612739', '1610612737'] for Lakers/Celtics)."),
+        .describe("Filter by BallDontLie team IDs (numeric 1-30, e.g. ['14', '1'] for Lakers/Celtics)."),
       status: z
         .enum(["all", "scheduled", "live", "final"])
         .optional()

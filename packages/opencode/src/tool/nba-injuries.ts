@@ -79,13 +79,14 @@ export const NbaInjuriesTool = Tool.define("nba-injuries", async () => {
       "Get NBA injury reports from BallDontLie and ESPN. " +
       "Returns player injuries with status (OUT/Doubtful/Questionable/Probable) and injury details. " +
       "CRITICAL for betting analysis - injuries significantly impact game outcomes and odds. " +
-      "Supports filtering by team IDs.",
+      "Use team IDs from nba-games output (BallDontLie numeric format 1-30). " +
+      "If no teamIds provided, returns injuries for all teams with games today.",
 
     parameters: z.object({
       teamIds: z
         .array(z.string())
         .optional()
-        .describe("Filter injuries for specific team IDs (e.g., ['1610612739'] for Lakers)."),
+        .describe("BallDontLie team IDs (numeric 1-30, from nba-games output, e.g. ['14', '1'])."),
       status: z
         .enum(["all", "out", "questionable", "doubtful", "probable"])
         .optional()
