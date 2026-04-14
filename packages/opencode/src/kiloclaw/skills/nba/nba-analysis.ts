@@ -249,7 +249,15 @@ export const NbaAnalysisSkill: Skill = {
       input,
     })
 
-    const { gameId, teamIds, includeInjuries = true, includeOdds = true, minEdge = 0.05 } = input as NbaAnalysisInput
+    // Handle both NbaAnalysisInput and generic { query, sources } input from skill tool
+    const rawInput = input as Record<string, unknown>
+    const gameId = rawInput.gameId as string | undefined
+    const teamIds = rawInput.teamIds as string[] | undefined
+    const includeInjuries = rawInput.includeInjuries !== undefined ? Boolean(rawInput.includeInjuries) : true
+    const includeOdds = rawInput.includeOdds !== undefined ? Boolean(rawInput.includeOdds) : true
+    const minEdge = typeof rawInput.minEdge === "number" ? rawInput.minEdge : 0.05
+    // If query is passed (from skill tool's generic format), use today's date for analysis
+    const useTodayFallback = rawInput.query !== undefined
 
     const cb = getCircuitBreaker()
     const policyDecisions: NbaPolicyDecision[] = []
