@@ -30,9 +30,11 @@ export const AuditOperation = z.enum([
   "drive.create",
   "drive.delete",
   "docs.read",
+  "docs.download",
   "docs.update",
   "docs.delete",
   "sheets.read",
+  "sheets.download",
   "sheets.update",
   "sheets.delete",
 ])
@@ -388,6 +390,8 @@ export namespace GWorkspaceAudit {
       sessionId?: string
       documentId?: string
       documentName?: string
+      format?: string
+      sizeBytes?: number
       hitlRequired?: boolean
       hitlRequestId?: string
       error?: string
@@ -435,6 +439,8 @@ export namespace GWorkspaceAudit {
       spreadsheetId?: string
       spreadsheetName?: string
       range?: string
+      format?: string
+      sizeBytes?: number
       hitlRequired?: boolean
       hitlRequestId?: string
       error?: string

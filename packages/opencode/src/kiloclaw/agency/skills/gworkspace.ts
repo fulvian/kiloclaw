@@ -10,6 +10,8 @@ import { GWorkspaceAgency, type PolicyLevel } from "../manifests/gworkspace-mani
 import { GWorkspaceHITL } from "../hitl/gworkspace-hitl"
 import { GWorkspaceAudit } from "../audit/gworkspace-audit"
 import { GWorkspaceBroker } from "../broker/gworkspace-broker"
+import { DocumentExporter, ContentParser, EXPORT_FORMATS, type ExportFormat } from "../services/document-exporter"
+import { BrokerTokenIntegration } from "../auth/broker-integration"
 
 const IntentReceived = BusEvent.define(
   "intent.received",
@@ -566,6 +568,17 @@ export const DocsReadInputSchema = z.object({
   workspaceId: z.string().optional().default("default").describe("Workspace ID"),
 })
 
+export const DocsDownloadInputSchema = z.object({
+  documentId: z.string().describe("Document ID"),
+  format: z
+    .enum(["pdf", "docx", "txt", "csv"])
+    .optional()
+    .default("pdf")
+    .describe("Export format"),
+  userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
+  workspaceId: z.string().optional().default("default").describe("Workspace ID"),
+})
+
 export namespace DocsSkills {
   const log = Log.create({ service: "gworkspace.skill.docs" })
 
@@ -607,6 +620,81 @@ export namespace DocsSkills {
 
     return result.data
   })
+
+  export const download = fn(DocsDownloadInputSchema, async (input) => {
+    const ctx = makeCtx()
+    const userId = input.userId ?? process.env.KILO_USER_ID
+    const workspaceId = input.workspaceId
+
+    if (!userId) {
+      throw new Error("userId is required (set via input or KILO_USER_ID environment variable)")
+    }
+
+    log.info("docs.download", { documentId: input.documentId, format: input.format, userId, workspaceId })
+    emitIntent("docs", "documents.export")
+
+    try {
+      // Get access token
+      const accessToken = await BrokerTokenIntegration.getAccessToken({
+        userId,
+        workspaceId,
+      })
+
+      // Map format to MIME type
+      const formatMap: Record<string, ExportFormat> = {
+        pdf: EXPORT_FORMATS.PDF,
+        docx: EXPORT_FORMATS.DOCX,
+        txt: EXPORT_FORMATS.PLAINTEXT,
+        csv: EXPORT_FORMATS.CSV,
+      }
+
+      const mimeType = formatMap[input.format] || EXPORT_FORMATS.PDF
+
+      // Check if format is supported for Docs
+      if (!DocumentExporter.isSupportedFormat("docs", mimeType)) {
+        throw new Error(`Format ${input.format} not supported for Google Docs`)
+      }
+
+      // Export document
+      const result = await DocumentExporter.exportFromDrive(accessToken, input.documentId, {
+        format: mimeType,
+        timeout: 30000,
+        maxSize: 10 * 1024 * 1024, // 10MB
+      })
+
+      // Parse content
+      const parsed = await ContentParser.parseContent(result.buffer, result.mimeType)
+
+      await GWorkspaceAudit.recordDocs("docs.download", "success", {
+        ...ctx,
+        documentId: input.documentId,
+        format: input.format,
+        sizeBytes: result.size,
+      })
+
+      return {
+        success: true,
+        format: input.format,
+        size: result.size,
+        text: parsed.text,
+        metadata: parsed.metadata,
+        summary: ContentParser.extractSummary(parsed, 300),
+      }
+    } catch (error) {
+      log.error("docs.download error", {
+        documentId: input.documentId,
+        error: error instanceof Error ? error.message : String(error),
+      })
+
+      await GWorkspaceAudit.recordDocs("docs.download", "failure", {
+        ...ctx,
+        documentId: input.documentId,
+        error: error instanceof Error ? error.message : String(error),
+      })
+
+      throw error
+    }
+  })
 }
 
 // ============================================================================
@@ -616,6 +704,17 @@ export namespace DocsSkills {
 export const SheetsReadInputSchema = z.object({
   spreadsheetId: z.string().describe("Spreadsheet ID"),
   range: z.string().optional(),
+  userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
+  workspaceId: z.string().optional().default("default").describe("Workspace ID"),
+})
+
+export const SheetsDownloadInputSchema = z.object({
+  spreadsheetId: z.string().describe("Spreadsheet ID"),
+  format: z
+    .enum(["xlsx", "csv", "tsv"])
+    .optional()
+    .default("csv")
+    .describe("Export format"),
   userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
   workspaceId: z.string().optional().default("default").describe("Workspace ID"),
 })
@@ -664,5 +763,80 @@ export namespace SheetsSkills {
     }
 
     return result.data
+  })
+
+  export const download = fn(SheetsDownloadInputSchema, async (input) => {
+    const ctx = makeCtx()
+    const userId = input.userId ?? process.env.KILO_USER_ID
+    const workspaceId = input.workspaceId
+    const log = Log.create({ service: "gworkspace.skill.sheets" })
+
+    if (!userId) {
+      throw new Error("userId is required (set via input or KILO_USER_ID environment variable)")
+    }
+
+    log.info("sheets.download", { spreadsheetId: input.spreadsheetId, format: input.format, userId, workspaceId })
+    emitIntent("sheets", "spreadsheets.export")
+
+    try {
+      // Get access token
+      const accessToken = await BrokerTokenIntegration.getAccessToken({
+        userId,
+        workspaceId,
+      })
+
+      // Map format to MIME type
+      const formatMap: Record<string, ExportFormat> = {
+        xlsx: EXPORT_FORMATS.XLSX,
+        csv: EXPORT_FORMATS.CSV,
+        tsv: EXPORT_FORMATS.TSV,
+      }
+
+      const mimeType = formatMap[input.format] || EXPORT_FORMATS.CSV
+
+      // Check if format is supported for Sheets
+      if (!DocumentExporter.isSupportedFormat("sheets", mimeType)) {
+        throw new Error(`Format ${input.format} not supported for Google Sheets`)
+      }
+
+      // Export spreadsheet
+      const result = await DocumentExporter.exportFromDrive(accessToken, input.spreadsheetId, {
+        format: mimeType,
+        timeout: 30000,
+        maxSize: 10 * 1024 * 1024, // 10MB
+      })
+
+      // Parse content
+      const parsed = await ContentParser.parseContent(result.buffer, result.mimeType)
+
+      await GWorkspaceAudit.recordSheets("sheets.download", "success", {
+        ...ctx,
+        spreadsheetId: input.spreadsheetId,
+        format: input.format,
+        sizeBytes: result.size,
+      })
+
+      return {
+        success: true,
+        format: input.format,
+        size: result.size,
+        text: parsed.text,
+        metadata: parsed.metadata,
+        summary: ContentParser.extractSummary(parsed, 300),
+      }
+    } catch (error) {
+      log.error("sheets.download error", {
+        spreadsheetId: input.spreadsheetId,
+        error: error instanceof Error ? error.message : String(error),
+      })
+
+      await GWorkspaceAudit.recordSheets("sheets.download", "failure", {
+        ...ctx,
+        spreadsheetId: input.spreadsheetId,
+        error: error instanceof Error ? error.message : String(error),
+      })
+
+      throw error
+    }
   })
 }
