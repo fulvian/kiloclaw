@@ -238,7 +238,11 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
                 ? "weather"
                 : nbaSkills.some((s) => s.id === agencySkill.id)
                   ? "nba"
-                  : "finance"
+                  : financeSkills.some((s) => s.id === agencySkill.id)
+                    ? "finance"
+                    : travelSkills.some((s) => s.id === agencySkill.id)
+                      ? "travel"
+                      : "unknown"
         const skillName = agencySkill.id as string // Cast branded SkillId to string
 
         // P1: Build skill output
@@ -248,7 +252,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
           "",
           content,
           "",
-          `This is a ${agencyType === "knowledge" ? "Knowledge" : agencyType === "development" ? "Development" : agencyType === "nutrition" ? "Nutrition" : agencyType === "weather" ? "Weather" : agencyType === "nba" ? "NBA" : "Finance"} Agency skill.`,
+          `This is a ${agencyType === "knowledge" ? "Knowledge" : agencyType === "development" ? "Development" : agencyType === "nutrition" ? "Nutrition" : agencyType === "weather" ? "Weather" : agencyType === "nba" ? "NBA" : agencyType === "finance" ? "Finance" : agencyType === "travel" ? "Travel" : "Unknown"} Agency skill.`,
           "</skill_content>",
         ].join("\n")
 
@@ -288,15 +292,16 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
               // For weather skills, extract location from query text
               // Pattern: "weather in/at/city_name" or "tempo a/in city_name"
               if (agencySkill.id.startsWith("weather-")) {
-                // Extract location - look for "a [city]" pattern at end of query
-                // or patterns like "in [city]"
+                // Extract location - look for patterns anywhere in the text
                 const locationPatterns = [
-                  // Match "a Roma" or "ad Roma" at the end of string
-                  /(?:a|ad)\s+([A-Za-zÀ-ÿ\s\.\-\']+?)(?:\s*$)/i,
-                  // Match "in Italia", "in Roma" etc
-                  /(?:in)\s+([A-Za-zÀ-ÿ\s\.\-\']+?)(?:\s*$)/i,
-                  // Match "tempo a Roma", "previsioni Roma"
-                  /(?:tempo|meteo|previsioni|forecast)\s+(?:a\s+)?([A-Za-zÀ-ÿ\s\.\-\']+?)(?:\s*$)/i,
+                  // Match "a Roma", "ad Roma", "a Roma, Italia"
+                  /(?:a|ad)\s+([A-Za-zÀ-ÿ\s\.\-\']+?)(?:,|$|\s+[A-Z])/i,
+                  // Match "in Italia", "in Roma", "in Rome"
+                  /(?:in)\s+([A-Za-zÀ-ÿ\s\.\-\']+?)(?:,|$|\s+[A-Z])/i,
+                  // Match "tempo a Roma", "previsioni Roma", "meteo Roma"
+                  /(?:tempo|meteo|previsioni|forecast)\s+(?:a\s+)?([A-Za-zÀ-ÿ\s\.\-\']+?)(?:,|$|\s+[A-Z])/i,
+                  // Match "weather Rome", "weather Roma"
+                  /weather\s+(?:in\s+)?([A-Za-zÀ-ÿ\s\.\-\']+?)(?:,|$|\s+[A-Z])/i,
                 ]
                 let location = ""
                 for (const pattern of locationPatterns) {
@@ -304,17 +309,61 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
                   if (match && match[1]) {
                     location = match[1].trim()
                     // Clean up - remove trailing prepositions or days
-                    location = location.replace(/\s+(da|del|della|dalle|dai)\s+.*$/i, "")
-                    location = location.replace(/\s+(e|da|dei|degli|al|ai|alla|alle)\s+.*$/i, "")
+                    location = location.replace(/\s+(da|del|della|dalle|dai|e|da|dei|degli|al|ai|alla|alle)\s+.*$/i, "")
+                    location = location.replace(/,\s*$/, "") // remove trailing comma
                     break
                   }
                 }
-                // Default to common Italian cities if no location found
+                // Try to find Italian city names in the text
+                const italianCities = [
+                  "Roma",
+                  "Milano",
+                  "Napoli",
+                  "Firenze",
+                  "Venezia",
+                  "Torino",
+                  "Bologna",
+                  "Genova",
+                  "Palermo",
+                  "Bari",
+                  "Catania",
+                  "Verona",
+                  "Trieste",
+                  "Brescia",
+                  "Reggio Calabria",
+                  "Modena",
+                  "Parma",
+                  "Reggio Emilia",
+                  "Perugia",
+                  "Salerno",
+                  "Foggia",
+                  "Rimini",
+                  "Siracusa",
+                  "Bergamo",
+                  "Pescara",
+                  "Trento",
+                  "Ferrara",
+                  "Catanzaro",
+                  "Arezzo",
+                  "Latina",
+                  "Piacenza",
+                  "Lucca",
+                  "Frosinone",
+                  "Salerno",
+                  "Turino",
+                ]
+                for (const city of italianCities) {
+                  if (textParts.toLowerCase().includes(city.toLowerCase())) {
+                    location = city
+                    break
+                  }
+                }
+                // Default to Rome if no location found (common default)
                 if (!location) {
-                  location = "Roma" // default
+                  location = "Roma"
                 }
 
-                // Extract days if mentioned (temporal "da giovedi")
+                // Extract days if mentioned (temporal "da giovedi" or date references)
                 const daysMatch = textParts.match(/(\d+)\s*giorn[oi]|(\d+)\s*days?/i)
                 const days = daysMatch ? parseInt(daysMatch[1] || daysMatch[2]) : 7
 
