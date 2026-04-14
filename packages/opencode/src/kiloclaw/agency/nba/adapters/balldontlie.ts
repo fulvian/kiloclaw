@@ -9,7 +9,7 @@ import { KeyManager } from "../../key-pool"
 import { Log } from "@/util/log"
 import type { NbaAdapter, AdapterResult, AdapterError, FetchOptions, PaginatedResult } from "./base"
 
-const BASE_URL = "https://api.balldontlie.io/v1"
+const BASE_URL = "https://api.balldontlie.io"
 const PROVIDER = "balldontlie"
 
 export interface BallDontLieConfig {
@@ -279,7 +279,7 @@ export class BallDontLieAdapter implements NbaAdapter {
 
   async ping(): Promise<boolean> {
     try {
-      await this.fetch<{ data: BdlTeam[] }>("/teams?per_page=1")
+      await this.fetch<{ data: BdlTeam[] }>("/v1/teams?per_page=1")
       return true
     } catch {
       return false
@@ -308,7 +308,7 @@ export class BallDontLieAdapter implements NbaAdapter {
         options.teamIds.forEach((id) => params.append("team_ids[]", id))
       }
 
-      const response = await this.fetch<PaginatedResult<BdlGame>>(`/games?${params}`)
+      const response = await this.fetch<PaginatedResult<BdlGame>>(`/v1/games?${params}`)
       const now = Date.now()
 
       const games: Game[] = response.data.map((g) => {
@@ -375,7 +375,7 @@ export class BallDontLieAdapter implements NbaAdapter {
         options.teamIds.forEach((id) => params.append("team_ids[]", id))
       }
 
-      const response = await this.fetch<PaginatedResult<BdlPlayerInjury>>(`/player_injuries?${params}`)
+      const response = await this.fetch<PaginatedResult<BdlPlayerInjury>>(`/v1/player_injuries?${params}`)
       const now = Date.now()
 
       // We need team names - fetch teams for mapping if we don't have them cached
@@ -438,7 +438,7 @@ export class BallDontLieAdapter implements NbaAdapter {
     if (this.teamMapCache) return this.teamMapCache
 
     try {
-      const response = await this.fetch<{ data: BdlTeam[] }>("/teams")
+      const response = await this.fetch<{ data: BdlTeam[] }>("/v1/teams")
       this.teamMapCache = new Map(response.data.map((t) => [t.id, t.full_name]))
       return this.teamMapCache
     } catch {
@@ -568,7 +568,7 @@ export class BallDontLieAdapter implements NbaAdapter {
     if (options.endDate) params.set("end_date", options.endDate)
     if (options.postseason !== undefined) params.set("postseason", String(options.postseason))
 
-    const response = await this.fetch<PaginatedResult<BdlPlayerGameStat>>(`/stats?${params}`)
+    const response = await this.fetch<PaginatedResult<BdlPlayerGameStat>>(`/v1/stats?${params}`)
     const teamMap = await this.getTeamMap()
 
     const stats = response.data.map((s) => ({
@@ -623,32 +623,65 @@ export class BallDontLieAdapter implements NbaAdapter {
 
     const params = new URLSearchParams()
     params.set("season", String(season))
+    params.set("season_type", "regular")
+    params.set("type", "base")
     options.playerIds.forEach((id) => params.append("player_ids[]", id))
 
-    const response = await this.fetch<{ data: BdlSeasonAverage[] }>(`/season_averages?${params}`)
+    // BDL API requires category in path: /v1/season_averages/{category}
+    const response = await this.fetch<{
+      data: Array<{
+        player: { id: number; first_name: string; last_name: string }
+        season: number
+        season_type: string
+        stats: {
+          games_played?: number
+          min?: string
+          fgm?: number
+          fga?: number
+          fg_pct?: number
+          fg3m?: number
+          fg3a?: number
+          fg3_pct?: number
+          ftm?: number
+          fta?: number
+          ft_pct?: number
+          oreb?: number
+          dreb?: number
+          reb?: number
+          ast?: number
+          stl?: number
+          blk?: number
+          turnover?: number
+          pf?: number
+          pts?: number
+        }
+      }>
+    }>(`/v1/season_averages/general?${params}`)
 
     const stats = response.data.map((s) => ({
-      player_id: s.player_id,
+      player_id: s.player.id,
+      player_name: `${s.player.first_name} ${s.player.last_name}`,
       season: s.season,
-      games_played: s.games_played,
-      min: s.min,
-      pts: s.pts,
-      ast: s.ast,
-      reb: s.reb,
-      stl: s.stl,
-      blk: s.blk,
-      tov: s.turnover,
-      fgm: s.fgm,
-      fga: s.fga,
-      fg_pct: s.fg_pct,
-      fg3m: s.fg3m,
-      fg3a: s.fg3a,
-      fg3_pct: s.fg3_pct,
-      ftm: s.ftm,
-      fta: s.fta,
-      ft_pct: s.ft_pct,
-      oreb: s.oreb,
-      dreb: s.dreb,
+      season_type: s.season_type,
+      games_played: s.stats.games_played,
+      min: s.stats.min,
+      pts: s.stats.pts,
+      ast: s.stats.ast,
+      reb: s.stats.reb,
+      stl: s.stats.stl,
+      blk: s.stats.blk,
+      tov: s.stats.turnover,
+      fgm: s.stats.fgm,
+      fga: s.stats.fga,
+      fg_pct: s.stats.fg_pct,
+      fg3m: s.stats.fg3m,
+      fg3a: s.stats.fg3a,
+      fg3_pct: s.stats.fg3_pct,
+      ftm: s.stats.ftm,
+      fta: s.stats.fta,
+      ft_pct: s.stats.ft_pct,
+      oreb: s.stats.oreb,
+      dreb: s.stats.dreb,
     }))
 
     this.config.circuitBreaker.recordSuccess(PROVIDER)
@@ -714,7 +747,7 @@ export class BallDontLieAdapter implements NbaAdapter {
       params.append("team_ids[]", teamId)
       params.set("end_date", new Date().toISOString().split("T")[0])
 
-      const response = await this.fetch<PaginatedResult<BdlGame>>(`/games?${params}`)
+      const response = await this.fetch<PaginatedResult<BdlGame>>(`/v1/games?${params}`)
 
       // Take the last N games (most recent)
       const recentGames = response.data.slice(-limit).reverse()
