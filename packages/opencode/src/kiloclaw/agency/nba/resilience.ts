@@ -57,7 +57,11 @@ export const NbaFreshnessAssessmentSchema = z.object({
 })
 
 export function assessFreshness(source: z.infer<typeof NbaFreshnessSourceSchema>, ageSeconds: number) {
-  const age = z.number().int().nonnegative().parse(ageSeconds)
+  const age = z
+    .number()
+    .int()
+    .nonnegative()
+    .parse(Math.max(0, Math.floor(ageSeconds)))
   const maxAgeSeconds = FRESHNESS_TTL[source]
   const state = age <= maxAgeSeconds ? "fresh" : "stale"
   return NbaFreshnessAssessmentSchema.parse({

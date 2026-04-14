@@ -190,7 +190,7 @@ export class EspnAdapter implements NbaAdapter {
         if (!homeParticipant || !awayParticipant) continue
 
         const gameDate = new Date(event.date).getTime()
-        const freshnessSeconds = Math.floor((now - gameDate) / 1000)
+        const freshnessSeconds = Math.max(0, Math.floor((now - gameDate) / 1000))
         const statusType = competition.status.type
 
         let status: Game["status"] = "scheduled"
@@ -263,7 +263,7 @@ export class EspnAdapter implements NbaAdapter {
 
           for (const inj of response.injuries) {
             const injuryDate = new Date(inj.date).getTime()
-            const freshnessSeconds = Math.floor((now - injuryDate) / 1000)
+            const freshnessSeconds = Math.max(0, Math.floor((now - injuryDate) / 1000))
 
             injuries.push(
               InjurySchema.parse({

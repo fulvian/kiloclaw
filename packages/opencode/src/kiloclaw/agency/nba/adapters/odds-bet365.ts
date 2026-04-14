@@ -209,7 +209,7 @@ export class OddsBet365Adapter implements OddsAdapter {
           const vigPercent = (overround - 1) * 100
 
           const lastUpdate = new Date(bet365Bookmaker.last_update).getTime()
-          const freshnessSeconds = Math.floor((now - lastUpdate) / 1000)
+          const freshnessSeconds = Math.max(0, Math.floor((now - lastUpdate) / 1000))
           const freshness = assessFreshness("odds_bet365", freshnessSeconds)
 
           odds.push(

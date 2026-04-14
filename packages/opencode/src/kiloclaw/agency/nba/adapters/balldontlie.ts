@@ -223,7 +223,7 @@ export class BallDontLieAdapter implements NbaAdapter {
       const games: Game[] = response.data.map((g) => {
         const collectedAt = new Date().toISOString()
         const gameDate = new Date(g.datetime).getTime()
-        const freshnessSeconds = Math.floor((now - gameDate) / 1000)
+        const freshnessSeconds = Math.max(0, Math.floor((now - gameDate) / 1000))
         const freshness = assessFreshness("balldontlie_games", freshnessSeconds)
 
         return GameSchema.parse({
@@ -283,7 +283,7 @@ export class BallDontLieAdapter implements NbaAdapter {
       const injuries: Injury[] = response.data.map((inj) => {
         const collectedAt = new Date().toISOString()
         const injuryDate = new Date(inj.date).getTime()
-        const freshnessSeconds = Math.floor((now - injuryDate) / 1000)
+        const freshnessSeconds = Math.max(0, Math.floor((now - injuryDate) / 1000))
         const freshness = assessFreshness("balldontlie_injuries", freshnessSeconds)
 
         return InjurySchema.parse({

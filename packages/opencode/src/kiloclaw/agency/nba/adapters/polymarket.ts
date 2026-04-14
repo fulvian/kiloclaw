@@ -162,7 +162,7 @@ export class PolymarketAdapter implements NbaAdapter {
         const vigPercent = (overround - 1) * 100
 
         const lastUpdate = new Date(market.updated_at).getTime()
-        const freshnessSeconds = Math.floor((now - lastUpdate) / 1000)
+        const freshnessSeconds = Math.max(0, Math.floor((now - lastUpdate) / 1000))
         const freshness = assessFreshness("polymarket", freshnessSeconds)
 
         // Polymarket markets are binary (Yes/No) typically

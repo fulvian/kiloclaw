@@ -224,7 +224,7 @@ export class OddsApiAdapter implements OddsAdapter {
 
             // Determine freshness
             const lastUpdate = new Date(bookmaker.last_update).getTime()
-            const freshnessSeconds = Math.floor((now - lastUpdate) / 1000)
+            const freshnessSeconds = Math.max(0, Math.floor((now - lastUpdate) / 1000))
             const freshness = assessFreshness("odds_api", freshnessSeconds)
 
             odds.push(
