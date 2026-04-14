@@ -1,5 +1,6 @@
 // Google Workspace Tool Broker
 // Routes requests to native adapter or MCP fallback
+// With automatic token management via TokenManager
 
 import { Log } from "@/util/log"
 import { MCP } from "@/mcp"
@@ -17,6 +18,15 @@ export interface BrokerConfig {
   mcpFallbackEnabled: boolean
   fallbackServers: string[]
   accessToken?: string
+}
+
+// Enhanced broker config with user context (for automatic token management)
+export interface BrokerConfigWithUser {
+  userId: string
+  workspaceId: string
+  preferNative?: boolean
+  mcpFallbackEnabled?: boolean
+  fallbackServers?: string[]
 }
 
 export const defaultBrokerConfig: BrokerConfig = {
@@ -43,6 +53,84 @@ export interface ToolResult<T> {
 
 export namespace GWorkspaceBroker {
   const log = Log.create({ service: "gworkspace.broker" })
+
+  /**
+   * Get valid access token from TokenManager (with automatic refresh if needed)
+   * Converts user context config to broker config with token
+   */
+  export async function getAccessTokenForUser(cfg: BrokerConfigWithUser): Promise<string> {
+    try {
+      const { TokenManager } = await import("../auth/token-manager")
+      const { GWorkspaceOAuth } = await import("../auth/gworkspace-oauth")
+
+      return await TokenManager.getValidAccessToken(cfg.userId, cfg.workspaceId, async (refreshToken) => {
+        const newTokens = await GWorkspaceOAuth.refreshTokens(
+          {
+            clientId: process.env.GWORKSPACE_CLIENT_ID || "",
+            clientSecret: process.env.GWORKSPACE_CLIENT_SECRET,
+          },
+          refreshToken
+        )
+        return {
+          accessToken: newTokens.accessToken,
+          refreshToken: newTokens.refreshToken,
+          expiresIn: 3600,
+        }
+      })
+    } catch (error) {
+      log.error("failed to get access token for user", {
+        userId: cfg.userId,
+        workspaceId: cfg.workspaceId,
+        error: error instanceof Error ? error.message : String(error),
+      })
+      throw error
+    }
+  }
+
+  /**
+   * Convert user context config to standard broker config with token
+   */
+  export async function toBrokerConfig(cfg: BrokerConfigWithUser): Promise<BrokerConfig> {
+    const token = await getAccessTokenForUser(cfg)
+    return {
+      accessToken: token,
+      preferNative: cfg.preferNative ?? defaultBrokerConfig.preferNative,
+      mcpFallbackEnabled: cfg.mcpFallbackEnabled ?? defaultBrokerConfig.mcpFallbackEnabled,
+      fallbackServers: cfg.fallbackServers ?? defaultBrokerConfig.fallbackServers,
+    }
+  }
+
+  /**
+   * Revoke tokens on logout
+   */
+  export async function revokeTokensForUser(userId: string, workspaceId: string): Promise<void> {
+    try {
+      const { TokenManager } = await import("../auth/token-manager")
+      const { GWorkspaceOAuth } = await import("../auth/gworkspace-oauth")
+
+      await TokenManager.revoke(userId, workspaceId, async (refreshToken) => {
+        try {
+          await GWorkspaceOAuth.revokeToken(
+            {
+              clientId: process.env.GWORKSPACE_CLIENT_ID || "",
+              clientSecret: process.env.GWORKSPACE_CLIENT_SECRET,
+            },
+            refreshToken
+          )
+        } catch (err) {
+          log.warn("failed to revoke token with oauth provider", { userId, error: err })
+        }
+      })
+
+      log.info("tokens revoked for user", { userId, workspaceId })
+    } catch (error) {
+      log.error("failed to revoke tokens", {
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      })
+      throw error
+    }
+  }
 
   const RouteDecided = BusEvent.define(
     "agency.route.decided",

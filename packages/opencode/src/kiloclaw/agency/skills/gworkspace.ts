@@ -64,10 +64,14 @@ function makeCtx() {
 export const GmailSearchInputSchema = z.object({
   query: z.string().describe("Gmail search query"),
   maxResults: z.number().optional().default(10),
+  userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
+  workspaceId: z.string().optional().default("default").describe("Workspace ID"),
 })
 
 export const GmailReadInputSchema = z.object({
   messageId: z.string().describe("Message ID to read"),
+  userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
+  workspaceId: z.string().optional().default("default").describe("Workspace ID"),
 })
 
 export const GmailSendInputSchema = z.object({
@@ -75,6 +79,8 @@ export const GmailSendInputSchema = z.object({
   subject: z.string().describe("Subject"),
   body: z.string().describe("Body"),
   cc: z.array(z.string()).optional(),
+  userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
+  workspaceId: z.string().optional().default("default").describe("Workspace ID"),
 })
 
 export namespace GmailSkills {
@@ -82,7 +88,14 @@ export namespace GmailSkills {
 
   export const search = fn(GmailSearchInputSchema, async (input) => {
     const ctx = makeCtx()
-    log.info("gmail.search", { query: input.query })
+    const userId = input.userId ?? process.env.KILO_USER_ID
+    const workspaceId = input.workspaceId
+
+    if (!userId) {
+      throw new Error("userId is required (set via input or KILO_USER_ID environment variable)")
+    }
+
+    log.info("gmail.search", { query: input.query, userId, workspaceId })
     emitIntent("gmail", "messages.search")
     const policy = GWorkspaceAgency.getPolicy("gmail", "messages.search")
     emitPolicy("gmail", "messages.search", policy)
@@ -90,7 +103,14 @@ export namespace GmailSkills {
       throw new Error("Operation denied by policy")
     }
 
-    const result = await GWorkspaceBroker.gmail("search", { query: input.query, maxResults: input.maxResults })
+    const brokerCfg = await GWorkspaceBroker.toBrokerConfig({
+      userId,
+      workspaceId,
+      preferNative: true,
+      mcpFallbackEnabled: true,
+    })
+
+    const result = await GWorkspaceBroker.gmail("search", { query: input.query, maxResults: input.maxResults }, brokerCfg)
 
     await GWorkspaceAudit.recordGmail("gmail.search", result.success ? "success" : "failure", {
       ...ctx,
@@ -107,7 +127,14 @@ export namespace GmailSkills {
 
   export const read = fn(GmailReadInputSchema, async (input) => {
     const ctx = makeCtx()
-    log.info("gmail.read", { messageId: input.messageId })
+    const userId = input.userId ?? process.env.KILO_USER_ID
+    const workspaceId = input.workspaceId
+
+    if (!userId) {
+      throw new Error("userId is required (set via input or KILO_USER_ID environment variable)")
+    }
+
+    log.info("gmail.read", { messageId: input.messageId, userId, workspaceId })
     emitIntent("gmail", "messages.get")
     const policy = GWorkspaceAgency.getPolicy("gmail", "messages.get")
     emitPolicy("gmail", "messages.get", policy)
@@ -115,7 +142,14 @@ export namespace GmailSkills {
       throw new Error("Operation denied by policy")
     }
 
-    const result = await GWorkspaceBroker.gmail("read", { messageId: input.messageId })
+    const brokerCfg = await GWorkspaceBroker.toBrokerConfig({
+      userId,
+      workspaceId,
+      preferNative: true,
+      mcpFallbackEnabled: true,
+    })
+
+    const result = await GWorkspaceBroker.gmail("read", { messageId: input.messageId }, brokerCfg)
 
     await GWorkspaceAudit.recordGmail("gmail.read", result.success ? "success" : "failure", {
       ...ctx,
@@ -132,7 +166,14 @@ export namespace GmailSkills {
 
   export const send = fn(GmailSendInputSchema, async (input) => {
     const ctx = makeCtx()
-    log.info("gmail.send", { to: input.to.length, subject: input.subject })
+    const userId = input.userId ?? process.env.KILO_USER_ID
+    const workspaceId = input.workspaceId
+
+    if (!userId) {
+      throw new Error("userId is required (set via input or KILO_USER_ID environment variable)")
+    }
+
+    log.info("gmail.send", { to: input.to.length, subject: input.subject, userId, workspaceId })
     emitIntent("gmail", "messages.send")
     const policy = GWorkspaceAgency.getPolicy("gmail", "messages.send")
     emitPolicy("gmail", "messages.send", policy)
@@ -182,11 +223,18 @@ export namespace GmailSkills {
       })
     }
 
+    const brokerCfg = await GWorkspaceBroker.toBrokerConfig({
+      userId,
+      workspaceId,
+      preferNative: true,
+      mcpFallbackEnabled: true,
+    })
+
     const result = await GWorkspaceBroker.gmail("send", {
       to: input.to,
       subject: input.subject,
       body: input.body,
-    })
+    }, brokerCfg)
 
     await GWorkspaceAudit.recordGmail("gmail.send", result.success ? "success" : "failure", {
       ...ctx,

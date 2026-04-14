@@ -1,41 +1,11 @@
 // Google Workspace Token Database Implementation
-// Uses Drizzle ORM for SQLite/PostgreSQL abstraction
-// Replaces placeholder functions in TokenManager
+// Uses Drizzle ORM for SQLite abstraction
+// Persistent encrypted token storage with audit trail
 
 import { Log } from "@/util/log"
-import z from "zod"
-import { StoredToken } from "./token-manager"
-
-// ============================================================================
-// Database Schema (Drizzle ORM)
-// ============================================================================
-
-// Note: This is a template for Drizzle ORM schema
-// Adapt based on your actual Drizzle setup
-
-/*
-import { sqliteTable, text, integer, primaryKey, uniqueIndex } from 'drizzle-orm/sqlite-core'
-import { sql } from 'drizzle-orm'
-
-export const gworkspaceTokens = sqliteTable(
-  'gworkspace_tokens',
-  {
-    id: text('id').primaryKey().default(sql`gen_random_uuid()`),
-    userId: text('user_id').notNull(),
-    workspaceId: text('workspace_id').notNull(),
-    encryptedAccessToken: text('encrypted_access_token').notNull(),
-    encryptedRefreshToken: text('encrypted_refresh_token'),
-    expiresAt: integer('expires_at').notNull(),
-    rotatedAt: integer('rotated_at').notNull().default(sql`CAST(EXTRACT(EPOCH FROM NOW()) * 1000 AS INTEGER)`),
-    createdAt: integer('created_at').notNull().default(sql`CAST(EXTRACT(EPOCH FROM NOW()) * 1000 AS INTEGER)`),
-  },
-  (table) => ({
-    uniqueConstraint: uniqueIndex('unique_user_workspace').on(table.userId, table.workspaceId),
-    userIdIdx: index('idx_user_id').on(table.userId),
-    expiresAtIdx: index('idx_expires_at').on(table.expiresAt),
-  })
-)
-*/
+import { Database, eq, and, lt, count, min } from "@/storage/db"
+import { GWorkspaceTokenTable, GWorkspaceTokenRotationTable, GWorkspaceIdempotencyKeyTable } from "./gworkspace-token.sql"
+import type { StoredToken } from "./token-manager"
 
 // ============================================================================
 // Database Implementation
@@ -45,45 +15,36 @@ export namespace TokenDatabase {
   const log = Log.create({ service: "token-manager.database" })
 
   /**
-   * Save token to database (implements placeholder from TokenManager)
-   *
-   * This function should be called by TokenManager.store()
-   *
-   * Usage:
-   *   await TokenDatabase.saveToken(storedToken)
+   * Save token to database (insert or update)
+   * Uses upsert pattern to replace existing token for user/workspace pair
    */
   export async function saveToken(token: StoredToken): Promise<void> {
     try {
-      // TODO: Replace with your actual database implementation
-      // This is the Drizzle ORM pattern:
-      //
-      // import { db } from '@/your-db-config'
-      // import { gworkspaceTokens } from './token-db'
-      // import { eq, and } from 'drizzle-orm'
-      //
-      // await db
-      //   .insert(gworkspaceTokens)
-      //   .values({
-      //     id: token.id,
-      //     userId: token.userId,
-      //     workspaceId: token.workspaceId,
-      //     encryptedAccessToken: token.encryptedAccessToken,
-      //     encryptedRefreshToken: token.encryptedRefreshToken,
-      //     expiresAt: token.expiresAt,
-      //     rotatedAt: token.rotatedAt,
-      //     createdAt: token.createdAt,
-      //   })
-      //   .onConflictDoUpdate({
-      //     target: [gworkspaceTokens.userId, gworkspaceTokens.workspaceId],
-      //     set: {
-      //       encryptedAccessToken: token.encryptedAccessToken,
-      //       encryptedRefreshToken: token.encryptedRefreshToken,
-      //       expiresAt: token.expiresAt,
-      //       rotatedAt: token.rotatedAt,
-      //     },
-      //   })
+      const db = Database.Client()
 
-      log.debug("saveToken called", { userId: token.userId, id: token.id })
+      await db
+        .insert(GWorkspaceTokenTable)
+        .values({
+          id: token.id,
+          user_id: token.userId,
+          workspace_id: token.workspaceId,
+          encrypted_access_token: token.encryptedAccessToken,
+          encrypted_refresh_token: token.encryptedRefreshToken,
+          expires_at: token.expiresAt,
+          rotated_at: token.rotatedAt,
+        })
+        .onConflictDoUpdate({
+          target: [GWorkspaceTokenTable.user_id, GWorkspaceTokenTable.workspace_id],
+          set: {
+            id: token.id,
+            encrypted_access_token: token.encryptedAccessToken,
+            encrypted_refresh_token: token.encryptedRefreshToken,
+            expires_at: token.expiresAt,
+            rotated_at: token.rotatedAt,
+          },
+        })
+
+      log.debug("saveToken completed", { userId: token.userId, workspaceId: token.workspaceId })
     } catch (error) {
       log.error("failed to save token", {
         userId: token.userId,
@@ -94,39 +55,38 @@ export namespace TokenDatabase {
   }
 
   /**
-   * Load token from database (implements placeholder from TokenManager)
-   *
-   * This function should be called by TokenManager.getValidAccessToken()
-   *
-   * Usage:
-   *   const token = await TokenDatabase.loadToken(userId, workspaceId)
+   * Load token from database by userId + workspaceId
    */
   export async function loadToken(userId: string, workspaceId: string): Promise<StoredToken | null> {
     try {
-      // TODO: Replace with your actual database implementation
-      // This is the Drizzle ORM pattern:
-      //
-      // import { db } from '@/your-db-config'
-      // import { gworkspaceTokens } from './token-db'
-      // import { eq, and } from 'drizzle-orm'
-      //
-      // const result = await db
-      //   .select()
-      //   .from(gworkspaceTokens)
-      //   .where(
-      //     and(
-      //       eq(gworkspaceTokens.userId, userId),
-      //       eq(gworkspaceTokens.workspaceId, workspaceId)
-      //     )
-      //   )
-      //   .limit(1)
-      //
-      // if (!result.length) return null
-      //
-      // return result[0] as StoredToken
+      const db = Database.Client()
 
-      log.debug("loadToken called", { userId, workspaceId })
-      return null // Placeholder
+      const result = await db
+        .select()
+        .from(GWorkspaceTokenTable)
+        .where(
+          and(
+            eq(GWorkspaceTokenTable.user_id, userId),
+            eq(GWorkspaceTokenTable.workspace_id, workspaceId)
+          )
+        )
+        .limit(1)
+
+      if (!result.length) {
+        return null
+      }
+
+      const row = result[0]
+      return {
+        id: row.id,
+        userId: row.user_id,
+        workspaceId: row.workspace_id,
+        encryptedAccessToken: row.encrypted_access_token,
+        encryptedRefreshToken: row.encrypted_refresh_token ?? undefined,
+        expiresAt: row.expires_at,
+        rotatedAt: row.rotated_at,
+        createdAt: row.time_created,
+      } as StoredToken
     } catch (error) {
       log.error("failed to load token", {
         userId,
@@ -137,27 +97,22 @@ export namespace TokenDatabase {
   }
 
   /**
-   * Delete token from database (called on revoke)
+   * Delete token from database (called on logout/revoke)
    */
   export async function deleteToken(userId: string, workspaceId: string): Promise<void> {
     try {
-      // TODO: Replace with your actual database implementation
-      // This is the Drizzle ORM pattern:
-      //
-      // import { db } from '@/your-db-config'
-      // import { gworkspaceTokens } from './token-db'
-      // import { eq, and } from 'drizzle-orm'
-      //
-      // await db
-      //   .delete(gworkspaceTokens)
-      //   .where(
-      //     and(
-      //       eq(gworkspaceTokens.userId, userId),
-      //       eq(gworkspaceTokens.workspaceId, workspaceId)
-      //     )
-      //   )
+      const db = Database.Client()
 
-      log.debug("deleteToken called", { userId, workspaceId })
+      await db
+        .delete(GWorkspaceTokenTable)
+        .where(
+          and(
+            eq(GWorkspaceTokenTable.user_id, userId),
+            eq(GWorkspaceTokenTable.workspace_id, workspaceId)
+          )
+        )
+
+      log.debug("deleteToken completed", { userId, workspaceId })
     } catch (error) {
       log.error("failed to delete token", {
         userId,
@@ -168,7 +123,7 @@ export namespace TokenDatabase {
   }
 
   /**
-   * Record token rotation in audit table
+   * Record token rotation in audit table for compliance
    */
   export async function recordRotation(
     userId: string,
@@ -177,21 +132,17 @@ export namespace TokenDatabase {
     reason: "regular" | "compromise" | "refresh" | "logout" | "manual" = "regular"
   ): Promise<void> {
     try {
-      // TODO: Replace with your actual database implementation
-      // This is the Drizzle ORM pattern:
-      //
-      // import { db } from '@/your-db-config'
-      // import { gworkspaceTokenRotations } from './token-db'
-      //
-      // await db.insert(gworkspaceTokenRotations).values({
-      //   userId,
-      //   workspaceId,
-      //   oldRefreshTokenHash,
-      //   rotationReason: reason,
-      //   rotatedAt: Date.now(),
-      // })
+      const db = Database.Client()
 
-      log.debug("recordRotation called", { userId, workspaceId, reason })
+      await db.insert(GWorkspaceTokenRotationTable).values({
+        id: crypto.randomUUID(),
+        user_id: userId,
+        workspace_id: workspaceId,
+        old_refresh_token_hash: oldRefreshTokenHash,
+        rotation_reason: reason,
+      })
+
+      log.debug("recordRotation completed", { userId, workspaceId, reason })
     } catch (error) {
       log.error("failed to record rotation", {
         userId,
@@ -202,26 +153,22 @@ export namespace TokenDatabase {
   }
 
   /**
-   * Cleanup expired tokens (called periodically)
+   * Cleanup expired tokens older than 7 days
+   * Keeps recent tokens for audit trail
    */
   export async function cleanupExpiredTokens(): Promise<number> {
     try {
+      const db = Database.Client()
       const sevenDaysMs = 7 * 24 * 60 * 60 * 1000
       const cutoffTime = Date.now() - sevenDaysMs
 
-      // TODO: Replace with your actual database implementation
-      // This is the SQL pattern:
-      //
-      // DELETE FROM gworkspace_tokens
-      // WHERE expires_at < cutoff_time - (7 days in milliseconds)
-      //
-      // Using Drizzle ORM:
-      // const result = await db
-      //   .delete(gworkspaceTokens)
-      //   .where(lt(gworkspaceTokens.expiresAt, cutoffTime))
+      const result = await db
+        .delete(GWorkspaceTokenTable)
+        .where(lt(GWorkspaceTokenTable.expires_at, cutoffTime))
 
-      log.debug("cleanupExpiredTokens called", { cutoffTime })
-      return 0 // Placeholder: return count of deleted rows
+      const deletedCount = result.changes || 0
+      log.info("cleanupExpiredTokens completed", { deletedCount, cutoffTime })
+      return deletedCount
     } catch (error) {
       log.error("failed to cleanup expired tokens", {
         error: error instanceof Error ? error.message : String(error),
@@ -231,7 +178,7 @@ export namespace TokenDatabase {
   }
 
   /**
-   * Get token statistics (for monitoring)
+   * Get token statistics for monitoring
    */
   export async function getStatistics(): Promise<{
     totalTokens: number
@@ -240,24 +187,63 @@ export namespace TokenDatabase {
     oldestToken: number | null
   }> {
     try {
-      // TODO: Replace with your actual database implementation
-      // SQL pattern:
-      //
-      // SELECT
-      //   COUNT(*) as total_tokens,
-      //   SUM(CASE WHEN expires_at < NOW() THEN 1 ELSE 0 END) as expired_tokens,
-      //   SUM(CASE WHEN expires_at >= NOW() THEN 1 ELSE 0 END) as active_tokens,
-      //   MIN(created_at) as oldest_token
-      // FROM gworkspace_tokens
+      const db = Database.Client()
+      const now = Date.now()
+
+      // Get total count
+      const totalResult = await db
+        .select({ count: count() })
+        .from(GWorkspaceTokenTable)
+
+      const totalTokens = totalResult[0]?.count ?? 0
+
+      // Get expired count
+      const expiredResult = await db
+        .select({ count: count() })
+        .from(GWorkspaceTokenTable)
+        .where(lt(GWorkspaceTokenTable.expires_at, now))
+
+      const expiredTokens = expiredResult[0]?.count ?? 0
+      const activeTokens = totalTokens - expiredTokens
+
+      // Get oldest token time_created
+      const oldestResult = await db
+        .select({ oldest: min(GWorkspaceTokenTable.time_created) })
+        .from(GWorkspaceTokenTable)
+
+      const oldestToken = oldestResult[0]?.oldest ?? null
 
       return {
-        totalTokens: 0,
-        expiredTokens: 0,
-        activeTokens: 0,
-        oldestToken: null,
+        totalTokens,
+        expiredTokens,
+        activeTokens,
+        oldestToken,
       }
     } catch (error) {
       log.error("failed to get statistics", {
+        error: error instanceof Error ? error.message : String(error),
+      })
+      throw error
+    }
+  }
+
+  /**
+   * Cleanup expired idempotency keys
+   */
+  export async function cleanupIdempotencyKeys(): Promise<number> {
+    try {
+      const db = Database.Client()
+      const now = Date.now()
+
+      const result = await db
+        .delete(GWorkspaceIdempotencyKeyTable)
+        .where(lt(GWorkspaceIdempotencyKeyTable.expires_at, now))
+
+      const deletedCount = result.changes || 0
+      log.debug("cleanupIdempotencyKeys completed", { deletedCount })
+      return deletedCount
+    } catch (error) {
+      log.error("failed to cleanup idempotency keys", {
         error: error instanceof Error ? error.message : String(error),
       })
       throw error

@@ -320,9 +320,12 @@ export namespace TokenManager {
     cache.delete(cacheKey)
 
     // Delete from database
-    // TODO: await db.gworkspaceTokens.delete({
-    //   where: { userId_workspaceId: { userId, workspaceId } }
-    // })
+    try {
+      const { TokenDatabase } = await import("./token-db")
+      await TokenDatabase.deleteToken(userId, workspaceId)
+    } catch (err) {
+      log.error("failed to delete token from database", { userId, workspaceId, error: err })
+    }
 
     log.info("token revoked", { userId, workspaceId })
   }
