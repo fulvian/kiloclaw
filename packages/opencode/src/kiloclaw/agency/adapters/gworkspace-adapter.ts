@@ -295,11 +295,34 @@ export namespace GWorkspaceAdapter {
   export async function driveCreatePermission(
     accessToken: string,
     fileId: string,
-    permission: { type: string; email: string; role: string },
+    permission: {
+      type: "user" | "group" | "domain" | "anyone"
+      email?: string
+      role: "reader" | "commenter" | "writer" | "owner"
+    },
   ) {
+    // Validate type enum
+    if (!["user", "group", "domain", "anyone"].includes(permission.type)) {
+      throw new Error(`Invalid permission type: ${permission.type}. Must be user, group, domain, or anyone`)
+    }
+
+    // Validate required fields for type
+    if ((permission.type === "user" || permission.type === "group") && !permission.email) {
+      throw new Error(`type="${permission.type}" requires email address`)
+    }
+
+    // Build request body with correct field names
+    const body: Record<string, unknown> = {
+      type: permission.type,
+      role: permission.role,
+    }
+    if (permission.email) {
+      body.emailAddress = permission.email // Google API uses emailAddress, not email
+    }
+
     return withRetry<{ id: string }>(accessToken, `${API_VERSION.drive}/files/${fileId}/permissions`, {
       method: "POST",
-      body: permission,
+      body,
     })
   }
 

@@ -453,8 +453,27 @@ export const DriveSearchInputSchema = z.object({
 
 export const DriveShareInputSchema = z.object({
   fileId: z.string().describe("File ID"),
-  email: z.string().describe("Email to share with"),
-  role: z.enum(["reader", "writer", "commenter"]).default("reader"),
+  type: z.enum(["user", "group", "domain", "anyone"])
+    .describe("Permission type: user, group, domain, or anyone"),
+  email: z.string().optional()
+    .describe("Email address (required for type=user or type=group)"),
+  role: z.enum(["reader", "writer", "commenter"]).default("reader").describe("Permission role"),
+  userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
+  workspaceId: z.string().optional().default("default").describe("Workspace ID"),
+})
+
+export const DriveListInputSchema = z.object({
+  folderId: z.string().optional().default("root").describe("Parent folder ID (default: root)"),
+  pageSize: z.number().optional().default(100).describe("Max items per page"),
+  pageToken: z.string().optional().describe("Page token for continuation"),
+  query: z.string().optional().describe("Google Drive search query"),
+  userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
+  workspaceId: z.string().optional().default("default").describe("Workspace ID"),
+})
+
+export const DriveGetInputSchema = z.object({
+  fileId: z.string().describe("File ID"),
+  fields: z.string().optional().describe("Fields to return (default: all)"),
   userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
   workspaceId: z.string().optional().default("default").describe("Workspace ID"),
 })
@@ -503,6 +522,90 @@ export namespace DriveSkills {
     return result.data
   })
 
+  export const list = fn(DriveListInputSchema, async (input) => {
+    const ctx = makeCtx()
+    const userId = input.userId ?? process.env.KILO_USER_ID
+    const workspaceId = input.workspaceId
+
+    if (!userId) {
+      throw new Error("userId is required (set via input or KILO_USER_ID environment variable)")
+    }
+
+    log.info("drive.list", { folderId: input.folderId, userId, workspaceId })
+    emitIntent("drive", "files.list")
+    const policy = GWorkspaceAgency.getPolicy("drive", "files.list")
+    emitPolicy("drive", "files.list", policy)
+    if (policy === "DENY") {
+      throw new Error("Operation denied by policy")
+    }
+
+    const brokerCfg = await GWorkspaceBroker.toBrokerConfig({
+      userId,
+      workspaceId,
+      preferNative: true,
+      mcpFallbackEnabled: true,
+    })
+
+    const result = await GWorkspaceBroker.drive("list", {
+      folderId: input.folderId,
+      pageSize: input.pageSize,
+      pageToken: input.pageToken,
+      query: input.query,
+    }, brokerCfg)
+
+    await GWorkspaceAudit.recordDrive("drive.list", result.success ? "success" : "failure", {
+      ...ctx,
+      provider: result.provider,
+    })
+
+    if (!result.success) {
+      throw new Error(result.error ?? "Drive list failed")
+    }
+
+    return result.data
+  })
+
+  export const get = fn(DriveGetInputSchema, async (input) => {
+    const ctx = makeCtx()
+    const userId = input.userId ?? process.env.KILO_USER_ID
+    const workspaceId = input.workspaceId
+
+    if (!userId) {
+      throw new Error("userId is required (set via input or KILO_USER_ID environment variable)")
+    }
+
+    log.info("drive.get", { fileId: input.fileId, userId, workspaceId })
+    emitIntent("drive", "files.get")
+    const policy = GWorkspaceAgency.getPolicy("drive", "files.get")
+    emitPolicy("drive", "files.get", policy)
+    if (policy === "DENY") {
+      throw new Error("Operation denied by policy")
+    }
+
+    const brokerCfg = await GWorkspaceBroker.toBrokerConfig({
+      userId,
+      workspaceId,
+      preferNative: true,
+      mcpFallbackEnabled: true,
+    })
+
+    const result = await GWorkspaceBroker.drive("get", {
+      fileId: input.fileId,
+      fields: input.fields,
+    }, brokerCfg)
+
+    await GWorkspaceAudit.recordDrive("drive.get", result.success ? "success" : "failure", {
+      ...ctx,
+      provider: result.provider,
+    })
+
+    if (!result.success) {
+      throw new Error(result.error ?? "Drive get failed")
+    }
+
+    return result.data
+  })
+
   export const share = fn(DriveShareInputSchema, async (input) => {
     const ctx = makeCtx()
     const userId = input.userId ?? process.env.KILO_USER_ID
@@ -512,7 +615,12 @@ export namespace DriveSkills {
       throw new Error("userId is required (set via input or KILO_USER_ID environment variable)")
     }
 
-    log.info("drive.share", { fileId: input.fileId, email: input.email, userId, workspaceId })
+    // Validate permission type requirements
+    if ((input.type === "user" || input.type === "group") && !input.email) {
+      throw new Error(`type="${input.type}" requires email address to be specified`)
+    }
+
+    log.info("drive.share", { fileId: input.fileId, type: input.type, email: input.email, userId, workspaceId })
     emitIntent("drive", "files.share")
     const policy = GWorkspaceAgency.getPolicy("drive", "files.share")
     emitPolicy("drive", "files.share", policy)
@@ -529,9 +637,10 @@ export namespace DriveSkills {
         "drive",
         "files.share",
         "critical",
-        `Share file ${input.fileId} with external user: ${input.email}`,
+        `Share file ${input.fileId} with ${input.type}: ${input.email || "anyone"}`,
         {
           fileId: input.fileId,
+          type: input.type,
           email: input.email,
           role: input.role,
           correlationId: ctx.correlationId,
@@ -547,7 +656,7 @@ export namespace DriveSkills {
         await GWorkspaceAudit.recordDrive("drive.share", "hitl_denied", {
           ...ctx,
           fileId: input.fileId,
-          sharedWith: [input.email],
+          sharedWith: input.email ? [input.email] : [],
           hitlRequestId: hitlRequest.id,
         })
         throw new Error("HITL request denied")
@@ -556,7 +665,7 @@ export namespace DriveSkills {
       await GWorkspaceAudit.recordDrive("drive.share", "hitl_approved", {
         ...ctx,
         fileId: input.fileId,
-        sharedWith: [input.email],
+        sharedWith: input.email ? [input.email] : [],
         hitlRequestId: hitlRequest.id,
       })
     }
@@ -570,6 +679,7 @@ export namespace DriveSkills {
 
     const result = await GWorkspaceBroker.drive("share", {
       fileId: input.fileId,
+      type: input.type,
       email: input.email,
       role: input.role,
     }, brokerCfg)
@@ -577,7 +687,7 @@ export namespace DriveSkills {
     await GWorkspaceAudit.recordDrive("drive.share", result.success ? "success" : "failure", {
       ...ctx,
       fileId: input.fileId,
-      sharedWith: [input.email],
+      sharedWith: input.email ? [input.email] : [],
       provider: result.provider,
     })
 

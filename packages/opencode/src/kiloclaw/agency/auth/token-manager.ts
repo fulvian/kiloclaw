@@ -276,7 +276,9 @@ export namespace TokenManager {
       try {
         const newTokens = await refreshFn(decrypted.refreshToken)
         const newStored = await store(userId, workspaceId, newTokens)
-        return newStored.encryptedAccessToken // Return encrypted (will decrypt next call)
+        // Decrypt the newly stored token to return plaintext
+        const refreshedAccessToken = CryptoUtil.decryptToken(newStored.encryptedAccessToken, masterKey)
+        return refreshedAccessToken // Return plaintext token for immediate use
       } catch (err) {
         log.error("token refresh failed", { userId, workspaceId, error: err })
         throw new Error("Failed to refresh token - authentication required")

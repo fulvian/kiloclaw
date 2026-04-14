@@ -519,9 +519,9 @@ export namespace GWorkspaceBroker {
         return {
           success: true,
           data: await GWorkspaceAdapter.driveCreatePermission(accessToken, args.fileId as string, {
-            type: args.type as string,
-            email: args.email as string,
-            role: args.role as string,
+            type: args.type as "user" | "group" | "domain" | "anyone",
+            email: args.email as string | undefined,
+            role: args.role as "reader" | "commenter" | "writer" | "owner",
           }),
           provider: "native",
         }
@@ -1113,7 +1113,18 @@ export namespace GWorkspaceBroker {
     // Check for GoogleAPIError with specific status codes
     if ("status" in error && typeof (error as any).status === "number") {
       const status = (error as any).status
-      return status === 429 || status === 500 || status === 502 || status === 503 || status === 504
+      // Include auth errors (401) and permission errors (403) as recoverable via MCP
+      // - 401: token expired/invalid → MCP might have valid token
+      // - 403: permission denied/quota → MCP might have different scope/permissions
+      return (
+        status === 401 ||  // Unauthorized
+        status === 403 ||  // Forbidden (permission/quota)
+        status === 429 ||  // Rate limit
+        status === 500 ||  // Server error
+        status === 502 ||  // Bad gateway
+        status === 503 ||  // Service unavailable
+        status === 504    // Gateway timeout
+      )
     }
 
     // Fallback to message matching for network errors
