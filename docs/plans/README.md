@@ -53,11 +53,30 @@
 
 ---
 
-### Phase 3: Design & Architecture (NEXT)
-**Expected**: 2026-04-16  
-**Output**: ADRs + detailed implementation designs
+### Phase 3: Design & Architecture ✅ COMPLETE
 
-### Phase 4: Implementation (PENDING)
+#### Architecture Documents
+- **[PHASE_3_DESIGN.md](./PHASE_3_DESIGN.md)** - 4 Architecture Decision Records
+  - ADR-001: Token Storage (encrypted DB + rotation)
+  - ADR-002: CRUD Operations (atomic batchUpdate pattern)
+  - ADR-003: Error Recovery (classification + circuit breaker)
+  - ADR-004: Document Export (stream-based parsing)
+
+- **[PHASE_4_IMPLEMENTATION_PLAN.md](./PHASE_4_IMPLEMENTATION_PLAN.md)** - Detailed WBS
+  - Work breakdown by epic + task
+  - Resource allocation + timeline
+  - Risk mitigation strategies
+  - Definition of Done checklist
+
+**Key Decisions**:
+- Token storage: Encrypted database with automatic rotation
+- CRUD ops: Atomic batchUpdate with idempotency keys
+- Error recovery: Smart retry + circuit breaker pattern
+- Document export: Stream to memory (no temp files)
+
+**Timeline**: 2-3 weeks implementation
+
+### Phase 4: Implementation (READY TO START)
 **Expected**: 2026-04-20 → 2026-05-07  
 **Duration**: 2-3 weeks
 
@@ -152,13 +171,13 @@ docs/plans/
 
 ## Timeline Overview
 
-| Phase | Status | Duration | Target |
-|-------|--------|----------|--------|
-| Phase 1: Audit | ✅ Done | 2h | 2026-04-14 |
-| Phase 2: Research | ✅ Done | 2h | 2026-04-14 |
-| Phase 3: Design | 🔄 Next | 3h | 2026-04-16 |
-| Phase 4: Implementation | 📋 Pending | 2-3w | 2026-05-07 |
-| Phase 5: Testing | 📋 Pending | 1w | 2026-05-14 |
+| Phase | Status | Duration | Target | Completed |
+|-------|--------|----------|--------|-----------|
+| Phase 1: Audit | ✅ Done | 2h | 2026-04-14 | 2026-04-14 |
+| Phase 2: Research | ✅ Done | 2h | 2026-04-14 | 2026-04-14 |
+| Phase 3: Design | ✅ Done | 4h | 2026-04-16 | 2026-04-14 |
+| Phase 4: Implementation | 📋 Ready | 2-3w | 2026-05-07 | — |
+| Phase 5: Testing | 📋 Pending | 1w | 2026-05-14 | — |
 
 **Total Project Duration**: ~4 weeks (includes planning + implementation + testing)
 
