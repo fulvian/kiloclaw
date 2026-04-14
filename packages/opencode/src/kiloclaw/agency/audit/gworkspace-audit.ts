@@ -49,6 +49,7 @@ export const AuditOperation = z.enum([
   "slides.addSlide",
   "slides.update",
   "slides.delete",
+  "slides.export",
   "documents.search",
   "documents.tag",
   "index.stats",
@@ -503,6 +504,8 @@ export namespace GWorkspaceAudit {
       presentationId?: string
       presentationName?: string
       slideIndex?: number
+      format?: string
+      fileSize?: number
       hitlRequired?: boolean
       hitlRequestId?: string
       error?: string
@@ -534,6 +537,8 @@ export namespace GWorkspaceAudit {
       error: options.error,
       metadata: {
         slideIndex: options.slideIndex,
+        format: options.format,
+        fileSize: options.fileSize,
       },
       durationMs: options.durationMs,
       provider: options.provider,

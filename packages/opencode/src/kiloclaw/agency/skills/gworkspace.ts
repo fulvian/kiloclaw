@@ -2092,3 +2092,371 @@ export const sheetsDelete = fn(SheetsDeleteInputSchema, async (input) => {
   await GWorkspaceIdempotency.cacheResult(idempotencyKey, userId, workspaceId, "sheets.delete", result.data)
   return result.data
 })
+
+// ============================================================================
+// Slides Read Skill
+// ============================================================================
+
+export const SlidesReadInputSchema = z.object({
+  presentationId: z.string().describe("Presentation ID"),
+  userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
+  workspaceId: z.string().optional().default("default").describe("Workspace ID"),
+})
+
+export const slidesRead = fn(SlidesReadInputSchema, async (input) => {
+  const ctx = makeCtx()
+  const userId = input.userId ?? process.env.KILO_USER_ID
+  const workspaceId = input.workspaceId
+
+  if (!userId) throw new Error("userId is required (set via input or KILO_USER_ID environment variable)")
+
+  emitIntent("slides", "presentations.read")
+  const policy = GWorkspaceAgency.getPolicy("slides", "presentations.read")
+  if (policy === "DENY") throw new Error("Operation denied by policy")
+
+  const brokerCfg = await GWorkspaceBroker.toBrokerConfig({
+    userId,
+    workspaceId,
+    preferNative: true,
+    mcpFallbackEnabled: true,
+  })
+  const result = await GWorkspaceBroker.executeSlides("read", { presentationId: input.presentationId }, brokerCfg)
+
+  await GWorkspaceAudit.recordSlides("slides.read", result.success ? "success" : "failure", {
+    ...ctx,
+    presentationId: input.presentationId,
+    provider: result.provider,
+  })
+
+  if (!result.success) throw new Error(result.error ?? "Slides read failed")
+  return result.data
+})
+
+// ============================================================================
+// Slides Create Skill
+// ============================================================================
+
+export const SlidesCreateInputSchema = z.object({
+  title: z.string().describe("Presentation title"),
+  idempotencyKey: z.string().optional().describe("Idempotency key to prevent duplicate operations"),
+  userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
+  workspaceId: z.string().optional().default("default").describe("Workspace ID"),
+})
+
+export const slidesCreate = fn(SlidesCreateInputSchema, async (input) => {
+  const ctx = makeCtx()
+  const userId = input.userId ?? process.env.KILO_USER_ID
+  const workspaceId = input.workspaceId
+
+  if (!userId) throw new Error("userId is required (set via input or KILO_USER_ID environment variable)")
+
+  emitIntent("slides", "presentations.create")
+  const policy = GWorkspaceAgency.getPolicy("slides", "presentations.create")
+  if (policy === "DENY") throw new Error("Operation denied by policy")
+
+  const idempotencyKey = input.idempotencyKey ?? await GWorkspaceIdempotency.generateKey("slides.create", { title: input.title })
+  const cached = await GWorkspaceIdempotency.getCachedResult(idempotencyKey, userId, workspaceId, "slides.create")
+  if (cached) return cached
+
+  if (GWorkspaceAgency.requiresApproval("slides", "presentations.create")) {
+    const hitlReq = await GWorkspaceHITL.createRequest(
+      "slides",
+      "presentations.create",
+      "high",
+      `Create presentation: ${input.title}`,
+      { title: input.title, ...ctx },
+    )
+    const approved = await GWorkspaceHITL.waitForApproval(hitlReq.id)
+    if (!approved) {
+      await GWorkspaceAudit.recordSlides("slides.create", "hitl_denied", { ...ctx })
+      throw new Error("HITL request denied")
+    }
+  }
+
+  const brokerCfg = await GWorkspaceBroker.toBrokerConfig({
+    userId,
+    workspaceId,
+    preferNative: true,
+    mcpFallbackEnabled: true,
+  })
+  const result = await GWorkspaceBroker.executeSlides("create", { title: input.title }, brokerCfg)
+
+  await GWorkspaceAudit.recordSlides("slides.create", result.success ? "success" : "failure", {
+    ...ctx,
+    presentationName: input.title,
+    provider: result.provider,
+  })
+
+  if (!result.success) throw new Error(result.error ?? "Slides create failed")
+  await GWorkspaceIdempotency.cacheResult(idempotencyKey, userId, workspaceId, "slides.create", result.data)
+  return result.data
+})
+
+// ============================================================================
+// Slides Add Slide Skill
+// ============================================================================
+
+export const SlidesAddSlideInputSchema = z.object({
+  presentationId: z.string().describe("Presentation ID"),
+  layout: z.string().optional().describe("Slide layout ID (default: BLANK_LAYOUT)"),
+  insertIndex: z.number().optional().describe("Index to insert slide at"),
+  idempotencyKey: z.string().optional().describe("Idempotency key to prevent duplicate operations"),
+  userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
+  workspaceId: z.string().optional().default("default").describe("Workspace ID"),
+})
+
+export const slidesAddSlide = fn(SlidesAddSlideInputSchema, async (input) => {
+  const ctx = makeCtx()
+  const userId = input.userId ?? process.env.KILO_USER_ID
+  const workspaceId = input.workspaceId
+
+  if (!userId) throw new Error("userId is required (set via input or KILO_USER_ID environment variable)")
+
+  emitIntent("slides", "presentations.addSlide")
+  const policy = GWorkspaceAgency.getPolicy("slides", "presentations.addSlide")
+  if (policy === "DENY") throw new Error("Operation denied by policy")
+
+  const idempotencyKey = input.idempotencyKey ?? await GWorkspaceIdempotency.generateKey("slides.addSlide", { presentationId: input.presentationId, insertIndex: input.insertIndex })
+  const cached = await GWorkspaceIdempotency.getCachedResult(idempotencyKey, userId, workspaceId, "slides.addSlide")
+  if (cached) return cached
+
+  if (GWorkspaceAgency.requiresApproval("slides", "presentations.addSlide")) {
+    const hitlReq = await GWorkspaceHITL.createRequest(
+      "slides",
+      "presentations.addSlide",
+      "high",
+      `Add slide to presentation ${input.presentationId}`,
+      { presentationId: input.presentationId, ...ctx },
+    )
+    const approved = await GWorkspaceHITL.waitForApproval(hitlReq.id)
+    if (!approved) {
+      await GWorkspaceAudit.recordSlides("slides.addSlide", "hitl_denied", { ...ctx })
+      throw new Error("HITL request denied")
+    }
+  }
+
+  const brokerCfg = await GWorkspaceBroker.toBrokerConfig({
+    userId,
+    workspaceId,
+    preferNative: true,
+    mcpFallbackEnabled: true,
+  })
+  const result = await GWorkspaceBroker.executeSlides("addSlide", { presentationId: input.presentationId, layout: input.layout, insertIndex: input.insertIndex }, brokerCfg)
+
+  await GWorkspaceAudit.recordSlides("slides.addSlide", result.success ? "success" : "failure", {
+    ...ctx,
+    presentationId: input.presentationId,
+    slideIndex: input.insertIndex,
+    provider: result.provider,
+  })
+
+  if (!result.success) throw new Error(result.error ?? "Slides addSlide failed")
+  await GWorkspaceIdempotency.cacheResult(idempotencyKey, userId, workspaceId, "slides.addSlide", result.data)
+  return result.data
+})
+
+// ============================================================================
+// Slides Update Skill
+// ============================================================================
+
+export const SlidesUpdateInputSchema = z.object({
+  presentationId: z.string().describe("Presentation ID"),
+  requests: z.array(z.unknown()).describe("Array of batchUpdate requests"),
+  idempotencyKey: z.string().optional().describe("Idempotency key to prevent duplicate operations"),
+  userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
+  workspaceId: z.string().optional().default("default").describe("Workspace ID"),
+})
+
+export const slidesUpdate = fn(SlidesUpdateInputSchema, async (input) => {
+  const ctx = makeCtx()
+  const userId = input.userId ?? process.env.KILO_USER_ID
+  const workspaceId = input.workspaceId
+
+  if (!userId) throw new Error("userId is required (set via input or KILO_USER_ID environment variable)")
+
+  emitIntent("slides", "presentations.update")
+  const policy = GWorkspaceAgency.getPolicy("slides", "presentations.update")
+  if (policy === "DENY") throw new Error("Operation denied by policy")
+
+  const idempotencyKey = input.idempotencyKey ?? await GWorkspaceIdempotency.generateKey("slides.update", { presentationId: input.presentationId })
+  const cached = await GWorkspaceIdempotency.getCachedResult(idempotencyKey, userId, workspaceId, "slides.update")
+  if (cached) return cached
+
+  if (GWorkspaceAgency.requiresApproval("slides", "presentations.update")) {
+    const hitlReq = await GWorkspaceHITL.createRequest(
+      "slides",
+      "presentations.update",
+      "high",
+      `Update presentation ${input.presentationId}`,
+      { presentationId: input.presentationId, ...ctx },
+    )
+    const approved = await GWorkspaceHITL.waitForApproval(hitlReq.id)
+    if (!approved) {
+      await GWorkspaceAudit.recordSlides("slides.update", "hitl_denied", { ...ctx })
+      throw new Error("HITL request denied")
+    }
+  }
+
+  const brokerCfg = await GWorkspaceBroker.toBrokerConfig({
+    userId,
+    workspaceId,
+    preferNative: true,
+    mcpFallbackEnabled: true,
+  })
+  const result = await GWorkspaceBroker.executeSlides("update", { presentationId: input.presentationId, requests: input.requests }, brokerCfg)
+
+  await GWorkspaceAudit.recordSlides("slides.update", result.success ? "success" : "failure", {
+    ...ctx,
+    presentationId: input.presentationId,
+    provider: result.provider,
+  })
+
+  if (!result.success) throw new Error(result.error ?? "Slides update failed")
+  await GWorkspaceIdempotency.cacheResult(idempotencyKey, userId, workspaceId, "slides.update", result.data)
+  return result.data
+})
+
+// ============================================================================
+// Slides Delete Skill
+// ============================================================================
+
+export const SlidesDeleteInputSchema = z.object({
+  presentationId: z.string().describe("Presentation ID to delete"),
+  idempotencyKey: z.string().optional().describe("Idempotency key to prevent duplicate operations"),
+  userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
+  workspaceId: z.string().optional().default("default").describe("Workspace ID"),
+})
+
+export const slidesDelete = fn(SlidesDeleteInputSchema, async (input) => {
+  const ctx = makeCtx()
+  const userId = input.userId ?? process.env.KILO_USER_ID
+  const workspaceId = input.workspaceId
+
+  if (!userId) throw new Error("userId is required (set via input or KILO_USER_ID environment variable)")
+
+  emitIntent("slides", "presentations.delete")
+  const policy = GWorkspaceAgency.getPolicy("slides", "presentations.delete")
+  if (policy === "DENY") throw new Error("Operation denied by policy")
+
+  const idempotencyKey = input.idempotencyKey ?? await GWorkspaceIdempotency.generateKey("slides.delete", { presentationId: input.presentationId })
+  const cached = await GWorkspaceIdempotency.getCachedResult(idempotencyKey, userId, workspaceId, "slides.delete")
+  if (cached) return cached
+
+  if (GWorkspaceAgency.requiresApproval("slides", "presentations.delete")) {
+    const hitlReq = await GWorkspaceHITL.createRequest(
+      "slides",
+      "presentations.delete",
+      "high",
+      `Delete presentation ${input.presentationId}`,
+      { presentationId: input.presentationId, ...ctx },
+    )
+    const approved = await GWorkspaceHITL.waitForApproval(hitlReq.id)
+    if (!approved) {
+      await GWorkspaceAudit.recordSlides("slides.delete", "hitl_denied", { ...ctx })
+      throw new Error("HITL request denied")
+    }
+  }
+
+  const brokerCfg = await GWorkspaceBroker.toBrokerConfig({
+    userId,
+    workspaceId,
+    preferNative: true,
+    mcpFallbackEnabled: true,
+  })
+  const result = await GWorkspaceBroker.executeSlides("delete", { presentationId: input.presentationId }, brokerCfg)
+
+  await GWorkspaceAudit.recordSlides("slides.delete", result.success ? "success" : "failure", {
+    ...ctx,
+    presentationId: input.presentationId,
+    provider: result.provider,
+  })
+
+  if (!result.success) throw new Error(result.error ?? "Slides delete failed")
+  await GWorkspaceIdempotency.cacheResult(idempotencyKey, userId, workspaceId, "slides.delete", result.data)
+  return result.data
+})
+
+// ============================================================================
+// Slides Export Skill
+// ============================================================================
+
+export const SlidesExportInputSchema = z.object({
+  presentationId: z.string().describe("Presentation ID to export"),
+  format: z.enum(["pdf", "pptx", "odp", "plaintext", "jpeg", "png", "svg"]).default("pdf").describe("Export format"),
+  userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
+  workspaceId: z.string().optional().default("default").describe("Workspace ID"),
+})
+
+export const slidesExport = fn(SlidesExportInputSchema, async (input) => {
+  const ctx = makeCtx()
+  const userId = input.userId ?? process.env.KILO_USER_ID
+  const workspaceId = input.workspaceId
+
+  if (!userId) throw new Error("userId is required (set via input or KILO_USER_ID environment variable)")
+
+  emitIntent("slides", "presentations.export")
+  const policy = GWorkspaceAgency.getPolicy("slides", "presentations.export")
+  if (policy === "DENY") throw new Error("Operation denied by policy")
+
+  // Convert format string to MIME type
+  const formatMap: Record<string, ExportFormat> = {
+    pdf: EXPORT_FORMATS.PDF,
+    pptx: EXPORT_FORMATS.PPTX,
+    odp: EXPORT_FORMATS.ODP,
+    plaintext: EXPORT_FORMATS.PLAINTEXT,
+    jpeg: EXPORT_FORMATS.JPEG,
+    png: EXPORT_FORMATS.PNG,
+    svg: EXPORT_FORMATS.SVG,
+  }
+  const mimeType = formatMap[input.format] || EXPORT_FORMATS.PDF
+
+  // Verify format is supported for slides
+  if (!DocumentExporter.isSupportedFormat("slides", mimeType)) {
+    throw new Error(`Export format ${input.format} is not supported for Slides presentations`)
+  }
+
+  try {
+    // Get access token for Drive export
+    const brokerCfg = await GWorkspaceBroker.toBrokerConfig({
+      userId,
+      workspaceId,
+      preferNative: true,
+      mcpFallbackEnabled: false,
+    })
+
+    if (!brokerCfg.accessToken) {
+      throw new Error("Failed to obtain access token for export")
+    }
+
+    // Export presentation from Drive (Slides stored as Drive files)
+    const result = await DocumentExporter.exportFromDrive(brokerCfg.accessToken, input.presentationId, {
+      format: mimeType,
+      timeout: 60000, // 60s for export
+      maxSize: 100 * 1024 * 1024, // 100MB max
+    })
+
+    await GWorkspaceAudit.recordSlides("slides.export", "success", {
+      ...ctx,
+      presentationId: input.presentationId,
+      format: input.format,
+      fileSize: result.size,
+    })
+
+    return {
+      presentationId: input.presentationId,
+      format: input.format,
+      buffer: result.buffer.toString("base64"),
+      mimeType: result.mimeType,
+      size: result.size,
+      filename: DocumentExporter.getSuggestedFilename(`presentation_${input.presentationId}`, mimeType),
+    }
+  } catch (err) {
+    await GWorkspaceAudit.recordSlides("slides.export", "failure", {
+      ...ctx,
+      presentationId: input.presentationId,
+      format: input.format,
+      error: err instanceof Error ? err.message : String(err),
+    })
+    throw err
+  }
+})

@@ -14,6 +14,9 @@ export const EXPORT_FORMATS = {
   DOCX: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   XLSX: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   PPTX: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  ODP: "application/vnd.oasis.opendocument.presentation",
+  ODT: "application/vnd.oasis.opendocument.text",
+  ODS: "application/vnd.oasis.opendocument.spreadsheet",
   CSV: "text/csv",
   TSV: "text/tab-separated-values",
   PLAINTEXT: "text/plain",
@@ -196,6 +199,8 @@ export namespace DocumentExporter {
   export function getSlidesExportMimeType(format: ExportFormat): string {
     const slidesFormats = {
       [EXPORT_FORMATS.PDF]: "application/pdf",
+      [EXPORT_FORMATS.PPTX]: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      [EXPORT_FORMATS.ODP]: "application/vnd.oasis.opendocument.presentation",
       [EXPORT_FORMATS.PLAINTEXT]: "text/plain",
       [EXPORT_FORMATS.JPEG]: "image/jpeg",
       [EXPORT_FORMATS.PNG]: "image/png",
@@ -209,9 +214,9 @@ export namespace DocumentExporter {
    */
   export function isSupportedFormat(documentType: "docs" | "sheets" | "slides", format: ExportFormat): boolean {
     const supported = {
-      docs: [EXPORT_FORMATS.PDF, EXPORT_FORMATS.DOCX, EXPORT_FORMATS.PLAINTEXT, EXPORT_FORMATS.CSV],
-      sheets: [EXPORT_FORMATS.XLSX, EXPORT_FORMATS.CSV, EXPORT_FORMATS.TSV, EXPORT_FORMATS.PDF, EXPORT_FORMATS.PLAINTEXT],
-      slides: [EXPORT_FORMATS.PDF, EXPORT_FORMATS.PLAINTEXT, EXPORT_FORMATS.JPEG, EXPORT_FORMATS.PNG, EXPORT_FORMATS.SVG],
+      docs: [EXPORT_FORMATS.PDF, EXPORT_FORMATS.DOCX, EXPORT_FORMATS.ODT, EXPORT_FORMATS.PLAINTEXT, EXPORT_FORMATS.CSV],
+      sheets: [EXPORT_FORMATS.XLSX, EXPORT_FORMATS.ODS, EXPORT_FORMATS.CSV, EXPORT_FORMATS.TSV, EXPORT_FORMATS.PDF, EXPORT_FORMATS.PLAINTEXT],
+      slides: [EXPORT_FORMATS.PDF, EXPORT_FORMATS.PPTX, EXPORT_FORMATS.ODP, EXPORT_FORMATS.PLAINTEXT, EXPORT_FORMATS.JPEG, EXPORT_FORMATS.PNG, EXPORT_FORMATS.SVG],
     }
     return (supported[documentType] as ExportFormat[]).includes(format)
   }
@@ -230,8 +235,11 @@ export namespace DocumentExporter {
     const extensions: Record<ExportFormat, string> = {
       [EXPORT_FORMATS.PDF]: "pdf",
       [EXPORT_FORMATS.DOCX]: "docx",
+      [EXPORT_FORMATS.ODT]: "odt",
       [EXPORT_FORMATS.XLSX]: "xlsx",
+      [EXPORT_FORMATS.ODS]: "ods",
       [EXPORT_FORMATS.PPTX]: "pptx",
+      [EXPORT_FORMATS.ODP]: "odp",
       [EXPORT_FORMATS.CSV]: "csv",
       [EXPORT_FORMATS.TSV]: "tsv",
       [EXPORT_FORMATS.PLAINTEXT]: "txt",
