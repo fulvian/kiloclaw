@@ -276,10 +276,10 @@ export namespace RoutingPipeline {
     const isWeatherAgency = agencyId === "agency-weather"
 
     const nbaCapabilityToTools: Record<string, string[]> = {
-      schedule_live: ["balldontlie.getGames", "espn.getScoreboard"],
-      team_player_stats: ["balldontlie.getStats", "espn.getStandings"],
-      injury_status: ["balldontlie.getInjuries", "espn.getInjuries"],
-      odds_markets: ["odds_bet365.getOdds", "odds_api.getOdds", "parlay.getOdds", "polymarket.getOdds"],
+      schedule_live: ["nba-games"],
+      team_player_stats: ["nba-games"],
+      injury_status: ["nba-injuries"],
+      odds_markets: ["nba-odds"],
       game_preview: ["skill"],
       probability_estimation: ["skill"],
       vig_removal: ["skill"],

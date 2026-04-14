@@ -97,11 +97,6 @@ export namespace ToolIdentityMap {
     "nba-games": "nba-games",
     "nba-odds": "nba-odds",
     "nba-injuries": "nba-injuries",
-    // Adapter aliases (resolved by tool-identity-resolver)
-    "balldontlie.getGames": "balldontlie.getGames",
-    "balldontlie.getInjuries": "balldontlie.getInjuries",
-    "odds_bet365.getOdds": "odds_bet365.getOdds",
-    "odds_api.getOdds": "odds_api.getOdds",
   }
 
   // =============================================================================
