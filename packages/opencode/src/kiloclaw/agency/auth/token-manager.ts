@@ -155,36 +155,37 @@ export namespace TokenManager {
   }
 
   /**
-   * Store token in database (implementation depends on your DB)
-   * This is a placeholder - replace with actual DB implementation
+   * Store token in database using TokenDatabase implementation
    */
   async function saveToDatabase(token: StoredToken): Promise<void> {
-    // TODO: Implement actual database storage
-    // For now, this is a no-op that should be replaced with real DB calls
-    log.debug("saveToDatabase called", { userId: token.userId, id: token.id })
-
-    // Placeholder for database insert/update:
-    // await db.gworkspaceTokens.upsert({
-    //   where: { userId_workspaceId: { userId: token.userId, workspaceId: token.workspaceId } },
-    //   update: { ...token },
-    //   create: { ...token }
-    // })
+    try {
+      // Import TokenDatabase dynamically to avoid circular dependencies
+      const { TokenDatabase } = await import("./token-db")
+      await TokenDatabase.saveToken(token)
+    } catch (error) {
+      log.error("saveToDatabase failed", {
+        userId: token.userId,
+        error: error instanceof Error ? error.message : String(error),
+      })
+      throw error
+    }
   }
 
   /**
-   * Load token from database (implementation depends on your DB)
-   * This is a placeholder - replace with actual DB implementation
+   * Load token from database using TokenDatabase implementation
    */
   async function loadFromDatabase(userId: string, workspaceId: string): Promise<StoredToken | null> {
-    // TODO: Implement actual database query
-    log.debug("loadFromDatabase called", { userId, workspaceId })
-
-    // Placeholder for database query:
-    // return await db.gworkspaceTokens.findUnique({
-    //   where: { userId_workspaceId: { userId, workspaceId } }
-    // })
-
-    return null
+    try {
+      // Import TokenDatabase dynamically to avoid circular dependencies
+      const { TokenDatabase } = await import("./token-db")
+      return await TokenDatabase.loadToken(userId, workspaceId)
+    } catch (error) {
+      log.error("loadFromDatabase failed", {
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      })
+      throw error
+    }
   }
 
   /**
