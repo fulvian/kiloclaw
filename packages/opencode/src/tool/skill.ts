@@ -316,6 +316,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
                 }
                 // Try to find Italian city names in the text
                 const italianCities = [
+                  // Italian names (preferred)
                   "Roma",
                   "Milano",
                   "Napoli",
@@ -349,8 +350,14 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
                   "Piacenza",
                   "Lucca",
                   "Frosinone",
-                  "Salerno",
-                  "Turino",
+                  // English names
+                  "Rome",
+                  "Milan",
+                  "Naples",
+                  "Florence",
+                  "Venice",
+                  "Turin",
+                  "Genoa",
                 ]
                 for (const city of italianCities) {
                   if (textParts.toLowerCase().includes(city.toLowerCase())) {

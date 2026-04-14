@@ -36,6 +36,21 @@ import { WeatherCurrentSkill } from "../skills/weather/weather-current"
 // NBA Betting Agency skills
 import { NbaAnalysisSkill } from "../skills/nba/nba-analysis"
 
+// Finance Agency skills
+import { FinanceMarketDataSkill } from "../skills/finance/market-data"
+import { FinanceTechnicalAnalysisSkill } from "../skills/finance/technical-analysis"
+import { FinanceRiskEngineSkill } from "../skills/finance/risk-engine"
+
+// Travel Agency skills
+import { TravelDestinationDiscoverySkill } from "../skills/travel/destination-discovery"
+import { TravelFlightSearchSkill } from "../skills/travel/flight-search"
+import { TravelHotelSearchSkill } from "../skills/travel/hotel-search"
+import { TravelActivitySearchSkill } from "../skills/travel/activity-search"
+import { TravelRestaurantSearchSkill } from "../skills/travel/restaurant-search"
+import { TravelTransferSearchSkill } from "../skills/travel/transfer-search"
+import { TravelWeatherCheckSkill } from "../skills/travel/weather-check"
+import { TravelItineraryBuilderSkill } from "../skills/travel/itinerary-builder"
+
 const log = Log.create({ service: "kiloclaw.chain-executor" })
 
 // Chain execution result
@@ -82,6 +97,19 @@ const skillRegistry: Record<string, Skill> = {
   "weather-current": WeatherCurrentSkill,
   // NBA Betting Agency skills
   "nba-analysis": NbaAnalysisSkill,
+  // Finance Agency skills
+  "finance-market-data": FinanceMarketDataSkill,
+  "finance-technical-analysis": FinanceTechnicalAnalysisSkill,
+  "finance-risk-engine": FinanceRiskEngineSkill,
+  // Travel Agency skills
+  "travel-destination-discovery": TravelDestinationDiscoverySkill,
+  "travel-flight-search": TravelFlightSearchSkill,
+  "travel-hotel-search": TravelHotelSearchSkill,
+  "travel-activity-search": TravelActivitySearchSkill,
+  "travel-restaurant-search": TravelRestaurantSearchSkill,
+  "travel-transfer-search": TravelTransferSearchSkill,
+  "travel-weather-check": TravelWeatherCheckSkill,
+  "travel-itinerary-builder": TravelItineraryBuilderSkill,
 }
 
 // Get a skill by ID (exported for use by execution-bridge)

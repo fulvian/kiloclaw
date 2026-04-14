@@ -97,6 +97,29 @@ interface WeatherForecastOutput {
   }
 }
 
+// Italian city coordinates - bypass geocoding API for well-known Italian cities
+const ITALIAN_CITY_COORDS: Record<string, { lat: number; lon: number; timezone: string }> = {
+  Roma: { lat: 41.9028, lon: 12.4964, timezone: "Europe/Rome" },
+  Rome: { lat: 41.9028, lon: 12.4964, timezone: "Europe/Rome" },
+  Milano: { lat: 45.4642, lon: 9.19, timezone: "Europe/Rome" },
+  Milan: { lat: 45.4642, lon: 9.19, timezone: "Europe/Rome" },
+  Napoli: { lat: 40.8518, lon: 14.2681, timezone: "Europe/Rome" },
+  Naples: { lat: 40.8518, lon: 14.2681, timezone: "Europe/Rome" },
+  Firenze: { lat: 43.7696, lon: 11.2558, timezone: "Europe/Rome" },
+  Florence: { lat: 43.7696, lon: 11.2558, timezone: "Europe/Rome" },
+  Venezia: { lat: 45.4408, lon: 12.3155, timezone: "Europe/Rome" },
+  Venice: { lat: 45.4408, lon: 12.3155, timezone: "Europe/Rome" },
+  Bologna: { lat: 44.4949, lon: 11.3426, timezone: "Europe/Rome" },
+  Torino: { lat: 45.0703, lon: 7.6869, timezone: "Europe/Rome" },
+  Turin: { lat: 45.0703, lon: 7.6869, timezone: "Europe/Rome" },
+  Genova: { lat: 44.4056, lon: 8.9463, timezone: "Europe/Rome" },
+  Genoa: { lat: 44.4056, lon: 8.9463, timezone: "Europe/Rome" },
+  Palermo: { lat: 38.1157, lon: 13.3615, timezone: "Europe/Rome" },
+  Bari: { lat: 41.1258, lon: 16.862, timezone: "Europe/Rome" },
+  Catania: { lat: 37.5079, lon: 15.083, timezone: "Europe/Rome" },
+  Verona: { lat: 45.4384, lon: 10.9916, timezone: "Europe/Rome" },
+}
+
 // Geocode location using Open-Meteo Geocoding API
 async function geocode(location: string): Promise<{
   latitude: number
@@ -106,8 +129,24 @@ async function geocode(location: string): Promise<{
   admin1?: string
   timezone: string
 } | null> {
+  // Check if it's a known Italian city first
+  const normalizedLocation = location.trim()
+  const italianMatch = ITALIAN_CITY_COORDS[normalizedLocation]
+  if (italianMatch) {
+    return {
+      latitude: italianMatch.lat,
+      longitude: italianMatch.lon,
+      name: normalizedLocation,
+      country: "Italia",
+      admin1: normalizedLocation,
+      timezone: italianMatch.timezone,
+    }
+  }
+
+  // For other locations, try geocoding with country suffix for ambiguous names
+  const locationWithCountry = normalizeLocation(location)
   const geoResponse = await fetch(
-    `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(location)}&count=1&language=en&format=json`,
+    `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(locationWithCountry)}&count=5&language=en&format=json`,
   )
 
   if (!geoResponse.ok) {
@@ -120,7 +159,9 @@ async function geocode(location: string): Promise<{
     return null
   }
 
-  const result = geoData.results[0]
+  // Prefer Italian results for common Italian city names
+  const italianResult = geoData.results.find((r: any) => r.country?.toLowerCase() === "italy" || r.country === "Italia")
+  const result = italianResult || geoData.results[0]
   return {
     latitude: result.latitude,
     longitude: result.longitude,
@@ -129,6 +170,54 @@ async function geocode(location: string): Promise<{
     admin1: result.admin1,
     timezone: result.timezone || "UTC",
   }
+}
+
+// Normalize location string to improve geocoding accuracy
+function normalizeLocation(location: string): string {
+  const loc = location.trim()
+
+  // Common Italian city name variations
+  const cityMappings: Record<string, string> = {
+    roma: "Roma, Italia",
+    rome: "Rome, Italy",
+    milano: "Milano, Italia",
+    milan: "Milan, Italy",
+    napoli: "Napoli, Italia",
+    naples: "Naples, Italy",
+    firenze: "Firenze, Italia",
+    florence: "Florence, Italy",
+    venezia: "Venezia, Italia",
+    venice: "Venice, Italy",
+    bologna: "Bologna, Italia",
+    torino: "Torino, Italia",
+    turin: "Turin, Italy",
+    genova: "Genova, Italia",
+    genoa: "Genoa, Italy",
+    palermo: "Palermo, Italia",
+    bari: "Bari, Italia",
+    catania: "Catania, Italia",
+    verona: "Verona, Italia",
+  }
+
+  const normalized = loc.toLowerCase()
+  if (cityMappings[normalized]) {
+    return cityMappings[normalized]
+  }
+
+  // If location already has a comma (city, country format), return as-is
+  if (loc.includes(",")) {
+    return loc
+  }
+
+  // For other locations, append Italy if it seems like an Italian city query
+  // by checking if it's a single word that might be an Italian city
+  const italianCityPatterns = /^[A-Za-zÀ-ÿ]+$/ // Single Italian-sounding name
+  if (italianCityPatterns.test(loc) && loc.length > 2) {
+    // Try with Italy suffix but don't force it
+    return loc
+  }
+
+  return loc
 }
 
 // Fetch forecast from Open-Meteo
