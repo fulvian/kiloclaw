@@ -343,6 +343,153 @@ const DOMAIN_KEYWORDS: Record<string, string[]> = {
     "chuva",
     "sol",
   ],
+  travel: [
+    // Italian - Core travel terms
+    "viaggio",
+    "vacanza",
+    "itinerario",
+    "meta",
+    "destinazione",
+    "partire",
+    "ritorno",
+    "andata",
+    "soggiorno",
+    "city break",
+    "weekend lungo",
+    "ponte",
+    "ferie",
+    "disponibilità",
+    "finestre date",
+    "prezzi voli",
+    "volo economico",
+    "coincidenza",
+    "scalo",
+    "bagaglio",
+    "hotel",
+    "albergo",
+    "appartamento",
+    "ostello",
+    "resort",
+    "b&b",
+    "alloggio",
+    "check-in",
+    "check-out",
+    "cancellazione gratuita",
+    "non rimborsabile",
+    "transfer",
+    "navetta",
+    "treno",
+    "bus",
+    "pullman",
+    "autonoleggio",
+    "noleggio auto",
+    "patente",
+    "pedaggi",
+    "parcheggio",
+    "trasporto locale",
+    "metro",
+    "tram",
+    "pass turistico",
+    "ristorante",
+    "trattoria",
+    "cucina locale",
+    "prenotazione tavolo",
+    "attività",
+    "tour guidato",
+    "museo",
+    "mostra",
+    "spettacolo",
+    "concerto",
+    "evento live",
+    "biglietti evento",
+    "things to do",
+    "points of interest",
+    "POI",
+    "mappe",
+    "geocoding",
+    "routing",
+    "meteo viaggio",
+    "pioggia",
+    "temperatura",
+    "allerte meteo",
+    "sicurezza viaggio",
+    "advisory",
+    "emergenza",
+    "ospedale vicino",
+    "farmacia vicino",
+    "ambasciata",
+    "consolato",
+    // English - Core travel terms
+    "travel",
+    "trip",
+    "vacation",
+    "holiday",
+    "destination",
+    "itinerary",
+    "booking",
+    "flight",
+    "flights",
+    "hotel",
+    "accommodation",
+    "hostel",
+    "resort",
+    "apartment",
+    "B&B",
+    "car rental",
+    "train",
+    "rail",
+    "bus",
+    "transport",
+    "restaurant",
+    "dining",
+    "attractions",
+    "activities",
+    "events",
+    "tickets",
+    "museum",
+    "tour",
+    "sightseeing",
+    "explore",
+    "weather",
+    "forecast",
+    "advisory",
+    "emergency",
+    "hospital",
+    "pharmacy",
+    "embassy",
+    "passport",
+    "visa",
+    "itinerary",
+    "schedule",
+    "day trip",
+    "weekend getaway",
+    "travel plan",
+    "travel booking",
+    "trip optimizer",
+    "best time to go",
+    // Spanish
+    "viaje",
+    "vacaciones",
+    "destino",
+    "vuelo",
+    "hotel",
+    "alojamiento",
+    "restaurante",
+    "turismo",
+    // French
+    "voyage",
+    "vacances",
+    "destination",
+    "vol",
+    "hôtel",
+    "voyager",
+    // German
+    "reise",
+    "urlaub",
+    "flug",
+    "hotel",
+    "reisen",
+  ],
   gworkspace: [
     "google workspace",
     "google drive",
@@ -731,6 +878,41 @@ export const Router = {
       ],
       knowledge: ["search", "research", "find", "lookup", "document", "information"],
       nutrition: ["nutrition", "diet", "food", "recipe", "calories", "macros", "proteins"],
+      travel: [
+        "viaggio",
+        "vacanza",
+        "itinerario",
+        "destinazione",
+        "volo",
+        "hotel",
+        "prenotazione",
+        "travel",
+        "trip",
+        "vacation",
+        "destination",
+        "flight",
+        "booking",
+        "itinerario viaggio",
+        "confronto mete",
+        "ottimizza date viaggio",
+        "volo+hotel",
+        "multi city trip",
+        "prenotazione alloggio",
+        "trasporti A/R",
+        "noleggio auto aeroporto",
+        "attività turistiche",
+        "pianifica giornata",
+        "biglietti concerto viaggio",
+        "ristorante con prenotazione",
+        "weather risk travel",
+        "travel advisory",
+        "emergency support travel",
+        "nearest hospital travel",
+        "embassy contact",
+        "trip cost optimizer",
+        "fare calendar",
+        "travel booking link",
+      ],
       gworkspace: [
         "gmail",
         "drive",
@@ -811,29 +993,37 @@ export const Router = {
               : domain === "nutrition" &&
                   (type.includes("nutrition") || type.includes("diet") || type.includes("recipe"))
                 ? 0.2
-                : domain === "gworkspace" &&
-                    (type.includes("gmail") ||
-                      type.includes("drive") ||
-                      type.includes("calendar") ||
-                      type.includes("workspace"))
+                : domain === "travel" &&
+                    (type.includes("travel") ||
+                      type.includes("trip") ||
+                      type.includes("vacation") ||
+                      type.includes("flight") ||
+                      type.includes("hotel") ||
+                      type.includes("booking"))
                   ? 0.25
-                  : domain === "nba" &&
-                      (type.includes("nba") ||
-                        type.includes("basketball") ||
-                        type.includes("betting") ||
-                        type.includes("odds") ||
-                        type.includes("game") ||
-                        type.includes("score"))
+                  : domain === "gworkspace" &&
+                      (type.includes("gmail") ||
+                        type.includes("drive") ||
+                        type.includes("calendar") ||
+                        type.includes("workspace"))
                     ? 0.25
-                    : domain === "finance" &&
-                        (type.includes("stock") ||
-                          type.includes("trading") ||
-                          type.includes("crypto") ||
-                          type.includes("market") ||
-                          type.includes("price") ||
-                          type.includes("investment"))
+                    : domain === "nba" &&
+                        (type.includes("nba") ||
+                          type.includes("basketball") ||
+                          type.includes("betting") ||
+                          type.includes("odds") ||
+                          type.includes("game") ||
+                          type.includes("score"))
                       ? 0.25
-                      : 0
+                      : domain === "finance" &&
+                          (type.includes("stock") ||
+                            type.includes("trading") ||
+                            type.includes("crypto") ||
+                            type.includes("market") ||
+                            type.includes("price") ||
+                            type.includes("investment"))
+                        ? 0.25
+                        : 0
       return Math.min(1, base + coreBonus + typeBoost)
     }
 
@@ -854,7 +1044,17 @@ export const Router = {
 
         // Calculate scores for each domain
         const scores: DomainScore[] = (
-          ["development", "knowledge", "nutrition", "weather", "gworkspace", "nba", "finance", "custom"] as string[]
+          [
+            "development",
+            "knowledge",
+            "nutrition",
+            "weather",
+            "travel",
+            "gworkspace",
+            "nba",
+            "finance",
+            "custom",
+          ] as string[]
         ).map((domain) => {
           const keywordScoreValue = keywordScore(intent, domain)
           const reasons: string[] = []

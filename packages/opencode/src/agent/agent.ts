@@ -336,6 +336,9 @@ export namespace Agent {
             skill: "allow",
             codesearch: "allow",
             codebase_search: "allow",
+            "nba-games": "allow",
+            "nba-odds": "allow",
+            "nba-injuries": "allow",
             external_directory: {
               [Truncate.GLOB]: "allow",
             },

@@ -258,6 +258,8 @@ export const CalendarListInputSchema = z.object({
   calendarId: z.string().optional().default("primary"),
   timeMin: z.string().optional(),
   timeMax: z.string().optional(),
+  userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
+  workspaceId: z.string().optional().default("default").describe("Workspace ID"),
 })
 
 export const CalendarCreateInputSchema = z.object({
@@ -267,6 +269,8 @@ export const CalendarCreateInputSchema = z.object({
   end: z.string().describe("ISO 8601 end"),
   attendees: z.array(z.string()).optional(),
   location: z.string().optional(),
+  userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
+  workspaceId: z.string().optional().default("default").describe("Workspace ID"),
 })
 
 export namespace CalendarSkills {
@@ -274,7 +278,14 @@ export namespace CalendarSkills {
 
   export const list = fn(CalendarListInputSchema, async (input) => {
     const ctx = makeCtx()
-    log.info("calendar.list", { calendarId: input.calendarId })
+    const userId = input.userId ?? process.env.KILO_USER_ID
+    const workspaceId = input.workspaceId
+
+    if (!userId) {
+      throw new Error("userId is required (set via input or KILO_USER_ID environment variable)")
+    }
+
+    log.info("calendar.list", { calendarId: input.calendarId, userId, workspaceId })
     emitIntent("calendar", "events.list")
     const policy = GWorkspaceAgency.getPolicy("calendar", "events.list")
     emitPolicy("calendar", "events.list", policy)
@@ -282,11 +293,18 @@ export namespace CalendarSkills {
       throw new Error("Operation denied by policy")
     }
 
+    const brokerCfg = await GWorkspaceBroker.toBrokerConfig({
+      userId,
+      workspaceId,
+      preferNative: true,
+      mcpFallbackEnabled: true,
+    })
+
     const result = await GWorkspaceBroker.calendar("events", {
       calendarId: input.calendarId,
       timeMin: input.timeMin,
       timeMax: input.timeMax,
-    })
+    }, brokerCfg)
 
     await GWorkspaceAudit.recordCalendar("calendar.list", result.success ? "success" : "failure", {
       ...ctx,
@@ -303,7 +321,14 @@ export namespace CalendarSkills {
 
   export const create = fn(CalendarCreateInputSchema, async (input) => {
     const ctx = makeCtx()
-    log.info("calendar.create", { summary: input.summary, attendees: input.attendees?.length })
+    const userId = input.userId ?? process.env.KILO_USER_ID
+    const workspaceId = input.workspaceId
+
+    if (!userId) {
+      throw new Error("userId is required (set via input or KILO_USER_ID environment variable)")
+    }
+
+    log.info("calendar.create", { summary: input.summary, attendees: input.attendees?.length, userId, workspaceId })
     emitIntent("calendar", "events.insert")
     const policy = GWorkspaceAgency.getPolicy("calendar", "events.insert")
     emitPolicy("calendar", "events.insert", policy)
@@ -351,6 +376,13 @@ export namespace CalendarSkills {
       })
     }
 
+    const brokerCfg = await GWorkspaceBroker.toBrokerConfig({
+      userId,
+      workspaceId,
+      preferNative: true,
+      mcpFallbackEnabled: true,
+    })
+
     const result = await GWorkspaceBroker.calendar("create", {
       calendarId: input.calendarId,
       summary: input.summary,
@@ -358,7 +390,7 @@ export namespace CalendarSkills {
       end: input.end,
       location: input.location,
       attendees: input.attendees,
-    })
+    }, brokerCfg)
 
     await GWorkspaceAudit.recordCalendar("calendar.create", result.success ? "success" : "failure", {
       ...ctx,
@@ -382,12 +414,16 @@ export namespace CalendarSkills {
 export const DriveSearchInputSchema = z.object({
   query: z.string().describe("Search query"),
   pageSize: z.number().optional().default(10),
+  userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
+  workspaceId: z.string().optional().default("default").describe("Workspace ID"),
 })
 
 export const DriveShareInputSchema = z.object({
   fileId: z.string().describe("File ID"),
   email: z.string().describe("Email to share with"),
   role: z.enum(["reader", "writer", "commenter"]).default("reader"),
+  userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
+  workspaceId: z.string().optional().default("default").describe("Workspace ID"),
 })
 
 export namespace DriveSkills {
@@ -395,7 +431,14 @@ export namespace DriveSkills {
 
   export const search = fn(DriveSearchInputSchema, async (input) => {
     const ctx = makeCtx()
-    log.info("drive.search", { query: input.query })
+    const userId = input.userId ?? process.env.KILO_USER_ID
+    const workspaceId = input.workspaceId
+
+    if (!userId) {
+      throw new Error("userId is required (set via input or KILO_USER_ID environment variable)")
+    }
+
+    log.info("drive.search", { query: input.query, userId, workspaceId })
     emitIntent("drive", "files.search")
     const policy = GWorkspaceAgency.getPolicy("drive", "files.search")
     emitPolicy("drive", "files.search", policy)
@@ -403,10 +446,17 @@ export namespace DriveSkills {
       throw new Error("Operation denied by policy")
     }
 
+    const brokerCfg = await GWorkspaceBroker.toBrokerConfig({
+      userId,
+      workspaceId,
+      preferNative: true,
+      mcpFallbackEnabled: true,
+    })
+
     const result = await GWorkspaceBroker.drive("search", {
       query: input.query,
       pageSize: input.pageSize,
-    })
+    }, brokerCfg)
 
     await GWorkspaceAudit.recordDrive("drive.search", result.success ? "success" : "failure", {
       ...ctx,
@@ -422,7 +472,14 @@ export namespace DriveSkills {
 
   export const share = fn(DriveShareInputSchema, async (input) => {
     const ctx = makeCtx()
-    log.info("drive.share", { fileId: input.fileId, email: input.email })
+    const userId = input.userId ?? process.env.KILO_USER_ID
+    const workspaceId = input.workspaceId
+
+    if (!userId) {
+      throw new Error("userId is required (set via input or KILO_USER_ID environment variable)")
+    }
+
+    log.info("drive.share", { fileId: input.fileId, email: input.email, userId, workspaceId })
     emitIntent("drive", "files.share")
     const policy = GWorkspaceAgency.getPolicy("drive", "files.share")
     emitPolicy("drive", "files.share", policy)
@@ -471,11 +528,18 @@ export namespace DriveSkills {
       })
     }
 
+    const brokerCfg = await GWorkspaceBroker.toBrokerConfig({
+      userId,
+      workspaceId,
+      preferNative: true,
+      mcpFallbackEnabled: true,
+    })
+
     const result = await GWorkspaceBroker.drive("share", {
       fileId: input.fileId,
       email: input.email,
       role: input.role,
-    })
+    }, brokerCfg)
 
     await GWorkspaceAudit.recordDrive("drive.share", result.success ? "success" : "failure", {
       ...ctx,
@@ -498,6 +562,8 @@ export namespace DriveSkills {
 
 export const DocsReadInputSchema = z.object({
   documentId: z.string().describe("Document ID"),
+  userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
+  workspaceId: z.string().optional().default("default").describe("Workspace ID"),
 })
 
 export namespace DocsSkills {
@@ -505,7 +571,14 @@ export namespace DocsSkills {
 
   export const read = fn(DocsReadInputSchema, async (input) => {
     const ctx = makeCtx()
-    log.info("docs.read", { documentId: input.documentId })
+    const userId = input.userId ?? process.env.KILO_USER_ID
+    const workspaceId = input.workspaceId
+
+    if (!userId) {
+      throw new Error("userId is required (set via input or KILO_USER_ID environment variable)")
+    }
+
+    log.info("docs.read", { documentId: input.documentId, userId, workspaceId })
     emitIntent("docs", "documents.get")
     const policy = GWorkspaceAgency.getPolicy("docs", "documents.get")
     emitPolicy("docs", "documents.get", policy)
@@ -513,7 +586,14 @@ export namespace DocsSkills {
       throw new Error("Operation denied by policy")
     }
 
-    const result = await GWorkspaceBroker.executeDocs("read", { documentId: input.documentId })
+    const brokerCfg = await GWorkspaceBroker.toBrokerConfig({
+      userId,
+      workspaceId,
+      preferNative: true,
+      mcpFallbackEnabled: true,
+    })
+
+    const result = await GWorkspaceBroker.executeDocs("read", { documentId: input.documentId }, brokerCfg)
 
     await GWorkspaceAudit.recordDocs("docs.read", result.success ? "success" : "failure", {
       ...ctx,
@@ -536,6 +616,8 @@ export namespace DocsSkills {
 export const SheetsReadInputSchema = z.object({
   spreadsheetId: z.string().describe("Spreadsheet ID"),
   range: z.string().optional(),
+  userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
+  workspaceId: z.string().optional().default("default").describe("Workspace ID"),
 })
 
 export namespace SheetsSkills {
@@ -543,7 +625,14 @@ export namespace SheetsSkills {
 
   export const read = fn(SheetsReadInputSchema, async (input) => {
     const ctx = makeCtx()
-    log.info("sheets.read", { spreadsheetId: input.spreadsheetId })
+    const userId = input.userId ?? process.env.KILO_USER_ID
+    const workspaceId = input.workspaceId
+
+    if (!userId) {
+      throw new Error("userId is required (set via input or KILO_USER_ID environment variable)")
+    }
+
+    log.info("sheets.read", { spreadsheetId: input.spreadsheetId, userId, workspaceId })
     emitIntent("sheets", "spreadsheets.get")
     const policy = GWorkspaceAgency.getPolicy("sheets", "spreadsheets.get")
     emitPolicy("sheets", "spreadsheets.get", policy)
@@ -551,10 +640,17 @@ export namespace SheetsSkills {
       throw new Error("Operation denied by policy")
     }
 
+    const brokerCfg = await GWorkspaceBroker.toBrokerConfig({
+      userId,
+      workspaceId,
+      preferNative: true,
+      mcpFallbackEnabled: true,
+    })
+
     const result = await GWorkspaceBroker.executeSheets("read", {
       spreadsheetId: input.spreadsheetId,
       range: input.range,
-    })
+    }, brokerCfg)
 
     await GWorkspaceAudit.recordSheets("sheets.read", result.success ? "success" : "failure", {
       ...ctx,

@@ -720,6 +720,83 @@ const agentDefinitions: FlexibleAgentDefinition[] = [
     constraints: {},
     version: "1.0.0",
   },
+
+  // ============ NBA-ANALYST ============
+  {
+    id: "nba-analyst",
+    name: "NBA Analyst",
+    primaryAgency: "agency-nba",
+    secondaryAgencies: ["knowledge"],
+    capabilities: [
+      "schedule_live",
+      "team_player_stats",
+      "game_preview",
+      "injury_status",
+      "odds_markets",
+      "probability_estimation",
+      "vig_removal",
+      "edge_detection",
+      "calibration_monitoring",
+      "value_watchlist",
+      "recommendation_report",
+      "stake_sizing",
+      "search",
+      "synthesis",
+    ],
+    skills: ["nba-analysis"],
+    description:
+      "NBA betting analyst agent with direct access to live game data, odds, and injury reports from BallDontLie, ESPN, Odds API, Bet365, and Parlay APIs.",
+    prompt: `You are an NBA betting analyst agent with direct access to professional sports data APIs.
+
+## Your Tools (USE THESE — NEVER use websearch for NBA data)
+- **nba-games**: Get NBA games, live scores, schedule from BallDontLie/ESPN/NBA API with fallback
+  - Params: date? (YYYY-MM-DD), teamIds? (string[]), status? ("all"|"scheduled"|"live"|"final")
+- **nba-odds**: Get betting odds from Bet365/OddsAPI/Parlay with multi-bookmaker comparison
+  - Params: gameIds? (string[]), markets? (string[]), minEdge? (number)
+- **nba-injuries**: Get injury reports with severity from BallDontLie/ESPN
+  - Params: teamIds? (string[]), status? (string)
+- **skill** with name "nba-analysis": Full analysis with signals, value detection, and recommendations
+
+## CRITICAL RULES
+1. **ALWAYS use nba-games/nba-odds/nba-injuries tools FIRST** — they provide official API data with freshness tracking
+2. **NEVER use websearch/webfetch** for data that the NBA tools can provide
+3. Only use websearch as fallback if NBA tools return no data AND you need supplementary context
+4. Present data with source attribution (which provider, freshness timestamp)
+5. All betting recommendations require confidence levels and human approval
+
+## Analysis Workflow
+1. Get today's games with nba-games
+2. Get injury reports with nba-injuries for relevant teams
+3. Get odds with nba-odds for available markets
+4. Synthesize data into actionable analysis
+5. Highlight value bets and edges across bookmakers
+
+## Data Quality
+- All data includes freshness tracking (seconds since last update)
+- Stale data (>5 min) is flagged with ⚠
+- Multiple providers are compared for accuracy
+- Circuit breaker prevents cascading API failures`,
+    permission: PermissionNext.fromConfig({
+      "*": "deny",
+      "nba-games": "allow",
+      "nba-odds": "allow",
+      "nba-injuries": "allow",
+      skill: "allow",
+      websearch: "allow",
+      webfetch: "allow",
+      read: "allow",
+      grep: "allow",
+      glob: "allow",
+      list: "allow",
+      question: "allow",
+      external_directory: {
+        "*": "ask",
+      },
+    }),
+    mode: "subagent",
+    constraints: {},
+    version: "1.0.0",
+  },
 ]
 
 // Register all agents

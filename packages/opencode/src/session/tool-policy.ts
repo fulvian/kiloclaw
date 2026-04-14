@@ -5,6 +5,8 @@
 import { Flag } from "@/flag/flag"
 
 export type CanonicalToolId =
+  // Task delegation
+  | "task"
   // Knowledge/NBA
   | "websearch"
   | "webfetch"
@@ -41,6 +43,36 @@ export type CanonicalToolId =
   | "nba-games"
   | "nba-odds"
   | "nba-injuries"
+  // Travel Agency
+  | "travel-destination-search"
+  | "travel-destination-compare"
+  | "travel-budget-estimator"
+  | "travel-price-calendar"
+  | "travel-flight-search"
+  | "travel-flight-compare"
+  | "travel-rail-search"
+  | "travel-bus-search"
+  | "travel-transfer-search"
+  | "travel-hotel-search"
+  | "travel-hotel-compare"
+  | "travel-booking-link"
+  | "travel-rate-policy-parse"
+  | "travel-local-transport-plan"
+  | "travel-car-rental-search"
+  | "travel-parking-info"
+  | "travel-restaurant-search"
+  | "travel-restaurant-booking-link"
+  | "travel-place-search-google"
+  | "travel-place-search-opentripmap"
+  | "travel-activity-search"
+  | "travel-event-search-ticketmaster"
+  | "travel-event-booking-link"
+  | "travel-itinerary-builder"
+  | "travel-itinerary-optimizer"
+  | "travel-weather-check"
+  | "travel-emergency-info"
+  | "travel-advisory-info"
+  | "travel-audit-log-write"
 
 /**
  * Returns the canonical tool IDs for a given agency.
@@ -78,6 +110,42 @@ export function getAgencyCanonicalToolIds(agencyId: string): CanonicalToolId[] {
       return ["finance-api", "skill", "websearch", "webfetch"]
     case "agency-weather":
       return ["weather-api", "skill"]
+    case "agency-travel":
+      return [
+        "travel-destination-search",
+        "travel-destination-compare",
+        "travel-budget-estimator",
+        "travel-price-calendar",
+        "travel-flight-search",
+        "travel-flight-compare",
+        "travel-rail-search",
+        "travel-bus-search",
+        "travel-transfer-search",
+        "travel-hotel-search",
+        "travel-hotel-compare",
+        "travel-booking-link",
+        "travel-rate-policy-parse",
+        "travel-local-transport-plan",
+        "travel-car-rental-search",
+        "travel-parking-info",
+        "travel-restaurant-search",
+        "travel-restaurant-booking-link",
+        "travel-place-search-google",
+        "travel-place-search-opentripmap",
+        "travel-activity-search",
+        "travel-event-search-ticketmaster",
+        "travel-event-booking-link",
+        "travel-itinerary-builder",
+        "travel-itinerary-optimizer",
+        "travel-weather-check",
+        "travel-emergency-info",
+        "travel-advisory-info",
+        "travel-audit-log-write",
+        "skill",
+        "read",
+        "websearch",
+        "webfetch",
+      ]
     default:
       return []
   }
@@ -125,6 +193,55 @@ export const DEVELOPMENT_TOOL_ALLOWLIST = [
 
 export const FINANCE_TOOL_ALLOWLIST = ["finance-api", "skill", "websearch", "webfetch"] as const
 export const WEATHER_TOOL_ALLOWLIST = ["weather-api", "skill"] as const
+
+// Travel Agency Tool Allowlist
+// Based on 32 capabilities mapped to tools per KILOCLAW_TRAVEL_AGENCY_IMPLEMENTATION_PLAN_2026-04-14
+export const TRAVEL_TOOL_ALLOWLIST = [
+  // Destination & planning
+  "travel_destination_search",
+  "travel_destination_compare",
+  "travel_budget_estimator",
+  "travel_price_calendar",
+  "travel_itinerary_builder",
+  "travel_itinerary_optimizer",
+  // Transport
+  "travel_flight_search",
+  "travel_flight_compare",
+  "travel_rail_search",
+  "travel_bus_search",
+  "travel_transfer_search",
+  // Accommodation
+  "travel_hotel_search",
+  "travel_hotel_compare",
+  "travel_booking_link",
+  "travel_rate_policy_parse",
+  // Local mobility
+  "travel_local_transport_plan",
+  "travel_car_rental_search",
+  "travel_parking_info",
+  // Dining
+  "travel_restaurant_search",
+  "travel_restaurant_booking_link",
+  // POI
+  "travel_place_search_google",
+  "travel_place_search_opentripmap",
+  // Activities & Events
+  "travel_activity_search",
+  "travel_event_search_ticketmaster",
+  "travel_event_booking_link",
+  // Risk & Emergency
+  "travel_weather_check",
+  "travel_emergency_info",
+  "travel_advisory_info",
+  // Compliance
+  "travel_audit_log_write",
+  // Skills fallback
+  "skill",
+  // Safe read operations
+  "read",
+  "websearch",
+  "webfetch",
+] as const
 
 export type PolicyProfile = "strict" | "balanced" | "dev-local"
 
@@ -323,6 +440,93 @@ export function mapWeatherCapabilitiesToTools(capabilities: string[]) {
   return Array.from(new Set(tools))
 }
 
+export function mapTravelCapabilitiesToTools(capabilities: string[]) {
+  const tools = capabilities.flatMap((cap) => {
+    // Destination discovery & comparison
+    if (["destination-discovery", "destination-compare"].includes(cap)) {
+      return ["travel_destination_search", "travel_destination_compare"]
+    }
+    // Budget & planning
+    if (["budget-fit-check", "date-window-optimization", "multi-city-optimizer"].includes(cap)) {
+      return ["travel_budget_estimator", "travel_price_calendar"]
+    }
+    // Seasonality & risk
+    if (["seasonality-analysis", "weather-risk-check"].includes(cap)) {
+      return ["travel_weather_check"]
+    }
+    // Visa doc check
+    if (["visa-doc-check", "advisory-monitor"].includes(cap)) {
+      return ["travel_advisory_info"]
+    }
+    // Transport - flight
+    if (["flight-search", "flight-compare"].includes(cap)) {
+      return ["travel_flight_search", "travel_flight_compare"]
+    }
+    // Transport - rail
+    if (["rail-search"].includes(cap)) {
+      return ["travel_rail_search"]
+    }
+    // Transport - bus
+    if (["bus-search"].includes(cap)) {
+      return ["travel_bus_search"]
+    }
+    // Transfer
+    if (["transfer-search"].includes(cap)) {
+      return ["travel_transfer_search"]
+    }
+    // Accommodation
+    if (["hotel-search", "hotel-compare"].includes(cap)) {
+      return ["travel_hotel_search", "travel_hotel_compare"]
+    }
+    // Booking
+    if (["booking-link-hotel", "event-booking-link"].includes(cap)) {
+      return ["travel_booking_link", "travel_event_booking_link"]
+    }
+    // Policy
+    if (["cancellation-policy-check"].includes(cap)) {
+      return ["travel_rate_policy_parse"]
+    }
+    // Local mobility
+    if (["local-transport-plan", "parking-check"].includes(cap)) {
+      return ["travel_local_transport_plan", "travel_parking_info"]
+    }
+    // Car rental
+    if (["car-rental-search"].includes(cap)) {
+      return ["travel_car_rental_search"]
+    }
+    // Dining
+    if (["restaurant-search", "restaurant-availability"].includes(cap)) {
+      return ["travel_restaurant_search", "travel_restaurant_booking_link"]
+    }
+    // POI
+    if (["poi-search", "poi-alt-search"].includes(cap)) {
+      return ["travel_place_search_google", "travel_place_search_opentripmap"]
+    }
+    // Activities
+    if (["activity-search"].includes(cap)) {
+      return ["travel_activity_search"]
+    }
+    // Events
+    if (["event-search"].includes(cap)) {
+      return ["travel_event_search_ticketmaster"]
+    }
+    // Itinerary
+    if (["itinerary-build", "itinerary-balance"].includes(cap)) {
+      return ["travel_itinerary_builder", "travel_itinerary_optimizer"]
+    }
+    // Emergency
+    if (["emergency-nearby"].includes(cap)) {
+      return ["travel_emergency_info"]
+    }
+    // Audit
+    if (["audit-log"].includes(cap)) {
+      return ["travel_audit_log_write"]
+    }
+    return []
+  })
+  return Array.from(new Set(tools))
+}
+
 export function resolveAgencyAllowedTools(input: {
   agencyId?: string | null
   enabled: boolean
@@ -389,6 +593,15 @@ export function resolveAgencyAllowedTools(input: {
   if (input.agencyId === "agency-weather") {
     const mapped = mapWeatherCapabilitiesToTools(input.capabilities ?? [])
     const allowedTools = Array.from(new Set([...WEATHER_TOOL_ALLOWLIST, ...mapped]))
+    return {
+      enabled: true,
+      allowedTools,
+    }
+  }
+
+  if (input.agencyId === "agency-travel") {
+    const mapped = mapTravelCapabilitiesToTools(input.capabilities ?? [])
+    const allowedTools = Array.from(new Set([...TRAVEL_TOOL_ALLOWLIST, ...mapped]))
     return {
       enabled: true,
       allowedTools,

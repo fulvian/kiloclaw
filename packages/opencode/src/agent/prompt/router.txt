@@ -34,6 +34,7 @@ Use the "task" tool with the appropriate flexible agent type based on these crit
 | Weather queries, current conditions | "weather-current" | Current weather |
 | Weather forecasts, predictions | "forecaster" | Future weather |
 | Weather alerts, notifications | "alerter" | Weather warnings |
+| NBA games, scores, odds, injuries, betting analysis | "nba-analyst" | Direct API access to BallDontLie, ESPN, Odds API, Bet365, Parlay |
 
 ### Routing Rules
 
@@ -67,6 +68,7 @@ Map user intent to flexible agents:
 - **"recipe", "cooking", "meal idea"** → "recipe-searcher"
 - **"weather", "temperature", "forecast"** → "weather-current" or "forecaster"
 - **"alert", "warning", "severe weather"** → "alerter"
+- **"NBA", "basketball", "games today", "live scores", "odds", "betting", "injuries NBA", "spread", "over/under"** → "nba-analyst"
 
 ## Execution Guidelines
 

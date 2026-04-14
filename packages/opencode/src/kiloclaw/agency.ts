@@ -99,7 +99,7 @@ export type ToolHealth = z.infer<typeof ToolHealth>
 // Agency Info for registry
 export const AgencyInfo = z.object({
   id: z.string(),
-  domain: z.enum(["development", "knowledge", "nutrition", "weather", "nba", "finance", "custom"]),
+  domain: z.enum(["development", "knowledge", "nutrition", "weather", "nba", "finance", "custom", "travel"]),
   status: z.enum(["idle", "running", "paused", "stopped", "error"]),
 })
 export type AgencyInfo = z.infer<typeof AgencyInfo>
@@ -128,7 +128,7 @@ export namespace Agency {
 
   export const Info = z.object({
     id: z.string(),
-    domain: z.enum(["development", "knowledge", "nutrition", "weather", "nba", "finance", "custom"]),
+    domain: z.enum(["development", "knowledge", "nutrition", "weather", "nba", "finance", "custom", "travel"]),
   })
 
   export const create = fn(Info, (input) => {

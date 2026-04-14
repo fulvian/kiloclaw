@@ -47,6 +47,9 @@ function inferDomain(skill: Skill): Domain {
   ) {
     return "finance"
   }
+  if (tags.includes("travel") || tags.includes("trip") || tags.includes("vacation")) {
+    return "travel"
+  }
 
   return "knowledge" // default
 }
@@ -808,6 +811,375 @@ function bootstrapFinanceCapabilities(): void {
 }
 
 /**
+ * Bootstrap Travel agency capabilities
+ */
+export function bootstrapTravelCapabilities(): void {
+  const registry = getCapabilityRegistry()
+
+  const capabilities = [
+    // Destination discovery & comparison
+    {
+      id: "destination-discovery",
+      domain: "travel" as Domain,
+      description: "Discover and compare travel destinations",
+      keywords: [
+        "viaggio",
+        "vacanza",
+        "destinazione",
+        "meta",
+        "itinerario",
+        "travel",
+        "trip",
+        "destination",
+        "holiday",
+        "vacation",
+        "city break",
+        "weekend lungo",
+        "partire",
+        "ponte",
+        "ferie",
+        "viaggiare",
+        "travel plan",
+        "trip planner",
+      ],
+      capabilities: ["destination-discovery"],
+    },
+    {
+      id: "destination-compare",
+      domain: "travel" as Domain,
+      description: "Compare multiple travel destinations",
+      keywords: [
+        "confronto mete",
+        "confronta destinazioni",
+        "compare destinations",
+        "best destination",
+        "miglior destinazione",
+        "confronto viaggi",
+        "itinerario viaggio",
+      ],
+      capabilities: ["destination-compare"],
+    },
+    {
+      id: "budget-fit-check",
+      domain: "travel" as Domain,
+      description: "Check if destinations fit within budget",
+      keywords: [
+        "budget",
+        "budget viaggio",
+        "prezzo",
+        "costo",
+        "spesa",
+        "cost estimate",
+        "fare calendar",
+        "trip cost",
+        "vacation cost",
+      ],
+      capabilities: ["budget-fit-check"],
+    },
+    {
+      id: "seasonality-analysis",
+      domain: "travel" as Domain,
+      description: "Analyze best time to visit destinations",
+      keywords: [
+        "stagionalità",
+        "best time to go",
+        "when to visit",
+        "season",
+        "meteo",
+        "climate",
+        "weather risk",
+        "temperature",
+        "pioggia",
+        "sole",
+      ],
+      capabilities: ["seasonality-analysis"],
+    },
+    {
+      id: "date-window-optimization",
+      domain: "travel" as Domain,
+      description: "Optimize travel dates for price and availability",
+      keywords: [
+        "date",
+        "finestre date",
+        "optimizza date",
+        "ottimizza date viaggio",
+        "cheapest date",
+        "price calendar",
+        "fare calendar",
+        "giorni",
+        "partenza",
+        "ritorno",
+        "andata",
+      ],
+      capabilities: ["date-window-optimization"],
+    },
+    // Transport search
+    {
+      id: "flight-search",
+      domain: "travel" as Domain,
+      description: "Search for flights",
+      keywords: [
+        "volo",
+        "voli",
+        "flight",
+        "flights",
+        "avi",
+        "aeroporto",
+        "airport",
+        "airline",
+        "scal",
+        "bagaglio",
+        "primo volo",
+        "volo economico",
+        "volo lowcost",
+        "book flight",
+      ],
+      capabilities: ["flight-search"],
+    },
+    {
+      id: "rail-search",
+      domain: "travel" as Domain,
+      description: "Search for train/rail connections",
+      keywords: [
+        "treno",
+        "rail",
+        "train",
+        "ferrovia",
+        "fs",
+        "italo",
+        "high-speed rail",
+        "biglietto treno",
+        "tariffe treni",
+        "orario treno",
+      ],
+      capabilities: ["rail-search"],
+    },
+    {
+      id: "bus-search",
+      domain: "travel" as Domain,
+      description: "Search for bus connections",
+      keywords: ["bus", "pullman", "autobus", "bus station", "flixbus", "marino", "bus terminal", "bus ticket"],
+      capabilities: ["bus-search"],
+    },
+    // Accommodation
+    {
+      id: "hotel-search",
+      domain: "travel" as Domain,
+      description: "Search for hotels and accommodation",
+      keywords: [
+        "hotel",
+        "albergo",
+        "alloggio",
+        "appartamento",
+        "resort",
+        "b&b",
+        "ostello",
+        "vacation rental",
+        "check-in",
+        "check-out",
+        "prenotazione",
+        "booking",
+        "camere",
+        "guesthouse",
+      ],
+      capabilities: ["hotel-search"],
+    },
+    {
+      id: "hotel-compare",
+      domain: "travel" as Domain,
+      description: "Compare hotel options",
+      keywords: [
+        "confronta hotel",
+        "hotel comparison",
+        "hotel review",
+        "recensioni",
+        "rating",
+        "stelle",
+        "price comparison",
+        "miglior hotel",
+      ],
+      capabilities: ["hotel-compare"],
+    },
+    {
+      id: "cancellation-policy-check",
+      domain: "travel" as Domain,
+      description: "Check cancellation policies",
+      keywords: [
+        "cancellazione",
+        "cancellation policy",
+        "rimborso",
+        "non rimborsabile",
+        "free cancellation",
+        "refundable",
+        "policy",
+        "penale",
+      ],
+      capabilities: ["cancellation-policy-check"],
+    },
+    // Local mobility
+    {
+      id: "local-transport-plan",
+      domain: "travel" as Domain,
+      description: "Plan local transportation",
+      keywords: [
+        "trasporto locale",
+        "metro",
+        "tram",
+        "pass turistico",
+        "local transport",
+        "public transit",
+        "bus metro",
+        "ztr",
+        "noleggio",
+        "noleggio auto",
+        "car rental",
+      ],
+      capabilities: ["local-transport-plan"],
+    },
+    // Dining & POI
+    {
+      id: "restaurant-search",
+      domain: "travel" as Domain,
+      description: "Search for restaurants",
+      keywords: [
+        "ristorante",
+        "trattoria",
+        "restaurant",
+        "cucina locale",
+        "local cuisine",
+        "dining",
+        "food",
+        "prenotazione tavolo",
+        "restaurant booking",
+        "mangiare",
+      ],
+      capabilities: ["restaurant-search"],
+    },
+    {
+      id: "poi-search",
+      domain: "travel" as Domain,
+      description: "Search for points of interest",
+      keywords: [
+        "POI",
+        "things to do",
+        "attrazioni",
+        "points of interest",
+        "museum",
+        "mostra",
+        "tour guidato",
+        "guided tour",
+        "sightseeing",
+        "explore",
+      ],
+      capabilities: ["poi-search"],
+    },
+    // Activities & Events
+    {
+      id: "activity-search",
+      domain: "travel" as Domain,
+      description: "Search for activities and tours",
+      keywords: [
+        "attività",
+        "activity",
+        "tour",
+        "experienza",
+        "guided tour",
+        "excursion",
+        "day trip",
+        "attività turistiche",
+        "tour operator",
+      ],
+      capabilities: ["activity-search"],
+    },
+    {
+      id: "event-search",
+      domain: "travel" as Domain,
+      description: "Search for events and shows",
+      keywords: [
+        "evento",
+        "events",
+        "spettacolo",
+        "concerto",
+        "biglietti evento",
+        "event booking",
+        "live show",
+        "ticketmaster",
+        "biglietti",
+        "tickets",
+      ],
+      capabilities: ["event-search"],
+    },
+    // Itinerary & Risk
+    {
+      id: "itinerary-build",
+      domain: "travel" as Domain,
+      description: "Build complete travel itinerary",
+      keywords: [
+        "itinerario",
+        "pianifica giornata",
+        "day by day",
+        "travel planner",
+        "trip planner",
+        "piano viaggio",
+        "schedule",
+        "agenda",
+      ],
+      capabilities: ["itinerary-build"],
+    },
+    {
+      id: "weather-risk-check",
+      domain: "travel" as Domain,
+      description: "Check weather risks for travel",
+      keywords: [
+        "weather risk",
+        "maltempo",
+        "allerta meteo",
+        "storm",
+        "tempesta",
+        "安全",
+        "travel advisory",
+        "advisory",
+        "alert",
+      ],
+      capabilities: ["weather-risk-check"],
+    },
+    // Emergency & Advisory
+    {
+      id: "emergency-nearby",
+      domain: "travel" as Domain,
+      description: "Find nearby emergency services",
+      keywords: [
+        "emergenza",
+        "emergency",
+        "ospedale",
+        "pharmacy",
+        "farmacia",
+        "hospital",
+        "consolato",
+        "ambasciata",
+        "police",
+        "help",
+        "soccorso",
+      ],
+      capabilities: ["emergency-nearby"],
+    },
+  ]
+
+  for (const cap of capabilities) {
+    try {
+      registry.register({
+        ...cap,
+        metadata: { source: "bootstrap", domain: "travel" },
+      })
+    } catch (err) {
+      // Skip if already exists
+    }
+  }
+
+  log.info("travel capabilities bootstrapped", { count: capabilities.length })
+}
+
+/**
  * Bootstrap all default capabilities
  */
 export function bootstrapAllCapabilities(): void {
@@ -818,6 +1190,7 @@ export function bootstrapAllCapabilities(): void {
   bootstrapGWorkspaceCapabilities()
   bootstrapNbaCapabilities()
   bootstrapFinanceCapabilities()
+  bootstrapTravelCapabilities()
 
   log.info("all default capabilities bootstrapped", {
     total: getCapabilityRegistry().size(),

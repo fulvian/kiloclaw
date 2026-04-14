@@ -25,7 +25,7 @@ export const Duration = z.number().int().nonnegative()
 export type Duration = z.infer<typeof Duration>
 
 // Domain types
-export const Domain = z.enum(["development", "knowledge", "nutrition", "weather", "nba", "finance", "custom"])
+export const Domain = z.enum(["development", "knowledge", "nutrition", "weather", "travel", "nba", "finance", "custom"])
 export type Domain = z.infer<typeof Domain>
 
 // Finance asset types

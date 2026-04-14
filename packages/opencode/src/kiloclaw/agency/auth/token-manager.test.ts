@@ -109,6 +109,7 @@ describe("TokenManager", () => {
       const tokens: TokenPayload = {
         accessToken: "test-access-token",
         expiresIn: -3600, // Already expired
+        tokenType: "Bearer",
       }
 
       await TokenManager.store("user-123", "workspace-abc", tokens)
@@ -137,6 +138,7 @@ describe("TokenManager", () => {
         accessToken: "test-access-token",
         refreshToken: "test-refresh-token",
         expiresIn: -3600, // Already expired
+        tokenType: "Bearer",
       }
 
       await TokenManager.store("user-123", "workspace-abc", tokens)
@@ -182,6 +184,7 @@ describe("TokenManager", () => {
         accessToken: "test-access-token",
         refreshToken: "test-refresh-token",
         expiresIn: 3600,
+        tokenType: "Bearer",
       }
 
       await TokenManager.store("user-123", "workspace-abc", tokens)
@@ -238,11 +241,13 @@ describe("TokenManager", () => {
       const tokens1: TokenPayload = {
         accessToken: "token-1",
         expiresIn: 3600,
+        tokenType: "Bearer",
       }
 
       const tokens2: TokenPayload = {
         accessToken: "token-1", // Same plaintext
         expiresIn: 3600,
+        tokenType: "Bearer",
       }
 
       const stored1 = await TokenManager.store("user-1", "workspace-abc", tokens1)
@@ -259,6 +264,7 @@ describe("TokenManager", () => {
         await TokenManager.store("user-123", "workspace-abc", {
           accessToken: "test-token",
           expiresIn: 3600,
+          tokenType: "Bearer",
         })
         expect.unreachable()
       } catch (error) {

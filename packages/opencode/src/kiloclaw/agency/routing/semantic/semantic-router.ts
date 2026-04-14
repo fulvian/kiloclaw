@@ -415,6 +415,7 @@ export class SemanticRouter {
       knowledge: "web-search",
       nutrition: "nutrition-analysis",
       weather: "weather-forecast",
+      travel: "destination-discovery",
       nba: "nba-analysis",
       finance: "finance-market-data",
       custom: "web-search",

@@ -1301,6 +1301,75 @@ export namespace SessionPrompt {
             "- Alerts must include severity and effective/expires times",
             "",
           ].join("\n")
+        } else if (agencyContext.agencyId === "agency-travel") {
+          agencyBlock = [
+            "",
+            "<!-- Agency Context: Travel Agency -->",
+            "This conversation has been routed to the Travel Agency.",
+            `Routing confidence: ${Math.round(agencyContext.confidence * 100)}%`,
+            `Routing reason: ${agencyContext.reason}`,
+            `Routing source: ${agencyContext.routeSource}`,
+            ...(agencyContext.fallbackUsed ? [`Routing fallback: ${agencyContext.fallbackReason ?? "none"}`] : []),
+            ...(agencyContext.layers?.L1
+              ? [
+                  `L1 capabilities: ${agencyContext.layers.L1.capabilities.join(", ") || "none"}`,
+                  `L1 route type: ${agencyContext.layers.L1.routeResult?.type ?? "fallback"}`,
+                ]
+              : []),
+            ...(agencyContext.layers?.L2
+              ? [
+                  `L2 agent: ${agencyContext.layers.L2.agentId ?? "none"}`,
+                  `L2 health: ${agencyContext.layers.L2.agentHealth}`,
+                ]
+              : []),
+            ...(agencyContext.layers?.L3
+              ? [
+                  `L3 tools denied: ${agencyContext.layers.L3.toolsDenied}`,
+                  `L3 fallback used: ${agencyContext.layers.L3.fallbackUsed}`,
+                ]
+              : []),
+            "",
+            "CRITICAL TOOL INSTRUCTIONS:",
+            "- For travel search and booking: use ONLY the 'skill' tool with travel skills",
+            "- For flight search: use skill { name: 'travel-flight-search', mode: 'execute' }",
+            "- For hotel search: use skill { name: 'travel-hotel-search', mode: 'execute' }",
+            "- For destination discovery: use skill { name: 'travel-destination-discovery', mode: 'execute' }",
+            "- For itinerary building: use skill { name: 'travel-itinerary-build', mode: 'execute' }",
+            "- DO NOT use websearch or webfetch for travel planning - use specialized travel skills",
+            "- DO NOT make up flight prices, hotel availability, or event tickets",
+            "- DO NOT provide medical advice or emergency decisions - always escalate to human",
+            "- All booking operations require user confirmation before proceeding",
+            "- Always include 'price and availability subject to confirmation' disclaimer",
+            "",
+            "TRAVEL SKILLS (use skill tool with mode='execute'):",
+            "- For destination discovery: skill { name: 'travel-destination-discovery', mode: 'execute' }",
+            "- For flight search: skill { name: 'travel-flight-search', mode: 'execute' }",
+            "- For hotel search: skill { name: 'travel-hotel-search', mode: 'execute' }",
+            "- For restaurant search: skill { name: 'travel-restaurant-search', mode: 'execute' }",
+            "- For activity search: skill { name: 'travel-activity-search', mode: 'execute' }",
+            "- For weather check: skill { name: 'weather-forecast', mode: 'execute' }",
+            "- For emergency support: skill { name: 'travel-emergency-support', mode: 'execute' }",
+            "",
+            "PROVIDER PRIORITY:",
+            "- Primary: Amadeus (flight/hotel search with OAuth)",
+            "- Fallback: Generic web search for non-bookable discovery",
+            "- Events: Ticketmaster Discovery API",
+            "- Weather: OpenWeatherMap",
+            "",
+            "POLICY LEVELS:",
+            "- SAFE: Destination discovery, price calendar, weather check",
+            "- NOTIFY: Itinerary generation, reminder creation",
+            "- CONFIRM: Opening booking deep-links",
+            "- HITL: Total cost > user threshold, non-refundable bookings, minors/medical",
+            "- DENY: Automatic payment execution, irreversible bookings without approval",
+            "",
+            "OUTPUT REQUIREMENTS:",
+            "- All responses must include provider attribution when using external APIs",
+            "- All prices must show currency and include 'confirm at checkout' disclaimer",
+            "- Booking links are deep-links only - never process payment",
+            "- Emergency queries: provide local contacts and nearest resources",
+            "",
+          ].join("\n")
         }
 
         if (agencyBlock) {
