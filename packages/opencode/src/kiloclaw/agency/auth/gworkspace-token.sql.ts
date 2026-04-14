@@ -50,12 +50,17 @@ export const GWorkspaceTokenRotationTable = sqliteTable(
 export const GWorkspaceIdempotencyKeyTable = sqliteTable(
   "gworkspace_idempotency_key",
   {
-    key: text().primaryKey(), // UUID
-    result_hash: text().notNull(), // Hash of operation result
+    key: text().primaryKey(), // UUID or client-provided idempotency key
+    user_id: text().notNull(),
+    workspace_id: text().notNull(),
+    operation: text().notNull(), // e.g., "docs.create", "sheets.append"
+    result_data: text().notNull(), // JSON blob with operation result
     expires_at: integer().notNull(), // TTL: 30 minutes
     ...Timestamps,
   },
   (table) => [
+    index("gworkspace_idempotency_key_user_workspace_idx").on(table.user_id, table.workspace_id),
+    index("gworkspace_idempotency_key_operation_idx").on(table.operation),
     index("gworkspace_idempotency_key_expires_idx").on(table.expires_at),
   ],
 )

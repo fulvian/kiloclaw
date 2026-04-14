@@ -228,6 +228,104 @@ export namespace TokenDatabase {
   }
 
   /**
+   * Retrieve cached result from idempotency key (if not expired)
+   */
+  export async function getIdempotencyResult(
+    key: string,
+    userId: string,
+    workspaceId: string,
+    operation: string
+  ): Promise<unknown | null> {
+    try {
+      const db = Database.Client()
+      const now = Date.now()
+
+      const result = await db
+        .select()
+        .from(GWorkspaceIdempotencyKeyTable)
+        .where(
+          and(
+            eq(GWorkspaceIdempotencyKeyTable.key, key),
+            eq(GWorkspaceIdempotencyKeyTable.user_id, userId),
+            eq(GWorkspaceIdempotencyKeyTable.workspace_id, workspaceId),
+            eq(GWorkspaceIdempotencyKeyTable.operation, operation),
+            // Only return if not expired
+          )
+        )
+        .limit(1)
+
+      if (!result.length) {
+        return null
+      }
+
+      const row = result[0]
+      // Check expiration
+      if (row.expires_at <= now) {
+        // Expired, but don't return it
+        return null
+      }
+
+      // Parse and return the cached result
+      return JSON.parse(row.result_data)
+    } catch (error) {
+      log.error("failed to get idempotency result", {
+        key,
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      })
+      return null
+    }
+  }
+
+  /**
+   * Store operation result with idempotency key (30min TTL)
+   */
+  export async function storeIdempotencyResult(
+    key: string,
+    userId: string,
+    workspaceId: string,
+    operation: string,
+    result: unknown,
+    ttlMs: number = 30 * 60 * 1000 // 30 minutes default
+  ): Promise<void> {
+    try {
+      const db = Database.Client()
+      const expiresAt = Date.now() + ttlMs
+
+      await db
+        .insert(GWorkspaceIdempotencyKeyTable)
+        .values({
+          key,
+          user_id: userId,
+          workspace_id: workspaceId,
+          operation,
+          result_data: JSON.stringify(result),
+          expires_at: expiresAt,
+        })
+        .onConflictDoUpdate({
+          target: [GWorkspaceIdempotencyKeyTable.key],
+          set: {
+            result_data: JSON.stringify(result),
+            expires_at: expiresAt,
+          },
+        })
+
+      log.debug("storeIdempotencyResult completed", {
+        userId,
+        operation,
+        expiresAt,
+      })
+    } catch (error) {
+      log.error("failed to store idempotency result", {
+        key,
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      })
+      throw error
+    }
+  }
+
+  /**
    * Cleanup expired idempotency keys
    */
   export async function cleanupIdempotencyKeys(): Promise<number> {

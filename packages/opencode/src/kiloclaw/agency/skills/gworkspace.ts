@@ -10,6 +10,7 @@ import { GWorkspaceAgency, type PolicyLevel } from "../manifests/gworkspace-mani
 import { GWorkspaceHITL } from "../hitl/gworkspace-hitl"
 import { GWorkspaceAudit } from "../audit/gworkspace-audit"
 import { GWorkspaceBroker } from "../broker/gworkspace-broker"
+import { GWorkspaceIdempotency } from "../services/gworkspace-idempotency"
 import { DocumentExporter, ContentParser, EXPORT_FORMATS, type ExportFormat } from "../services/document-exporter"
 import { DocumentIndexer, type DocumentMetadata } from "../services/document-indexer"
 import { BrokerTokenIntegration } from "../auth/broker-integration"
@@ -272,6 +273,7 @@ export const CalendarCreateInputSchema = z.object({
   end: z.string().describe("ISO 8601 end"),
   attendees: z.array(z.string()).optional(),
   location: z.string().optional(),
+  idempotencyKey: z.string().optional().describe("Idempotency key to prevent duplicate operations"),
   userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
   workspaceId: z.string().optional().default("default").describe("Workspace ID"),
 })
@@ -337,6 +339,25 @@ export namespace CalendarSkills {
     emitPolicy("calendar", "events.insert", policy)
     if (policy === "DENY") {
       throw new Error("Operation denied by policy")
+    }
+
+    // Generate idempotency key if not provided
+    const idempotencyKey = input.idempotencyKey ?? await GWorkspaceIdempotency.generateKey("calendar.create", {
+      summary: input.summary,
+      start: input.start,
+      end: input.end,
+    })
+
+    // Check idempotency cache
+    const cached = await GWorkspaceIdempotency.getCachedResult(
+      idempotencyKey,
+      userId,
+      workspaceId,
+      "calendar.create"
+    )
+    if (cached) {
+      log.info("calendar.create idempotency cache hit", { userId })
+      return cached
     }
 
     // Check if HITL is required
@@ -405,6 +426,15 @@ export namespace CalendarSkills {
     if (!result.success) {
       throw new Error(result.error ?? "Calendar create failed")
     }
+
+    // Store result in idempotency cache
+    await GWorkspaceIdempotency.cacheResult(
+      idempotencyKey,
+      userId,
+      workspaceId,
+      "calendar.create",
+      result.data
+    )
 
     return result.data
   })
@@ -1069,6 +1099,7 @@ export const CalendarUpdateInputSchema = z.object({
   calendarId: z.string().optional().default("primary").describe("Calendar ID"),
   eventId: z.string().describe("Event ID to update"),
   event: z.record(z.string(), z.unknown()).describe("Event object with updates"),
+  idempotencyKey: z.string().optional().describe("Idempotency key to prevent duplicate operations"),
   userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
   workspaceId: z.string().optional().default("default").describe("Workspace ID"),
 })
@@ -1083,6 +1114,21 @@ export const calendarUpdate = fn(CalendarUpdateInputSchema, async (input) => {
   emitIntent("calendar", "events.update")
   const policy = GWorkspaceAgency.getPolicy("calendar", "events.update")
   if (policy === "DENY") throw new Error("Operation denied by policy")
+
+  // Generate idempotency key if not provided
+  const idempotencyKey = input.idempotencyKey ?? await GWorkspaceIdempotency.generateKey("calendar.update", {
+    eventId: input.eventId,
+    event: input.event,
+  })
+
+  // Check idempotency cache
+  const cached = await GWorkspaceIdempotency.getCachedResult(
+    idempotencyKey,
+    userId,
+    workspaceId,
+    "calendar.update"
+  )
+  if (cached) return cached
 
   if (GWorkspaceAgency.requiresApproval("calendar", "events.update")) {
     const hitlReq = await GWorkspaceHITL.createRequest(
@@ -1118,6 +1164,16 @@ export const calendarUpdate = fn(CalendarUpdateInputSchema, async (input) => {
   })
 
   if (!result.success) throw new Error(result.error ?? "Calendar update failed")
+
+  // Store result in idempotency cache
+  await GWorkspaceIdempotency.cacheResult(
+    idempotencyKey,
+    userId,
+    workspaceId,
+    "calendar.update",
+    result.data
+  )
+
   return result.data
 })
 
@@ -1128,6 +1184,7 @@ export const calendarUpdate = fn(CalendarUpdateInputSchema, async (input) => {
 export const CalendarDeleteInputSchema = z.object({
   calendarId: z.string().optional().default("primary").describe("Calendar ID"),
   eventId: z.string().describe("Event ID to delete"),
+  idempotencyKey: z.string().optional().describe("Idempotency key to prevent duplicate operations"),
   userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
   workspaceId: z.string().optional().default("default").describe("Workspace ID"),
 })
@@ -1142,6 +1199,20 @@ export const calendarDelete = fn(CalendarDeleteInputSchema, async (input) => {
   emitIntent("calendar", "events.delete")
   const policy = GWorkspaceAgency.getPolicy("calendar", "events.delete")
   if (policy === "DENY") throw new Error("Operation denied by policy")
+
+  // Generate idempotency key if not provided
+  const idempotencyKey = input.idempotencyKey ?? await GWorkspaceIdempotency.generateKey("calendar.delete", {
+    eventId: input.eventId,
+  })
+
+  // Check idempotency cache
+  const cached = await GWorkspaceIdempotency.getCachedResult(
+    idempotencyKey,
+    userId,
+    workspaceId,
+    "calendar.delete"
+  )
+  if (cached) return cached
 
   if (GWorkspaceAgency.requiresApproval("calendar", "events.delete")) {
     const hitlReq = await GWorkspaceHITL.createRequest(
@@ -1177,6 +1248,16 @@ export const calendarDelete = fn(CalendarDeleteInputSchema, async (input) => {
   })
 
   if (!result.success) throw new Error(result.error ?? "Calendar delete failed")
+
+  // Store result in idempotency cache
+  await GWorkspaceIdempotency.cacheResult(
+    idempotencyKey,
+    userId,
+    workspaceId,
+    "calendar.delete",
+    result.data
+  )
+
   return result.data
 })
 
@@ -1188,6 +1269,7 @@ export const DriveCreateInputSchema = z.object({
   name: z.string().describe("File name"),
   mimeType: z.string().optional().describe("MIME type (e.g., application/vnd.google-apps.document)"),
   parents: z.array(z.string()).optional().describe("Parent folder IDs"),
+  idempotencyKey: z.string().optional().describe("Idempotency key to prevent duplicate operations"),
   userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
   workspaceId: z.string().optional().default("default").describe("Workspace ID"),
 })
@@ -1202,6 +1284,13 @@ export const driveCreate = fn(DriveCreateInputSchema, async (input) => {
   emitIntent("drive", "files.create")
   const policy = GWorkspaceAgency.getPolicy("drive", "files.create")
   if (policy === "DENY") throw new Error("Operation denied by policy")
+
+  const idempotencyKey = input.idempotencyKey ?? await GWorkspaceIdempotency.generateKey("drive.create", {
+    name: input.name,
+    mimeType: input.mimeType,
+  })
+  const cached = await GWorkspaceIdempotency.getCachedResult(idempotencyKey, userId, workspaceId, "drive.create")
+  if (cached) return cached
 
   if (GWorkspaceAgency.requiresApproval("drive", "files.create")) {
     const hitlReq = await GWorkspaceHITL.createRequest(
@@ -1237,6 +1326,8 @@ export const driveCreate = fn(DriveCreateInputSchema, async (input) => {
   })
 
   if (!result.success) throw new Error(result.error ?? "Drive create failed")
+
+  await GWorkspaceIdempotency.cacheResult(idempotencyKey, userId, workspaceId, "drive.create", result.data)
   return result.data
 })
 
@@ -1247,6 +1338,7 @@ export const driveCreate = fn(DriveCreateInputSchema, async (input) => {
 export const DriveUpdateInputSchema = z.object({
   fileId: z.string().describe("File ID to update"),
   metadata: z.record(z.string(), z.unknown()).describe("Metadata to update (name, description, etc)"),
+  idempotencyKey: z.string().optional().describe("Idempotency key to prevent duplicate operations"),
   userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
   workspaceId: z.string().optional().default("default").describe("Workspace ID"),
 })
@@ -1261,6 +1353,13 @@ export const driveUpdate = fn(DriveUpdateInputSchema, async (input) => {
   emitIntent("drive", "files.update")
   const policy = GWorkspaceAgency.getPolicy("drive", "files.update")
   if (policy === "DENY") throw new Error("Operation denied by policy")
+
+  const idempotencyKey = input.idempotencyKey ?? await GWorkspaceIdempotency.generateKey("drive.update", {
+    fileId: input.fileId,
+    metadata: input.metadata,
+  })
+  const cached = await GWorkspaceIdempotency.getCachedResult(idempotencyKey, userId, workspaceId, "drive.update")
+  if (cached) return cached
 
   if (GWorkspaceAgency.requiresApproval("drive", "files.update")) {
     const hitlReq = await GWorkspaceHITL.createRequest(
@@ -1296,6 +1395,8 @@ export const driveUpdate = fn(DriveUpdateInputSchema, async (input) => {
   })
 
   if (!result.success) throw new Error(result.error ?? "Drive update failed")
+
+  await GWorkspaceIdempotency.cacheResult(idempotencyKey, userId, workspaceId, "drive.update", result.data)
   return result.data
 })
 
@@ -1305,6 +1406,7 @@ export const driveUpdate = fn(DriveUpdateInputSchema, async (input) => {
 
 export const DriveDeleteInputSchema = z.object({
   fileId: z.string().describe("File ID to delete"),
+  idempotencyKey: z.string().optional().describe("Idempotency key to prevent duplicate operations"),
   userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
   workspaceId: z.string().optional().default("default").describe("Workspace ID"),
 })
@@ -1319,6 +1421,10 @@ export const driveDelete = fn(DriveDeleteInputSchema, async (input) => {
   emitIntent("drive", "files.delete")
   const policy = GWorkspaceAgency.getPolicy("drive", "files.delete")
   if (policy === "DENY") throw new Error("Operation denied by policy")
+
+  const idempotencyKey = input.idempotencyKey ?? await GWorkspaceIdempotency.generateKey("drive.delete", { fileId: input.fileId })
+  const cached = await GWorkspaceIdempotency.getCachedResult(idempotencyKey, userId, workspaceId, "drive.delete")
+  if (cached) return cached
 
   if (GWorkspaceAgency.requiresApproval("drive", "files.delete")) {
     const hitlReq = await GWorkspaceHITL.createRequest(
@@ -1350,6 +1456,7 @@ export const driveDelete = fn(DriveDeleteInputSchema, async (input) => {
   })
 
   if (!result.success) throw new Error(result.error ?? "Drive delete failed")
+  await GWorkspaceIdempotency.cacheResult(idempotencyKey, userId, workspaceId, "drive.delete", result.data)
   return result.data
 })
 
@@ -1360,6 +1467,7 @@ export const driveDelete = fn(DriveDeleteInputSchema, async (input) => {
 export const DriveCopyInputSchema = z.object({
   fileId: z.string().describe("File ID to copy"),
   name: z.string().describe("New file name"),
+  idempotencyKey: z.string().optional().describe("Idempotency key to prevent duplicate operations"),
   userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
   workspaceId: z.string().optional().default("default").describe("Workspace ID"),
 })
@@ -1374,6 +1482,10 @@ export const driveCopy = fn(DriveCopyInputSchema, async (input) => {
   emitIntent("drive", "files.copy")
   const policy = GWorkspaceAgency.getPolicy("drive", "files.copy")
   if (policy === "DENY") throw new Error("Operation denied by policy")
+
+  const idempotencyKey = input.idempotencyKey ?? await GWorkspaceIdempotency.generateKey("drive.copy", { fileId: input.fileId, name: input.name })
+  const cached = await GWorkspaceIdempotency.getCachedResult(idempotencyKey, userId, workspaceId, "drive.copy")
+  if (cached) return cached
 
   if (GWorkspaceAgency.requiresApproval("drive", "files.copy")) {
     const hitlReq = await GWorkspaceHITL.createRequest(
@@ -1406,6 +1518,7 @@ export const driveCopy = fn(DriveCopyInputSchema, async (input) => {
   })
 
   if (!result.success) throw new Error(result.error ?? "Drive copy failed")
+  await GWorkspaceIdempotency.cacheResult(idempotencyKey, userId, workspaceId, "drive.copy", result.data)
   return result.data
 })
 
@@ -1417,6 +1530,7 @@ export const DriveMoveInputSchema = z.object({
   fileId: z.string().describe("File ID to move"),
   addParents: z.array(z.string()).optional().describe("Folder IDs to add as parents"),
   removeParents: z.array(z.string()).optional().describe("Folder IDs to remove as parents"),
+  idempotencyKey: z.string().optional().describe("Idempotency key to prevent duplicate operations"),
   userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
   workspaceId: z.string().optional().default("default").describe("Workspace ID"),
 })
@@ -1431,6 +1545,10 @@ export const driveMove = fn(DriveMoveInputSchema, async (input) => {
   emitIntent("drive", "files.move")
   const policy = GWorkspaceAgency.getPolicy("drive", "files.move")
   if (policy === "DENY") throw new Error("Operation denied by policy")
+
+  const idempotencyKey = input.idempotencyKey ?? await GWorkspaceIdempotency.generateKey("drive.move", { fileId: input.fileId, addParents: input.addParents, removeParents: input.removeParents })
+  const cached = await GWorkspaceIdempotency.getCachedResult(idempotencyKey, userId, workspaceId, "drive.move")
+  if (cached) return cached
 
   if (GWorkspaceAgency.requiresApproval("drive", "files.move")) {
     const hitlReq = await GWorkspaceHITL.createRequest(
@@ -1466,6 +1584,7 @@ export const driveMove = fn(DriveMoveInputSchema, async (input) => {
   })
 
   if (!result.success) throw new Error(result.error ?? "Drive move failed")
+  await GWorkspaceIdempotency.cacheResult(idempotencyKey, userId, workspaceId, "drive.move", result.data)
   return result.data
 })
 
@@ -1475,6 +1594,7 @@ export const driveMove = fn(DriveMoveInputSchema, async (input) => {
 
 export const DocsCreateInputSchema = z.object({
   title: z.string().describe("Document title"),
+  idempotencyKey: z.string().optional().describe("Idempotency key to prevent duplicate operations"),
   userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
   workspaceId: z.string().optional().default("default").describe("Workspace ID"),
 })
@@ -1489,6 +1609,10 @@ export const docsCreate = fn(DocsCreateInputSchema, async (input) => {
   emitIntent("docs", "documents.create")
   const policy = GWorkspaceAgency.getPolicy("docs", "documents.create")
   if (policy === "DENY") throw new Error("Operation denied by policy")
+
+  const idempotencyKey = input.idempotencyKey ?? await GWorkspaceIdempotency.generateKey("docs.create", { title: input.title })
+  const cached = await GWorkspaceIdempotency.getCachedResult(idempotencyKey, userId, workspaceId, "docs.create")
+  if (cached) return cached
 
   if (GWorkspaceAgency.requiresApproval("docs", "documents.create")) {
     const hitlReq = await GWorkspaceHITL.createRequest(
@@ -1520,6 +1644,7 @@ export const docsCreate = fn(DocsCreateInputSchema, async (input) => {
   })
 
   if (!result.success) throw new Error(result.error ?? "Docs create failed")
+  await GWorkspaceIdempotency.cacheResult(idempotencyKey, userId, workspaceId, "docs.create", result.data)
   return result.data
 })
 
@@ -1530,6 +1655,7 @@ export const docsCreate = fn(DocsCreateInputSchema, async (input) => {
 export const DocsUpdateInputSchema = z.object({
   documentId: z.string().describe("Document ID to update"),
   requests: z.array(z.unknown()).describe("Array of batchUpdate requests"),
+  idempotencyKey: z.string().optional().describe("Idempotency key to prevent duplicate operations"),
   userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
   workspaceId: z.string().optional().default("default").describe("Workspace ID"),
 })
@@ -1544,6 +1670,10 @@ export const docsUpdate = fn(DocsUpdateInputSchema, async (input) => {
   emitIntent("docs", "documents.update")
   const policy = GWorkspaceAgency.getPolicy("docs", "documents.update")
   if (policy === "DENY") throw new Error("Operation denied by policy")
+
+  const idempotencyKey = input.idempotencyKey ?? await GWorkspaceIdempotency.generateKey("docs.update", { documentId: input.documentId, requests: input.requests })
+  const cached = await GWorkspaceIdempotency.getCachedResult(idempotencyKey, userId, workspaceId, "docs.update")
+  if (cached) return cached
 
   if (GWorkspaceAgency.requiresApproval("docs", "documents.update")) {
     const hitlReq = await GWorkspaceHITL.createRequest(
@@ -1579,6 +1709,7 @@ export const docsUpdate = fn(DocsUpdateInputSchema, async (input) => {
   })
 
   if (!result.success) throw new Error(result.error ?? "Docs update failed")
+  await GWorkspaceIdempotency.cacheResult(idempotencyKey, userId, workspaceId, "docs.update", result.data)
   return result.data
 })
 
@@ -1588,6 +1719,7 @@ export const docsUpdate = fn(DocsUpdateInputSchema, async (input) => {
 
 export const DocsDeleteInputSchema = z.object({
   documentId: z.string().describe("Document ID to delete"),
+  idempotencyKey: z.string().optional().describe("Idempotency key to prevent duplicate operations"),
   userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
   workspaceId: z.string().optional().default("default").describe("Workspace ID"),
 })
@@ -1602,6 +1734,10 @@ export const docsDelete = fn(DocsDeleteInputSchema, async (input) => {
   emitIntent("docs", "documents.delete")
   const policy = GWorkspaceAgency.getPolicy("docs", "documents.delete")
   if (policy === "DENY") throw new Error("Operation denied by policy")
+
+  const idempotencyKey = input.idempotencyKey ?? await GWorkspaceIdempotency.generateKey("docs.delete", { documentId: input.documentId })
+  const cached = await GWorkspaceIdempotency.getCachedResult(idempotencyKey, userId, workspaceId, "docs.delete")
+  if (cached) return cached
 
   if (GWorkspaceAgency.requiresApproval("docs", "documents.delete")) {
     const hitlReq = await GWorkspaceHITL.createRequest(
@@ -1633,6 +1769,7 @@ export const docsDelete = fn(DocsDeleteInputSchema, async (input) => {
   })
 
   if (!result.success) throw new Error(result.error ?? "Docs delete failed")
+  await GWorkspaceIdempotency.cacheResult(idempotencyKey, userId, workspaceId, "docs.delete", result.data)
   return result.data
 })
 
@@ -1642,6 +1779,7 @@ export const docsDelete = fn(DocsDeleteInputSchema, async (input) => {
 
 export const SheetsCreateInputSchema = z.object({
   title: z.string().describe("Spreadsheet title"),
+  idempotencyKey: z.string().optional().describe("Idempotency key to prevent duplicate operations"),
   userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
   workspaceId: z.string().optional().default("default").describe("Workspace ID"),
 })
@@ -1656,6 +1794,10 @@ export const sheetsCreate = fn(SheetsCreateInputSchema, async (input) => {
   emitIntent("sheets", "spreadsheets.create")
   const policy = GWorkspaceAgency.getPolicy("sheets", "spreadsheets.create")
   if (policy === "DENY") throw new Error("Operation denied by policy")
+
+  const idempotencyKey = input.idempotencyKey ?? await GWorkspaceIdempotency.generateKey("sheets.create", { title: input.title })
+  const cached = await GWorkspaceIdempotency.getCachedResult(idempotencyKey, userId, workspaceId, "sheets.create")
+  if (cached) return cached
 
   if (GWorkspaceAgency.requiresApproval("sheets", "spreadsheets.create")) {
     const hitlReq = await GWorkspaceHITL.createRequest(
@@ -1687,6 +1829,7 @@ export const sheetsCreate = fn(SheetsCreateInputSchema, async (input) => {
   })
 
   if (!result.success) throw new Error(result.error ?? "Sheets create failed")
+  await GWorkspaceIdempotency.cacheResult(idempotencyKey, userId, workspaceId, "sheets.create", result.data)
   return result.data
 })
 
@@ -1698,6 +1841,7 @@ export const SheetsValuesUpdateInputSchema = z.object({
   spreadsheetId: z.string().describe("Spreadsheet ID"),
   range: z.string().describe("A1 notation range (e.g., Sheet1!A1:C10)"),
   values: z.array(z.array(z.unknown())).describe("2D array of values to set"),
+  idempotencyKey: z.string().optional().describe("Idempotency key to prevent duplicate operations"),
   userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
   workspaceId: z.string().optional().default("default").describe("Workspace ID"),
 })
@@ -1712,6 +1856,10 @@ export const sheetsValuesUpdate = fn(SheetsValuesUpdateInputSchema, async (input
   emitIntent("sheets", "spreadsheets.values.update")
   const policy = GWorkspaceAgency.getPolicy("sheets", "spreadsheets.values.update")
   if (policy === "DENY") throw new Error("Operation denied by policy")
+
+  const idempotencyKey = input.idempotencyKey ?? await GWorkspaceIdempotency.generateKey("sheets.valuesUpdate", { spreadsheetId: input.spreadsheetId, range: input.range, values: input.values })
+  const cached = await GWorkspaceIdempotency.getCachedResult(idempotencyKey, userId, workspaceId, "sheets.valuesUpdate")
+  if (cached) return cached
 
   if (GWorkspaceAgency.requiresApproval("sheets", "spreadsheets.values.update")) {
     const hitlReq = await GWorkspaceHITL.createRequest(
@@ -1748,6 +1896,7 @@ export const sheetsValuesUpdate = fn(SheetsValuesUpdateInputSchema, async (input
   })
 
   if (!result.success) throw new Error(result.error ?? "Sheets update failed")
+  await GWorkspaceIdempotency.cacheResult(idempotencyKey, userId, workspaceId, "sheets.valuesUpdate", result.data)
   return result.data
 })
 
@@ -1759,6 +1908,7 @@ export const SheetsValuesAppendInputSchema = z.object({
   spreadsheetId: z.string().describe("Spreadsheet ID"),
   range: z.string().describe("A1 notation range to append to (e.g., Sheet1!A:C)"),
   values: z.array(z.array(z.unknown())).describe("2D array of values to append"),
+  idempotencyKey: z.string().optional().describe("Idempotency key to prevent duplicate operations"),
   userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
   workspaceId: z.string().optional().default("default").describe("Workspace ID"),
 })
@@ -1773,6 +1923,10 @@ export const sheetsValuesAppend = fn(SheetsValuesAppendInputSchema, async (input
   emitIntent("sheets", "spreadsheets.values.append")
   const policy = GWorkspaceAgency.getPolicy("sheets", "spreadsheets.values.append")
   if (policy === "DENY") throw new Error("Operation denied by policy")
+
+  const idempotencyKey = input.idempotencyKey ?? await GWorkspaceIdempotency.generateKey("sheets.valuesAppend", { spreadsheetId: input.spreadsheetId, range: input.range, values: input.values })
+  const cached = await GWorkspaceIdempotency.getCachedResult(idempotencyKey, userId, workspaceId, "sheets.valuesAppend")
+  if (cached) return cached
 
   if (GWorkspaceAgency.requiresApproval("sheets", "spreadsheets.values.append")) {
     const hitlReq = await GWorkspaceHITL.createRequest(
@@ -1809,6 +1963,7 @@ export const sheetsValuesAppend = fn(SheetsValuesAppendInputSchema, async (input
   })
 
   if (!result.success) throw new Error(result.error ?? "Sheets append failed")
+  await GWorkspaceIdempotency.cacheResult(idempotencyKey, userId, workspaceId, "sheets.valuesAppend", result.data)
   return result.data
 })
 
@@ -1819,6 +1974,7 @@ export const sheetsValuesAppend = fn(SheetsValuesAppendInputSchema, async (input
 export const SheetsValuesClearInputSchema = z.object({
   spreadsheetId: z.string().describe("Spreadsheet ID"),
   range: z.string().describe("A1 notation range to clear (e.g., Sheet1!A1:C10)"),
+  idempotencyKey: z.string().optional().describe("Idempotency key to prevent duplicate operations"),
   userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
   workspaceId: z.string().optional().default("default").describe("Workspace ID"),
 })
@@ -1833,6 +1989,10 @@ export const sheetsValuesClear = fn(SheetsValuesClearInputSchema, async (input) 
   emitIntent("sheets", "spreadsheets.values.clear")
   const policy = GWorkspaceAgency.getPolicy("sheets", "spreadsheets.values.clear")
   if (policy === "DENY") throw new Error("Operation denied by policy")
+
+  const idempotencyKey = input.idempotencyKey ?? await GWorkspaceIdempotency.generateKey("sheets.valuesClear", { spreadsheetId: input.spreadsheetId, range: input.range })
+  const cached = await GWorkspaceIdempotency.getCachedResult(idempotencyKey, userId, workspaceId, "sheets.valuesClear")
+  if (cached) return cached
 
   if (GWorkspaceAgency.requiresApproval("sheets", "spreadsheets.values.clear")) {
     const hitlReq = await GWorkspaceHITL.createRequest(
@@ -1869,6 +2029,7 @@ export const sheetsValuesClear = fn(SheetsValuesClearInputSchema, async (input) 
   })
 
   if (!result.success) throw new Error(result.error ?? "Sheets clear failed")
+  await GWorkspaceIdempotency.cacheResult(idempotencyKey, userId, workspaceId, "sheets.valuesClear", result.data)
   return result.data
 })
 
@@ -1878,6 +2039,7 @@ export const sheetsValuesClear = fn(SheetsValuesClearInputSchema, async (input) 
 
 export const SheetsDeleteInputSchema = z.object({
   spreadsheetId: z.string().describe("Spreadsheet ID to delete"),
+  idempotencyKey: z.string().optional().describe("Idempotency key to prevent duplicate operations"),
   userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
   workspaceId: z.string().optional().default("default").describe("Workspace ID"),
 })
@@ -1892,6 +2054,10 @@ export const sheetsDelete = fn(SheetsDeleteInputSchema, async (input) => {
   emitIntent("sheets", "spreadsheets.delete")
   const policy = GWorkspaceAgency.getPolicy("sheets", "spreadsheets.delete")
   if (policy === "DENY") throw new Error("Operation denied by policy")
+
+  const idempotencyKey = input.idempotencyKey ?? await GWorkspaceIdempotency.generateKey("sheets.delete", { spreadsheetId: input.spreadsheetId })
+  const cached = await GWorkspaceIdempotency.getCachedResult(idempotencyKey, userId, workspaceId, "sheets.delete")
+  if (cached) return cached
 
   if (GWorkspaceAgency.requiresApproval("sheets", "spreadsheets.delete")) {
     const hitlReq = await GWorkspaceHITL.createRequest(
@@ -1923,5 +2089,6 @@ export const sheetsDelete = fn(SheetsDeleteInputSchema, async (input) => {
   })
 
   if (!result.success) throw new Error(result.error ?? "Sheets delete failed")
+  await GWorkspaceIdempotency.cacheResult(idempotencyKey, userId, workspaceId, "sheets.delete", result.data)
   return result.data
 })
