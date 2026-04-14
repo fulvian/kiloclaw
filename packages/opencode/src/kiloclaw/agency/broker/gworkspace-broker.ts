@@ -355,6 +355,37 @@ export namespace GWorkspaceBroker {
     return executeMcpFallback("sheets", operation, args, config, "feature_flag")
   }
 
+  export async function executeSlides(
+    operation: string,
+    args: Record<string, unknown>,
+    config: BrokerConfig = defaultBrokerConfig,
+  ): Promise<ToolResult<unknown>> {
+    if (!config.accessToken) {
+      return executeMcpFallback("slides", operation, args, config, "native_unsupported")
+    }
+
+    try {
+      if (config.preferNative) {
+        Bus.publish(RouteDecided, {
+          agencyDomain: "gworkspace",
+          service: "slides",
+          operation,
+          provider: "native",
+          reason: "prefer_native",
+        })
+        return await GWorkspaceCircuitBreaker.execute("slides", () =>
+          executeNativeSlides(config.accessToken!, operation, args),
+        )
+      }
+    } catch (error) {
+      if (shouldFallback(error as Error, config)) {
+        return executeMcpFallback("slides", operation, args, config, "provider_degraded")
+      }
+      throw error
+    }
+    return executeMcpFallback("slides", operation, args, config, "feature_flag")
+  }
+
   // ========================================================================
   // Native Execution
   // ========================================================================
@@ -654,6 +685,58 @@ export namespace GWorkspaceBroker {
     }
   }
 
+  async function executeNativeSlides(
+    accessToken: string,
+    operation: string,
+    args: Record<string, unknown>,
+  ): Promise<ToolResult<unknown>> {
+    log.info("native slides", { operation })
+
+    switch (operation) {
+      case "create":
+        return {
+          success: true,
+          data: await GWorkspaceAdapter.slidesCreatePresentation(accessToken, args.title as string),
+          provider: "native",
+        }
+      case "read":
+        return {
+          success: true,
+          data: await GWorkspaceAdapter.slidesGetPresentation(accessToken, args.presentationId as string),
+          provider: "native",
+        }
+      case "addSlide":
+        return {
+          success: true,
+          data: await GWorkspaceAdapter.slidesAddSlide(
+            accessToken,
+            args.presentationId as string,
+            args.layout as string | undefined,
+            args.insertIndex as number | undefined,
+          ),
+          provider: "native",
+        }
+      case "update":
+        return {
+          success: true,
+          data: await GWorkspaceAdapter.slidesUpdatePresentation(
+            accessToken,
+            args.presentationId as string,
+            args.requests as unknown[],
+          ),
+          provider: "native",
+        }
+      case "delete":
+        return {
+          success: true,
+          data: await GWorkspaceAdapter.slidesDeletePresentation(accessToken, args.presentationId as string),
+          provider: "native",
+        }
+      default:
+        throw new Error(`Unsupported Slides operation: ${operation}`)
+    }
+  }
+
   // ========================================================================
   // MCP Fallback
   // ========================================================================
@@ -696,6 +779,13 @@ export namespace GWorkspaceBroker {
       valuesAppend: "manage_sheet",
       valuesClear: "manage_sheet",
       delete: "manage_sheet",
+    },
+    slides: {
+      read: "get_presentation_content",
+      create: "manage_presentation",
+      addSlide: "manage_presentation",
+      update: "manage_presentation",
+      delete: "manage_presentation",
     },
   }
 

@@ -60,6 +60,7 @@ export namespace GWorkspaceAdapter {
     drive: "drive/v3",
     docs: "docs/v1",
     sheets: "sheets/v4",
+    slides: "slides/v1",
   }
 
   /**
@@ -456,5 +457,58 @@ export namespace GWorkspaceAdapter {
     return withRetry<void>(accessToken, `${API_VERSION.calendar}/calendars/${calendarId}/events/${eventId}`, {
       method: "DELETE",
     })
+  }
+
+  // ========================================================================
+  // Slides API
+  // ========================================================================
+
+  export async function slidesCreatePresentation(accessToken: string, title: string) {
+    return withRetry<{ presentationId: string; title: string }>(
+      accessToken,
+      `${API_VERSION.slides}/presentations`,
+      { method: "POST", body: { title } },
+    )
+  }
+
+  export async function slidesGetPresentation(accessToken: string, presentationId: string) {
+    return withRetry<unknown>(accessToken, `${API_VERSION.slides}/presentations/${presentationId}`)
+  }
+
+  export async function slidesAddSlide(
+    accessToken: string,
+    presentationId: string,
+    layout: string = "BLANK_LAYOUT",
+    insertIndex?: number,
+  ) {
+    return withRetry<{ replies: unknown[] }>(
+      accessToken,
+      `${API_VERSION.slides}/presentations/${presentationId}:batchUpdate`,
+      {
+        method: "POST",
+        body: {
+          requests: [
+            {
+              createSlide: {
+                insertIndex,
+                slideLayoutId: layout,
+              },
+            },
+          ],
+        },
+      },
+    )
+  }
+
+  export async function slidesUpdatePresentation(accessToken: string, presentationId: string, requests: unknown[]) {
+    return withRetry<{ presentationId: string; replies: unknown[] }>(
+      accessToken,
+      `${API_VERSION.slides}/presentations/${presentationId}:batchUpdate`,
+      { method: "POST", body: { requests } },
+    )
+  }
+
+  export async function slidesDeletePresentation(accessToken: string, presentationId: string): Promise<void> {
+    return withRetry<void>(accessToken, `${API_VERSION.drive}/files/${presentationId}`, { method: "DELETE" })
   }
 }

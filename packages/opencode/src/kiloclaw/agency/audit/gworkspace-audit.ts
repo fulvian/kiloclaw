@@ -44,6 +44,11 @@ export const AuditOperation = z.enum([
   "sheets.clear",
   "sheets.update",
   "sheets.delete",
+  "slides.read",
+  "slides.create",
+  "slides.addSlide",
+  "slides.update",
+  "slides.delete",
   "documents.search",
   "documents.tag",
   "index.stats",
@@ -482,6 +487,53 @@ export namespace GWorkspaceAudit {
       error: options.error,
       metadata: {
         range: options.range,
+      },
+      durationMs: options.durationMs,
+      provider: options.provider,
+    })
+  }
+
+  export async function recordSlides(
+    operation: AuditOperation,
+    result: AuditResult,
+    options: BaseAuditOptions & {
+      userId?: string
+      userEmail?: string
+      sessionId?: string
+      presentationId?: string
+      presentationName?: string
+      slideIndex?: number
+      hitlRequired?: boolean
+      hitlRequestId?: string
+      error?: string
+      durationMs?: number
+      provider?: "native" | "mcp"
+    } = {},
+  ): Promise<AuditEntry> {
+    return record({
+      service: "slides",
+      operation,
+      correlationId: options.correlationId,
+      traceId: options.traceId,
+      actor: {
+        userId: options.userId,
+        userEmail: options.userEmail,
+        sessionId: options.sessionId,
+      },
+      resource: {
+        type: "presentation",
+        id: options.presentationId,
+        name: options.presentationName,
+      },
+      policy: {
+        level: getPolicyLevel("slides", operation),
+        hitlRequired: options.hitlRequired ?? false,
+        hitlRequestId: options.hitlRequestId,
+      },
+      result,
+      error: options.error,
+      metadata: {
+        slideIndex: options.slideIndex,
       },
       durationMs: options.durationMs,
       provider: options.provider,
