@@ -279,4 +279,139 @@ export namespace GWorkspaceAdapter {
     }
     return withRetry<unknown>(accessToken, `${API_VERSION.sheets}/spreadsheets/${spreadsheetId}`, { params })
   }
+
+  export async function sheetsCreateSpreadsheet(accessToken: string, title: string) {
+    return withRetry<{ spreadsheetId: string; properties: { title: string } }>(
+      accessToken,
+      `${API_VERSION.sheets}/spreadsheets`,
+      { method: "POST", body: { properties: { title }, sheets: [] } },
+    )
+  }
+
+  export async function sheetsValuesUpdate(
+    accessToken: string,
+    spreadsheetId: string,
+    range: string,
+    values: unknown[][],
+  ) {
+    return withRetry<{ updatedRows: number; updatedColumns: number }>(
+      accessToken,
+      `${API_VERSION.sheets}/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}`,
+      { method: "PUT", body: { values }, params: { valueInputOption: "USER_ENTERED" } },
+    )
+  }
+
+  export async function sheetsValuesAppend(
+    accessToken: string,
+    spreadsheetId: string,
+    range: string,
+    values: unknown[][],
+  ) {
+    return withRetry<{ updates: { updatedRows: number; updatedColumns: number } }>(
+      accessToken,
+      `${API_VERSION.sheets}/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}:append`,
+      { method: "POST", body: { values }, params: { valueInputOption: "USER_ENTERED" } },
+    )
+  }
+
+  export async function sheetsValuesClear(accessToken: string, spreadsheetId: string, range: string) {
+    return withRetry<{ clearedRange: string }>(
+      accessToken,
+      `${API_VERSION.sheets}/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}:clear`,
+      { method: "POST" },
+    )
+  }
+
+  // ========================================================================
+  // Docs CRUD
+  // ========================================================================
+
+  export async function docsCreateDocument(accessToken: string, title: string) {
+    return withRetry<{ documentId: string; title: string; revisionId?: string }>(
+      accessToken,
+      `${API_VERSION.docs}/documents`,
+      { method: "POST", body: { title } },
+    )
+  }
+
+  export async function docsUpdateDocument(accessToken: string, documentId: string, requests: unknown[]) {
+    return withRetry<{ documentId: string; replies: unknown[]; writeControl?: unknown }>(
+      accessToken,
+      `${API_VERSION.docs}/documents/${documentId}:batchUpdate`,
+      { method: "POST", body: { requests } },
+    )
+  }
+
+  // ========================================================================
+  // Drive CRUD
+  // ========================================================================
+
+  export async function driveCreateFile(
+    accessToken: string,
+    metadata: { name: string; mimeType?: string; parents?: string[] },
+  ) {
+    return withRetry<{ id: string; name: string; webViewLink: string }>(
+      accessToken,
+      `${API_VERSION.drive}/files`,
+      { method: "POST", body: metadata },
+    )
+  }
+
+  export async function driveUpdateFile(accessToken: string, fileId: string, metadata: Record<string, unknown>) {
+    return withRetry<unknown>(accessToken, `${API_VERSION.drive}/files/${fileId}`, {
+      method: "PATCH",
+      body: metadata,
+    })
+  }
+
+  export async function driveDeleteFile(accessToken: string, fileId: string): Promise<void> {
+    return withRetry<void>(accessToken, `${API_VERSION.drive}/files/${fileId}`, { method: "DELETE" })
+  }
+
+  export async function driveCopyFile(accessToken: string, fileId: string, name: string) {
+    return withRetry<{ id: string; name: string; webViewLink: string }>(
+      accessToken,
+      `${API_VERSION.drive}/files/${fileId}/copy`,
+      { method: "POST", body: { name } },
+    )
+  }
+
+  export async function driveMoveFile(
+    accessToken: string,
+    fileId: string,
+    addParents?: string[],
+    removeParents?: string[],
+  ) {
+    const params: Record<string, string> = {}
+    if (addParents?.length) params.addParents = addParents.join(",")
+    if (removeParents?.length) params.removeParents = removeParents.join(",")
+    return withRetry<unknown>(accessToken, `${API_VERSION.drive}/files/${fileId}`, {
+      method: "PATCH",
+      body: { parents: addParents },
+      params: params.addParents || params.removeParents ? params : undefined,
+    })
+  }
+
+  // ========================================================================
+  // Calendar CRUD
+  // ========================================================================
+
+  export async function calendarUpdateEvent(
+    accessToken: string,
+    calendarId: string,
+    eventId: string,
+    event: Record<string, unknown>,
+  ) {
+    return withRetry<{ id: string; status: string }>(
+      accessToken,
+      `${API_VERSION.calendar}/calendars/${calendarId}/events/${eventId}`,
+      { method: "PUT", body: event },
+    )
+  }
+
+  export async function calendarDeleteEvent(accessToken: string, calendarId: string, eventId: string): Promise<void> {
+    return withRetry<void>(accessToken, `${API_VERSION.calendar}/calendars/${calendarId}/events/${eventId}`, {
+      method: "DELETE",
+    })
+  }
 }

@@ -28,15 +28,25 @@ export const AuditOperation = z.enum([
   "drive.read",
   "drive.share",
   "drive.create",
+  "drive.update",
+  "drive.copy",
+  "drive.move",
   "drive.delete",
   "docs.read",
   "docs.download",
+  "docs.create",
   "docs.update",
   "docs.delete",
   "sheets.read",
   "sheets.download",
+  "sheets.create",
+  "sheets.append",
+  "sheets.clear",
   "sheets.update",
   "sheets.delete",
+  "documents.search",
+  "documents.tag",
+  "index.stats",
 ])
 export type AuditOperation = z.infer<typeof AuditOperation>
 
@@ -528,6 +538,51 @@ export namespace GWorkspaceAudit {
     entries = entries.slice(offset, offset + limit)
 
     return { entries, total }
+  }
+
+  export async function recordSearch(
+    operation: AuditOperation,
+    result: AuditResult,
+    options: BaseAuditOptions & {
+      userId?: string
+      userEmail?: string
+      sessionId?: string
+      query?: string
+      resultCount?: number
+      filters?: string[]
+      hitlRequired?: boolean
+      hitlRequestId?: string
+      error?: string
+      durationMs?: number
+      provider?: "native" | "mcp"
+    } = {},
+  ): Promise<AuditEntry> {
+    return record({
+      service: "search",
+      operation,
+      correlationId: options.correlationId,
+      traceId: options.traceId,
+      actor: {
+        userId: options.userId,
+        userEmail: options.userEmail,
+        sessionId: options.sessionId,
+      },
+      resource: {
+        type: "document_index",
+        id: undefined,
+        name: options.query,
+      },
+      policy: { level: "SAFE", hitlRequired: options.hitlRequired ?? false, hitlRequestId: options.hitlRequestId },
+      result,
+      error: options.error,
+      metadata: {
+        query: options.query,
+        resultCount: options.resultCount,
+        filters: options.filters,
+        provider: options.provider,
+      },
+      durationMs: options.durationMs,
+    })
   }
 
   /**

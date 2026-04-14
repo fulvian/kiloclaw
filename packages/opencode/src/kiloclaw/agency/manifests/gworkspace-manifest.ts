@@ -59,6 +59,11 @@ const POLICY: Record<string, Record<string, PolicyLevel>> = {
     "spreadsheets.values.clear": "CONFIRM",
     "spreadsheets.delete": "CONFIRM",
   },
+  search: {
+    "documents.search": "SAFE",
+    "documents.tag": "SAFE",
+    "index.stats": "SAFE",
+  },
 }
 
 const ALIAS: Record<string, Record<string, string>> = {
@@ -140,6 +145,16 @@ const ALIAS: Record<string, Record<string, string>> = {
     "sheets.export": "spreadsheets.export",
     "sheets.update": "spreadsheets.values.update",
     "sheets.delete": "spreadsheets.delete",
+  },
+  search: {
+    search: "documents.search",
+    tag: "documents.tag",
+    tag_add: "documents.tag",
+    tag_remove: "documents.tag",
+    stats: "index.stats",
+    "documents.search": "documents.search",
+    "documents.tag": "documents.tag",
+    "index.stats": "index.stats",
   },
 }
 

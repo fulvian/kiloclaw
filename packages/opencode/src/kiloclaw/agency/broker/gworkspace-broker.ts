@@ -421,6 +421,27 @@ export namespace GWorkspaceBroker {
           }),
           provider: "native",
         }
+      case "update":
+        return {
+          success: true,
+          data: await GWorkspaceAdapter.calendarUpdateEvent(
+            accessToken,
+            (args.calendarId as string) || "primary",
+            args.eventId as string,
+            args.event as Record<string, unknown>,
+          ),
+          provider: "native",
+        }
+      case "delete":
+        return {
+          success: true,
+          data: await GWorkspaceAdapter.calendarDeleteEvent(
+            accessToken,
+            (args.calendarId as string) || "primary",
+            args.eventId as string,
+          ),
+          provider: "native",
+        }
       default:
         throw new Error(`Unsupported Calendar operation: ${operation}`)
     }
@@ -462,6 +483,53 @@ export namespace GWorkspaceBroker {
           }),
           provider: "native",
         }
+      case "create":
+        return {
+          success: true,
+          data: await GWorkspaceAdapter.driveCreateFile(accessToken, {
+            name: args.name as string,
+            mimeType: args.mimeType as string,
+            parents: args.parents as string[],
+          }),
+          provider: "native",
+        }
+      case "update":
+        return {
+          success: true,
+          data: await GWorkspaceAdapter.driveUpdateFile(
+            accessToken,
+            args.fileId as string,
+            args.metadata as Record<string, unknown>,
+          ),
+          provider: "native",
+        }
+      case "delete":
+        return {
+          success: true,
+          data: await GWorkspaceAdapter.driveDeleteFile(accessToken, args.fileId as string),
+          provider: "native",
+        }
+      case "copy":
+        return {
+          success: true,
+          data: await GWorkspaceAdapter.driveCopyFile(
+            accessToken,
+            args.fileId as string,
+            args.name as string,
+          ),
+          provider: "native",
+        }
+      case "move":
+        return {
+          success: true,
+          data: await GWorkspaceAdapter.driveMoveFile(
+            accessToken,
+            args.fileId as string,
+            args.addParents as string[],
+            args.removeParents as string[],
+          ),
+          provider: "native",
+        }
       default:
         throw new Error(`Unsupported Drive operation: ${operation}`)
     }
@@ -479,6 +547,28 @@ export namespace GWorkspaceBroker {
         return {
           success: true,
           data: await GWorkspaceAdapter.docsGetDocument(accessToken, args.documentId as string),
+          provider: "native",
+        }
+      case "create":
+        return {
+          success: true,
+          data: await GWorkspaceAdapter.docsCreateDocument(accessToken, args.title as string),
+          provider: "native",
+        }
+      case "update":
+        return {
+          success: true,
+          data: await GWorkspaceAdapter.docsUpdateDocument(
+            accessToken,
+            args.documentId as string,
+            args.requests as unknown[],
+          ),
+          provider: "native",
+        }
+      case "delete":
+        return {
+          success: true,
+          data: await GWorkspaceAdapter.driveDeleteFile(accessToken, args.documentId as string),
           provider: "native",
         }
       default:
@@ -504,6 +594,50 @@ export namespace GWorkspaceBroker {
           ),
           provider: "native",
         }
+      case "create":
+        return {
+          success: true,
+          data: await GWorkspaceAdapter.sheetsCreateSpreadsheet(accessToken, args.title as string),
+          provider: "native",
+        }
+      case "valuesUpdate":
+        return {
+          success: true,
+          data: await GWorkspaceAdapter.sheetsValuesUpdate(
+            accessToken,
+            args.spreadsheetId as string,
+            args.range as string,
+            args.values as unknown[][],
+          ),
+          provider: "native",
+        }
+      case "valuesAppend":
+        return {
+          success: true,
+          data: await GWorkspaceAdapter.sheetsValuesAppend(
+            accessToken,
+            args.spreadsheetId as string,
+            args.range as string,
+            args.values as unknown[][],
+          ),
+          provider: "native",
+        }
+      case "valuesClear":
+        return {
+          success: true,
+          data: await GWorkspaceAdapter.sheetsValuesClear(
+            accessToken,
+            args.spreadsheetId as string,
+            args.range as string,
+          ),
+          provider: "native",
+        }
+      case "delete":
+        return {
+          success: true,
+          data: await GWorkspaceAdapter.driveDeleteFile(accessToken, args.spreadsheetId as string),
+          provider: "native",
+        }
       default:
         throw new Error(`Unsupported Sheets operation: ${operation}`)
     }
@@ -524,18 +658,33 @@ export namespace GWorkspaceBroker {
       list: "list_calendars",
       events: "get_events",
       create: "manage_event",
+      update: "manage_event",
+      delete: "manage_event",
     },
     drive: {
       search: "search_drive_files",
       list: "list_drive_items",
       get: "get_drive_file_content",
       share: "manage_drive_access",
+      create: "manage_drive_access",
+      update: "manage_drive_access",
+      delete: "manage_drive_access",
+      copy: "manage_drive_access",
+      move: "manage_drive_access",
     },
     docs: {
       read: "get_doc_content",
+      create: "manage_doc",
+      update: "manage_doc",
+      delete: "manage_doc",
     },
     sheets: {
       read: "read_sheet_values",
+      create: "manage_sheet",
+      valuesUpdate: "manage_sheet",
+      valuesAppend: "manage_sheet",
+      valuesClear: "manage_sheet",
+      delete: "manage_sheet",
     },
   }
 
@@ -622,6 +771,126 @@ export namespace GWorkspaceBroker {
       return {
         spreadsheet_id: args.spreadsheetId,
         range: args.range,
+      }
+    }
+
+    if (service === "calendar" && operation === "update") {
+      return {
+        action: "update",
+        calendar_id: args.calendarId,
+        event_id: args.eventId,
+        event: args.event,
+      }
+    }
+
+    if (service === "calendar" && operation === "delete") {
+      return {
+        action: "delete",
+        calendar_id: args.calendarId,
+        event_id: args.eventId,
+      }
+    }
+
+    if (service === "drive" && operation === "create") {
+      return {
+        action: "create",
+        name: args.name,
+        mime_type: args.mimeType,
+        parents: args.parents,
+      }
+    }
+
+    if (service === "drive" && operation === "update") {
+      return {
+        action: "update",
+        file_id: args.fileId,
+        metadata: args.metadata,
+      }
+    }
+
+    if (service === "drive" && operation === "delete") {
+      return {
+        action: "delete",
+        file_id: args.fileId,
+      }
+    }
+
+    if (service === "drive" && operation === "copy") {
+      return {
+        action: "copy",
+        file_id: args.fileId,
+        name: args.name,
+      }
+    }
+
+    if (service === "drive" && operation === "move") {
+      return {
+        action: "move",
+        file_id: args.fileId,
+        add_parents: args.addParents,
+        remove_parents: args.removeParents,
+      }
+    }
+
+    if (service === "docs" && operation === "create") {
+      return {
+        action: "create",
+        title: args.title,
+      }
+    }
+
+    if (service === "docs" && operation === "update") {
+      return {
+        action: "update",
+        document_id: args.documentId,
+        requests: args.requests,
+      }
+    }
+
+    if (service === "docs" && operation === "delete") {
+      return {
+        action: "delete",
+        document_id: args.documentId,
+      }
+    }
+
+    if (service === "sheets" && operation === "create") {
+      return {
+        action: "create",
+        title: args.title,
+      }
+    }
+
+    if (service === "sheets" && operation === "valuesUpdate") {
+      return {
+        action: "update",
+        spreadsheet_id: args.spreadsheetId,
+        range: args.range,
+        values: args.values,
+      }
+    }
+
+    if (service === "sheets" && operation === "valuesAppend") {
+      return {
+        action: "append",
+        spreadsheet_id: args.spreadsheetId,
+        range: args.range,
+        values: args.values,
+      }
+    }
+
+    if (service === "sheets" && operation === "valuesClear") {
+      return {
+        action: "clear",
+        spreadsheet_id: args.spreadsheetId,
+        range: args.range,
+      }
+    }
+
+    if (service === "sheets" && operation === "delete") {
+      return {
+        action: "delete",
+        spreadsheet_id: args.spreadsheetId,
       }
     }
 

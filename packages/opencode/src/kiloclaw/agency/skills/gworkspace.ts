@@ -11,6 +11,7 @@ import { GWorkspaceHITL } from "../hitl/gworkspace-hitl"
 import { GWorkspaceAudit } from "../audit/gworkspace-audit"
 import { GWorkspaceBroker } from "../broker/gworkspace-broker"
 import { DocumentExporter, ContentParser, EXPORT_FORMATS, type ExportFormat } from "../services/document-exporter"
+import { DocumentIndexer, type DocumentMetadata } from "../services/document-indexer"
 import { BrokerTokenIntegration } from "../auth/broker-integration"
 
 const IntentReceived = BusEvent.define(
@@ -840,3 +841,1087 @@ export namespace SheetsSkills {
     }
   })
 }
+
+// ============================================================================
+// Document Search Skill
+// ============================================================================
+
+export const DocumentSearchInputSchema = z.object({
+  query: z.string().describe("Search query (title, content, or metadata)"),
+  type: z.enum(["doc", "sheet", "slide", "file"]).optional().describe("Filter by document type"),
+  tag: z.string().optional().describe("Filter by tag"),
+  userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
+  workspaceId: z.string().optional().default("default").describe("Workspace ID"),
+})
+
+export const documentSearch = fn(DocumentSearchInputSchema, async (input) => {
+  const ctx = makeCtx()
+  const userId = input.userId ?? process.env.KILO_USER_ID
+  const workspaceId = input.workspaceId
+  const log = Log.create({ service: "gworkspace.skill.search" })
+
+  if (!userId) {
+    throw new Error("userId is required (set via input or KILO_USER_ID environment variable)")
+  }
+
+  log.info("document.search", { query: input.query, type: input.type, tag: input.tag, userId, workspaceId })
+  emitIntent("search", "documents.search")
+
+  try {
+    const startTime = Date.now()
+
+    // Search in index
+    const results = DocumentIndexer.search(workspaceId, input.query, { limit: 50 })
+
+    // Apply filters
+    let filtered = results
+    const filters: string[] = []
+
+    if (input.type) {
+      const type = input.type
+      filtered = filtered.filter((r) => r.document.type === type)
+      filters.push(`type:${type}`)
+    }
+
+    if (input.tag) {
+      const tag = input.tag
+      filtered = filtered.filter((r) => r.document.tags.includes(tag))
+      filters.push(`tag:${tag}`)
+    }
+
+    const durationMs = Date.now() - startTime
+
+    await GWorkspaceAudit.recordSearch("documents.search", "success", {
+      ...ctx,
+      query: input.query,
+      resultCount: filtered.length,
+      filters,
+      durationMs,
+    })
+
+    return {
+      success: true,
+      query: input.query,
+      resultCount: filtered.length,
+      results: filtered.map((r) => ({
+        id: r.document.id,
+        title: r.document.title,
+        type: r.document.type,
+        owner: r.document.owner,
+        lastModified: r.document.lastModified,
+        score: r.score,
+        matches: r.matches,
+        tags: r.document.tags,
+      })),
+    }
+  } catch (error) {
+    log.error("search error", {
+      query: input.query,
+      error: error instanceof Error ? error.message : String(error),
+    })
+
+    await GWorkspaceAudit.recordSearch("documents.search", "failure", {
+      ...ctx,
+      query: input.query,
+      error: error instanceof Error ? error.message : String(error),
+    })
+
+    throw error
+  }
+})
+
+// ============================================================================
+// Document Tagging Skill
+// ============================================================================
+
+export const DocumentTagInputSchema = z.object({
+  documentId: z.string().describe("Document ID to tag"),
+  action: z.enum(["add", "remove"]).describe("Add or remove tag"),
+  tag: z.string().describe("Tag to add/remove"),
+  userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
+  workspaceId: z.string().optional().default("default").describe("Workspace ID"),
+})
+
+export const documentTag = fn(DocumentTagInputSchema, async (input) => {
+  const ctx = makeCtx()
+  const userId = input.userId ?? process.env.KILO_USER_ID
+  const workspaceId = input.workspaceId
+  const log = Log.create({ service: "gworkspace.skill.tagging" })
+
+  if (!userId) {
+    throw new Error("userId is required (set via input or KILO_USER_ID environment variable)")
+  }
+
+  log.info("document.tag", { documentId: input.documentId, action: input.action, tag: input.tag, userId })
+  emitIntent("search", "documents.tag")
+
+  try {
+    const doc = DocumentIndexer.getDocument(workspaceId, input.documentId)
+
+    if (!doc) {
+      throw new Error(`Document not found: ${input.documentId}`)
+    }
+
+    if (input.action === "add") {
+      DocumentIndexer.addTag(workspaceId, input.documentId, input.tag)
+
+      await GWorkspaceAudit.recordSearch("documents.tag", "success", {
+        ...ctx,
+        query: `${input.documentId}:${input.tag}`,
+        filters: [`action:${input.action}`],
+      })
+
+      return {
+        success: true,
+        action: "add",
+        documentId: input.documentId,
+        tag: input.tag,
+        tags: doc.tags,
+      }
+    } else {
+      DocumentIndexer.removeTag(workspaceId, input.documentId, input.tag)
+
+      await GWorkspaceAudit.recordSearch("documents.tag", "success", {
+        ...ctx,
+        query: `${input.documentId}:${input.tag}`,
+        filters: [`action:${input.action}`],
+      })
+
+      return {
+        success: true,
+        action: "remove",
+        documentId: input.documentId,
+        tag: input.tag,
+        tags: doc.tags.filter((t) => t !== input.tag),
+      }
+    }
+  } catch (error) {
+    log.error("tagging error", {
+      documentId: input.documentId,
+      error: error instanceof Error ? error.message : String(error),
+    })
+
+    await GWorkspaceAudit.recordSearch("documents.tag", "failure", {
+      ...ctx,
+      query: `${input.documentId}:${input.tag}`,
+      error: error instanceof Error ? error.message : String(error),
+    })
+
+    throw error
+  }
+})
+
+// ============================================================================
+// Index Statistics Skill
+// ============================================================================
+
+export const IndexStatsInputSchema = z.object({
+  userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
+  workspaceId: z.string().optional().default("default").describe("Workspace ID"),
+})
+
+export const indexStats = fn(IndexStatsInputSchema, async (input) => {
+  const ctx = makeCtx()
+  const userId = input.userId ?? process.env.KILO_USER_ID
+  const workspaceId = input.workspaceId
+  const log = Log.create({ service: "gworkspace.skill.indexing" })
+
+  if (!userId) {
+    throw new Error("userId is required (set via input or KILO_USER_ID environment variable)")
+  }
+
+  log.info("index.stats", { userId, workspaceId })
+  emitIntent("search", "index.stats")
+
+  try {
+    const stats = DocumentIndexer.getStats(workspaceId)
+
+    await GWorkspaceAudit.recordSearch("index.stats", "success", {
+      ...ctx,
+      resultCount: stats.totalDocuments,
+    })
+
+    return {
+      success: true,
+      workspace: workspaceId,
+      ...stats,
+      indexHealthy: stats.indexedDocuments === stats.totalDocuments,
+    }
+  } catch (error) {
+    log.error("stats error", {
+      error: error instanceof Error ? error.message : String(error),
+    })
+
+    await GWorkspaceAudit.recordSearch("index.stats", "failure", {
+      ...ctx,
+      error: error instanceof Error ? error.message : String(error),
+    })
+
+    throw error
+  }
+})
+
+// ============================================================================
+// Calendar Update Skill
+// ============================================================================
+
+export const CalendarUpdateInputSchema = z.object({
+  calendarId: z.string().optional().default("primary").describe("Calendar ID"),
+  eventId: z.string().describe("Event ID to update"),
+  event: z.record(z.string(), z.unknown()).describe("Event object with updates"),
+  userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
+  workspaceId: z.string().optional().default("default").describe("Workspace ID"),
+})
+
+export const calendarUpdate = fn(CalendarUpdateInputSchema, async (input) => {
+  const ctx = makeCtx()
+  const userId = input.userId ?? process.env.KILO_USER_ID
+  const workspaceId = input.workspaceId
+
+  if (!userId) throw new Error("userId is required (set via input or KILO_USER_ID environment variable)")
+
+  emitIntent("calendar", "events.update")
+  const policy = GWorkspaceAgency.getPolicy("calendar", "events.update")
+  if (policy === "DENY") throw new Error("Operation denied by policy")
+
+  if (GWorkspaceAgency.requiresApproval("calendar", "events.update")) {
+    const hitlReq = await GWorkspaceHITL.createRequest(
+      "calendar",
+      "events.update",
+      "high",
+      `Update event ${input.eventId}`,
+      { eventId: input.eventId, ...ctx },
+    )
+    const approved = await GWorkspaceHITL.waitForApproval(hitlReq.id)
+    if (!approved) {
+      await GWorkspaceAudit.recordCalendar("calendar.update", "hitl_denied", { ...ctx })
+      throw new Error("HITL request denied")
+    }
+  }
+
+  const brokerCfg = await GWorkspaceBroker.toBrokerConfig({
+    userId,
+    workspaceId,
+    preferNative: true,
+    mcpFallbackEnabled: true,
+  })
+  const result = await GWorkspaceBroker.calendar(
+    "update",
+    { calendarId: input.calendarId, eventId: input.eventId, event: input.event },
+    brokerCfg,
+  )
+
+  await GWorkspaceAudit.recordCalendar("calendar.update", result.success ? "success" : "failure", {
+    ...ctx,
+    eventId: input.eventId,
+    provider: result.provider,
+  })
+
+  if (!result.success) throw new Error(result.error ?? "Calendar update failed")
+  return result.data
+})
+
+// ============================================================================
+// Calendar Delete Skill
+// ============================================================================
+
+export const CalendarDeleteInputSchema = z.object({
+  calendarId: z.string().optional().default("primary").describe("Calendar ID"),
+  eventId: z.string().describe("Event ID to delete"),
+  userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
+  workspaceId: z.string().optional().default("default").describe("Workspace ID"),
+})
+
+export const calendarDelete = fn(CalendarDeleteInputSchema, async (input) => {
+  const ctx = makeCtx()
+  const userId = input.userId ?? process.env.KILO_USER_ID
+  const workspaceId = input.workspaceId
+
+  if (!userId) throw new Error("userId is required (set via input or KILO_USER_ID environment variable)")
+
+  emitIntent("calendar", "events.delete")
+  const policy = GWorkspaceAgency.getPolicy("calendar", "events.delete")
+  if (policy === "DENY") throw new Error("Operation denied by policy")
+
+  if (GWorkspaceAgency.requiresApproval("calendar", "events.delete")) {
+    const hitlReq = await GWorkspaceHITL.createRequest(
+      "calendar",
+      "events.delete",
+      "high",
+      `Delete event ${input.eventId}`,
+      { eventId: input.eventId, ...ctx },
+    )
+    const approved = await GWorkspaceHITL.waitForApproval(hitlReq.id)
+    if (!approved) {
+      await GWorkspaceAudit.recordCalendar("calendar.delete", "hitl_denied", { ...ctx })
+      throw new Error("HITL request denied")
+    }
+  }
+
+  const brokerCfg = await GWorkspaceBroker.toBrokerConfig({
+    userId,
+    workspaceId,
+    preferNative: true,
+    mcpFallbackEnabled: true,
+  })
+  const result = await GWorkspaceBroker.calendar(
+    "delete",
+    { calendarId: input.calendarId, eventId: input.eventId },
+    brokerCfg,
+  )
+
+  await GWorkspaceAudit.recordCalendar("calendar.delete", result.success ? "success" : "failure", {
+    ...ctx,
+    eventId: input.eventId,
+    provider: result.provider,
+  })
+
+  if (!result.success) throw new Error(result.error ?? "Calendar delete failed")
+  return result.data
+})
+
+// ============================================================================
+// Drive Create Skill
+// ============================================================================
+
+export const DriveCreateInputSchema = z.object({
+  name: z.string().describe("File name"),
+  mimeType: z.string().optional().describe("MIME type (e.g., application/vnd.google-apps.document)"),
+  parents: z.array(z.string()).optional().describe("Parent folder IDs"),
+  userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
+  workspaceId: z.string().optional().default("default").describe("Workspace ID"),
+})
+
+export const driveCreate = fn(DriveCreateInputSchema, async (input) => {
+  const ctx = makeCtx()
+  const userId = input.userId ?? process.env.KILO_USER_ID
+  const workspaceId = input.workspaceId
+
+  if (!userId) throw new Error("userId is required (set via input or KILO_USER_ID environment variable)")
+
+  emitIntent("drive", "files.create")
+  const policy = GWorkspaceAgency.getPolicy("drive", "files.create")
+  if (policy === "DENY") throw new Error("Operation denied by policy")
+
+  if (GWorkspaceAgency.requiresApproval("drive", "files.create")) {
+    const hitlReq = await GWorkspaceHITL.createRequest(
+      "drive",
+      "files.create",
+      "high",
+      `Create file: ${input.name}`,
+      { name: input.name, ...ctx },
+    )
+    const approved = await GWorkspaceHITL.waitForApproval(hitlReq.id)
+    if (!approved) {
+      await GWorkspaceAudit.recordDrive("drive.create", "hitl_denied", { ...ctx })
+      throw new Error("HITL request denied")
+    }
+  }
+
+  const brokerCfg = await GWorkspaceBroker.toBrokerConfig({
+    userId,
+    workspaceId,
+    preferNative: true,
+    mcpFallbackEnabled: true,
+  })
+  const result = await GWorkspaceBroker.drive(
+    "create",
+    { name: input.name, mimeType: input.mimeType, parents: input.parents },
+    brokerCfg,
+  )
+
+  await GWorkspaceAudit.recordDrive("drive.create", result.success ? "success" : "failure", {
+    ...ctx,
+    fileName: input.name,
+    provider: result.provider,
+  })
+
+  if (!result.success) throw new Error(result.error ?? "Drive create failed")
+  return result.data
+})
+
+// ============================================================================
+// Drive Update Skill
+// ============================================================================
+
+export const DriveUpdateInputSchema = z.object({
+  fileId: z.string().describe("File ID to update"),
+  metadata: z.record(z.string(), z.unknown()).describe("Metadata to update (name, description, etc)"),
+  userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
+  workspaceId: z.string().optional().default("default").describe("Workspace ID"),
+})
+
+export const driveUpdate = fn(DriveUpdateInputSchema, async (input) => {
+  const ctx = makeCtx()
+  const userId = input.userId ?? process.env.KILO_USER_ID
+  const workspaceId = input.workspaceId
+
+  if (!userId) throw new Error("userId is required (set via input or KILO_USER_ID environment variable)")
+
+  emitIntent("drive", "files.update")
+  const policy = GWorkspaceAgency.getPolicy("drive", "files.update")
+  if (policy === "DENY") throw new Error("Operation denied by policy")
+
+  if (GWorkspaceAgency.requiresApproval("drive", "files.update")) {
+    const hitlReq = await GWorkspaceHITL.createRequest(
+      "drive",
+      "files.update",
+      "high",
+      `Update file ${input.fileId}`,
+      { fileId: input.fileId, ...ctx },
+    )
+    const approved = await GWorkspaceHITL.waitForApproval(hitlReq.id)
+    if (!approved) {
+      await GWorkspaceAudit.recordDrive("drive.update", "hitl_denied", { ...ctx })
+      throw new Error("HITL request denied")
+    }
+  }
+
+  const brokerCfg = await GWorkspaceBroker.toBrokerConfig({
+    userId,
+    workspaceId,
+    preferNative: true,
+    mcpFallbackEnabled: true,
+  })
+  const result = await GWorkspaceBroker.drive(
+    "update",
+    { fileId: input.fileId, metadata: input.metadata },
+    brokerCfg,
+  )
+
+  await GWorkspaceAudit.recordDrive("drive.update", result.success ? "success" : "failure", {
+    ...ctx,
+    fileId: input.fileId,
+    provider: result.provider,
+  })
+
+  if (!result.success) throw new Error(result.error ?? "Drive update failed")
+  return result.data
+})
+
+// ============================================================================
+// Drive Delete Skill
+// ============================================================================
+
+export const DriveDeleteInputSchema = z.object({
+  fileId: z.string().describe("File ID to delete"),
+  userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
+  workspaceId: z.string().optional().default("default").describe("Workspace ID"),
+})
+
+export const driveDelete = fn(DriveDeleteInputSchema, async (input) => {
+  const ctx = makeCtx()
+  const userId = input.userId ?? process.env.KILO_USER_ID
+  const workspaceId = input.workspaceId
+
+  if (!userId) throw new Error("userId is required (set via input or KILO_USER_ID environment variable)")
+
+  emitIntent("drive", "files.delete")
+  const policy = GWorkspaceAgency.getPolicy("drive", "files.delete")
+  if (policy === "DENY") throw new Error("Operation denied by policy")
+
+  if (GWorkspaceAgency.requiresApproval("drive", "files.delete")) {
+    const hitlReq = await GWorkspaceHITL.createRequest(
+      "drive",
+      "files.delete",
+      "high",
+      `Delete file ${input.fileId}`,
+      { fileId: input.fileId, ...ctx },
+    )
+    const approved = await GWorkspaceHITL.waitForApproval(hitlReq.id)
+    if (!approved) {
+      await GWorkspaceAudit.recordDrive("drive.delete", "hitl_denied", { ...ctx })
+      throw new Error("HITL request denied")
+    }
+  }
+
+  const brokerCfg = await GWorkspaceBroker.toBrokerConfig({
+    userId,
+    workspaceId,
+    preferNative: true,
+    mcpFallbackEnabled: true,
+  })
+  const result = await GWorkspaceBroker.drive("delete", { fileId: input.fileId }, brokerCfg)
+
+  await GWorkspaceAudit.recordDrive("drive.delete", result.success ? "success" : "failure", {
+    ...ctx,
+    fileId: input.fileId,
+    provider: result.provider,
+  })
+
+  if (!result.success) throw new Error(result.error ?? "Drive delete failed")
+  return result.data
+})
+
+// ============================================================================
+// Drive Copy Skill
+// ============================================================================
+
+export const DriveCopyInputSchema = z.object({
+  fileId: z.string().describe("File ID to copy"),
+  name: z.string().describe("New file name"),
+  userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
+  workspaceId: z.string().optional().default("default").describe("Workspace ID"),
+})
+
+export const driveCopy = fn(DriveCopyInputSchema, async (input) => {
+  const ctx = makeCtx()
+  const userId = input.userId ?? process.env.KILO_USER_ID
+  const workspaceId = input.workspaceId
+
+  if (!userId) throw new Error("userId is required (set via input or KILO_USER_ID environment variable)")
+
+  emitIntent("drive", "files.copy")
+  const policy = GWorkspaceAgency.getPolicy("drive", "files.copy")
+  if (policy === "DENY") throw new Error("Operation denied by policy")
+
+  if (GWorkspaceAgency.requiresApproval("drive", "files.copy")) {
+    const hitlReq = await GWorkspaceHITL.createRequest(
+      "drive",
+      "files.copy",
+      "high",
+      `Copy file ${input.fileId} → ${input.name}`,
+      { fileId: input.fileId, name: input.name, ...ctx },
+    )
+    const approved = await GWorkspaceHITL.waitForApproval(hitlReq.id)
+    if (!approved) {
+      await GWorkspaceAudit.recordDrive("drive.copy", "hitl_denied", { ...ctx })
+      throw new Error("HITL request denied")
+    }
+  }
+
+  const brokerCfg = await GWorkspaceBroker.toBrokerConfig({
+    userId,
+    workspaceId,
+    preferNative: true,
+    mcpFallbackEnabled: true,
+  })
+  const result = await GWorkspaceBroker.drive("copy", { fileId: input.fileId, name: input.name }, brokerCfg)
+
+  await GWorkspaceAudit.recordDrive("drive.copy", result.success ? "success" : "failure", {
+    ...ctx,
+    fileId: input.fileId,
+    fileName: input.name,
+    provider: result.provider,
+  })
+
+  if (!result.success) throw new Error(result.error ?? "Drive copy failed")
+  return result.data
+})
+
+// ============================================================================
+// Drive Move Skill
+// ============================================================================
+
+export const DriveMoveInputSchema = z.object({
+  fileId: z.string().describe("File ID to move"),
+  addParents: z.array(z.string()).optional().describe("Folder IDs to add as parents"),
+  removeParents: z.array(z.string()).optional().describe("Folder IDs to remove as parents"),
+  userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
+  workspaceId: z.string().optional().default("default").describe("Workspace ID"),
+})
+
+export const driveMove = fn(DriveMoveInputSchema, async (input) => {
+  const ctx = makeCtx()
+  const userId = input.userId ?? process.env.KILO_USER_ID
+  const workspaceId = input.workspaceId
+
+  if (!userId) throw new Error("userId is required (set via input or KILO_USER_ID environment variable)")
+
+  emitIntent("drive", "files.move")
+  const policy = GWorkspaceAgency.getPolicy("drive", "files.move")
+  if (policy === "DENY") throw new Error("Operation denied by policy")
+
+  if (GWorkspaceAgency.requiresApproval("drive", "files.move")) {
+    const hitlReq = await GWorkspaceHITL.createRequest(
+      "drive",
+      "files.move",
+      "high",
+      `Move file ${input.fileId}`,
+      { fileId: input.fileId, ...ctx },
+    )
+    const approved = await GWorkspaceHITL.waitForApproval(hitlReq.id)
+    if (!approved) {
+      await GWorkspaceAudit.recordDrive("drive.move", "hitl_denied", { ...ctx })
+      throw new Error("HITL request denied")
+    }
+  }
+
+  const brokerCfg = await GWorkspaceBroker.toBrokerConfig({
+    userId,
+    workspaceId,
+    preferNative: true,
+    mcpFallbackEnabled: true,
+  })
+  const result = await GWorkspaceBroker.drive(
+    "move",
+    { fileId: input.fileId, addParents: input.addParents, removeParents: input.removeParents },
+    brokerCfg,
+  )
+
+  await GWorkspaceAudit.recordDrive("drive.move", result.success ? "success" : "failure", {
+    ...ctx,
+    fileId: input.fileId,
+    provider: result.provider,
+  })
+
+  if (!result.success) throw new Error(result.error ?? "Drive move failed")
+  return result.data
+})
+
+// ============================================================================
+// Docs Create Skill
+// ============================================================================
+
+export const DocsCreateInputSchema = z.object({
+  title: z.string().describe("Document title"),
+  userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
+  workspaceId: z.string().optional().default("default").describe("Workspace ID"),
+})
+
+export const docsCreate = fn(DocsCreateInputSchema, async (input) => {
+  const ctx = makeCtx()
+  const userId = input.userId ?? process.env.KILO_USER_ID
+  const workspaceId = input.workspaceId
+
+  if (!userId) throw new Error("userId is required (set via input or KILO_USER_ID environment variable)")
+
+  emitIntent("docs", "documents.create")
+  const policy = GWorkspaceAgency.getPolicy("docs", "documents.create")
+  if (policy === "DENY") throw new Error("Operation denied by policy")
+
+  if (GWorkspaceAgency.requiresApproval("docs", "documents.create")) {
+    const hitlReq = await GWorkspaceHITL.createRequest(
+      "docs",
+      "documents.create",
+      "high",
+      `Create document: ${input.title}`,
+      { title: input.title, ...ctx },
+    )
+    const approved = await GWorkspaceHITL.waitForApproval(hitlReq.id)
+    if (!approved) {
+      await GWorkspaceAudit.recordDocs("docs.create", "hitl_denied", { ...ctx })
+      throw new Error("HITL request denied")
+    }
+  }
+
+  const brokerCfg = await GWorkspaceBroker.toBrokerConfig({
+    userId,
+    workspaceId,
+    preferNative: true,
+    mcpFallbackEnabled: true,
+  })
+  const result = await GWorkspaceBroker.executeDocs("create", { title: input.title }, brokerCfg)
+
+  await GWorkspaceAudit.recordDocs("docs.create", result.success ? "success" : "failure", {
+    ...ctx,
+    documentName: input.title,
+    provider: result.provider,
+  })
+
+  if (!result.success) throw new Error(result.error ?? "Docs create failed")
+  return result.data
+})
+
+// ============================================================================
+// Docs Update Skill
+// ============================================================================
+
+export const DocsUpdateInputSchema = z.object({
+  documentId: z.string().describe("Document ID to update"),
+  requests: z.array(z.unknown()).describe("Array of batchUpdate requests"),
+  userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
+  workspaceId: z.string().optional().default("default").describe("Workspace ID"),
+})
+
+export const docsUpdate = fn(DocsUpdateInputSchema, async (input) => {
+  const ctx = makeCtx()
+  const userId = input.userId ?? process.env.KILO_USER_ID
+  const workspaceId = input.workspaceId
+
+  if (!userId) throw new Error("userId is required (set via input or KILO_USER_ID environment variable)")
+
+  emitIntent("docs", "documents.update")
+  const policy = GWorkspaceAgency.getPolicy("docs", "documents.update")
+  if (policy === "DENY") throw new Error("Operation denied by policy")
+
+  if (GWorkspaceAgency.requiresApproval("docs", "documents.update")) {
+    const hitlReq = await GWorkspaceHITL.createRequest(
+      "docs",
+      "documents.update",
+      "high",
+      `Update document ${input.documentId}`,
+      { documentId: input.documentId, ...ctx },
+    )
+    const approved = await GWorkspaceHITL.waitForApproval(hitlReq.id)
+    if (!approved) {
+      await GWorkspaceAudit.recordDocs("docs.update", "hitl_denied", { ...ctx })
+      throw new Error("HITL request denied")
+    }
+  }
+
+  const brokerCfg = await GWorkspaceBroker.toBrokerConfig({
+    userId,
+    workspaceId,
+    preferNative: true,
+    mcpFallbackEnabled: true,
+  })
+  const result = await GWorkspaceBroker.executeDocs(
+    "update",
+    { documentId: input.documentId, requests: input.requests },
+    brokerCfg,
+  )
+
+  await GWorkspaceAudit.recordDocs("docs.update", result.success ? "success" : "failure", {
+    ...ctx,
+    documentId: input.documentId,
+    provider: result.provider,
+  })
+
+  if (!result.success) throw new Error(result.error ?? "Docs update failed")
+  return result.data
+})
+
+// ============================================================================
+// Docs Delete Skill
+// ============================================================================
+
+export const DocsDeleteInputSchema = z.object({
+  documentId: z.string().describe("Document ID to delete"),
+  userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
+  workspaceId: z.string().optional().default("default").describe("Workspace ID"),
+})
+
+export const docsDelete = fn(DocsDeleteInputSchema, async (input) => {
+  const ctx = makeCtx()
+  const userId = input.userId ?? process.env.KILO_USER_ID
+  const workspaceId = input.workspaceId
+
+  if (!userId) throw new Error("userId is required (set via input or KILO_USER_ID environment variable)")
+
+  emitIntent("docs", "documents.delete")
+  const policy = GWorkspaceAgency.getPolicy("docs", "documents.delete")
+  if (policy === "DENY") throw new Error("Operation denied by policy")
+
+  if (GWorkspaceAgency.requiresApproval("docs", "documents.delete")) {
+    const hitlReq = await GWorkspaceHITL.createRequest(
+      "docs",
+      "documents.delete",
+      "high",
+      `Delete document ${input.documentId}`,
+      { documentId: input.documentId, ...ctx },
+    )
+    const approved = await GWorkspaceHITL.waitForApproval(hitlReq.id)
+    if (!approved) {
+      await GWorkspaceAudit.recordDocs("docs.delete", "hitl_denied", { ...ctx })
+      throw new Error("HITL request denied")
+    }
+  }
+
+  const brokerCfg = await GWorkspaceBroker.toBrokerConfig({
+    userId,
+    workspaceId,
+    preferNative: true,
+    mcpFallbackEnabled: true,
+  })
+  const result = await GWorkspaceBroker.executeDocs("delete", { documentId: input.documentId }, brokerCfg)
+
+  await GWorkspaceAudit.recordDocs("docs.delete", result.success ? "success" : "failure", {
+    ...ctx,
+    documentId: input.documentId,
+    provider: result.provider,
+  })
+
+  if (!result.success) throw new Error(result.error ?? "Docs delete failed")
+  return result.data
+})
+
+// ============================================================================
+// Sheets Create Skill
+// ============================================================================
+
+export const SheetsCreateInputSchema = z.object({
+  title: z.string().describe("Spreadsheet title"),
+  userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
+  workspaceId: z.string().optional().default("default").describe("Workspace ID"),
+})
+
+export const sheetsCreate = fn(SheetsCreateInputSchema, async (input) => {
+  const ctx = makeCtx()
+  const userId = input.userId ?? process.env.KILO_USER_ID
+  const workspaceId = input.workspaceId
+
+  if (!userId) throw new Error("userId is required (set via input or KILO_USER_ID environment variable)")
+
+  emitIntent("sheets", "spreadsheets.create")
+  const policy = GWorkspaceAgency.getPolicy("sheets", "spreadsheets.create")
+  if (policy === "DENY") throw new Error("Operation denied by policy")
+
+  if (GWorkspaceAgency.requiresApproval("sheets", "spreadsheets.create")) {
+    const hitlReq = await GWorkspaceHITL.createRequest(
+      "sheets",
+      "spreadsheets.create",
+      "high",
+      `Create spreadsheet: ${input.title}`,
+      { title: input.title, ...ctx },
+    )
+    const approved = await GWorkspaceHITL.waitForApproval(hitlReq.id)
+    if (!approved) {
+      await GWorkspaceAudit.recordSheets("sheets.create", "hitl_denied", { ...ctx })
+      throw new Error("HITL request denied")
+    }
+  }
+
+  const brokerCfg = await GWorkspaceBroker.toBrokerConfig({
+    userId,
+    workspaceId,
+    preferNative: true,
+    mcpFallbackEnabled: true,
+  })
+  const result = await GWorkspaceBroker.executeSheets("create", { title: input.title }, brokerCfg)
+
+  await GWorkspaceAudit.recordSheets("sheets.create", result.success ? "success" : "failure", {
+    ...ctx,
+    spreadsheetName: input.title,
+    provider: result.provider,
+  })
+
+  if (!result.success) throw new Error(result.error ?? "Sheets create failed")
+  return result.data
+})
+
+// ============================================================================
+// Sheets Values Update Skill
+// ============================================================================
+
+export const SheetsValuesUpdateInputSchema = z.object({
+  spreadsheetId: z.string().describe("Spreadsheet ID"),
+  range: z.string().describe("A1 notation range (e.g., Sheet1!A1:C10)"),
+  values: z.array(z.array(z.unknown())).describe("2D array of values to set"),
+  userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
+  workspaceId: z.string().optional().default("default").describe("Workspace ID"),
+})
+
+export const sheetsValuesUpdate = fn(SheetsValuesUpdateInputSchema, async (input) => {
+  const ctx = makeCtx()
+  const userId = input.userId ?? process.env.KILO_USER_ID
+  const workspaceId = input.workspaceId
+
+  if (!userId) throw new Error("userId is required (set via input or KILO_USER_ID environment variable)")
+
+  emitIntent("sheets", "spreadsheets.values.update")
+  const policy = GWorkspaceAgency.getPolicy("sheets", "spreadsheets.values.update")
+  if (policy === "DENY") throw new Error("Operation denied by policy")
+
+  if (GWorkspaceAgency.requiresApproval("sheets", "spreadsheets.values.update")) {
+    const hitlReq = await GWorkspaceHITL.createRequest(
+      "sheets",
+      "spreadsheets.values.update",
+      "high",
+      `Update ${input.range} in spreadsheet ${input.spreadsheetId}`,
+      { spreadsheetId: input.spreadsheetId, range: input.range, ...ctx },
+    )
+    const approved = await GWorkspaceHITL.waitForApproval(hitlReq.id)
+    if (!approved) {
+      await GWorkspaceAudit.recordSheets("sheets.update", "hitl_denied", { ...ctx })
+      throw new Error("HITL request denied")
+    }
+  }
+
+  const brokerCfg = await GWorkspaceBroker.toBrokerConfig({
+    userId,
+    workspaceId,
+    preferNative: true,
+    mcpFallbackEnabled: true,
+  })
+  const result = await GWorkspaceBroker.executeSheets(
+    "valuesUpdate",
+    { spreadsheetId: input.spreadsheetId, range: input.range, values: input.values },
+    brokerCfg,
+  )
+
+  await GWorkspaceAudit.recordSheets("sheets.update", result.success ? "success" : "failure", {
+    ...ctx,
+    spreadsheetId: input.spreadsheetId,
+    range: input.range,
+    provider: result.provider,
+  })
+
+  if (!result.success) throw new Error(result.error ?? "Sheets update failed")
+  return result.data
+})
+
+// ============================================================================
+// Sheets Values Append Skill
+// ============================================================================
+
+export const SheetsValuesAppendInputSchema = z.object({
+  spreadsheetId: z.string().describe("Spreadsheet ID"),
+  range: z.string().describe("A1 notation range to append to (e.g., Sheet1!A:C)"),
+  values: z.array(z.array(z.unknown())).describe("2D array of values to append"),
+  userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
+  workspaceId: z.string().optional().default("default").describe("Workspace ID"),
+})
+
+export const sheetsValuesAppend = fn(SheetsValuesAppendInputSchema, async (input) => {
+  const ctx = makeCtx()
+  const userId = input.userId ?? process.env.KILO_USER_ID
+  const workspaceId = input.workspaceId
+
+  if (!userId) throw new Error("userId is required (set via input or KILO_USER_ID environment variable)")
+
+  emitIntent("sheets", "spreadsheets.values.append")
+  const policy = GWorkspaceAgency.getPolicy("sheets", "spreadsheets.values.append")
+  if (policy === "DENY") throw new Error("Operation denied by policy")
+
+  if (GWorkspaceAgency.requiresApproval("sheets", "spreadsheets.values.append")) {
+    const hitlReq = await GWorkspaceHITL.createRequest(
+      "sheets",
+      "spreadsheets.values.append",
+      "high",
+      `Append to ${input.range} in spreadsheet ${input.spreadsheetId}`,
+      { spreadsheetId: input.spreadsheetId, range: input.range, ...ctx },
+    )
+    const approved = await GWorkspaceHITL.waitForApproval(hitlReq.id)
+    if (!approved) {
+      await GWorkspaceAudit.recordSheets("sheets.append", "hitl_denied", { ...ctx })
+      throw new Error("HITL request denied")
+    }
+  }
+
+  const brokerCfg = await GWorkspaceBroker.toBrokerConfig({
+    userId,
+    workspaceId,
+    preferNative: true,
+    mcpFallbackEnabled: true,
+  })
+  const result = await GWorkspaceBroker.executeSheets(
+    "valuesAppend",
+    { spreadsheetId: input.spreadsheetId, range: input.range, values: input.values },
+    brokerCfg,
+  )
+
+  await GWorkspaceAudit.recordSheets("sheets.append", result.success ? "success" : "failure", {
+    ...ctx,
+    spreadsheetId: input.spreadsheetId,
+    range: input.range,
+    provider: result.provider,
+  })
+
+  if (!result.success) throw new Error(result.error ?? "Sheets append failed")
+  return result.data
+})
+
+// ============================================================================
+// Sheets Values Clear Skill
+// ============================================================================
+
+export const SheetsValuesClearInputSchema = z.object({
+  spreadsheetId: z.string().describe("Spreadsheet ID"),
+  range: z.string().describe("A1 notation range to clear (e.g., Sheet1!A1:C10)"),
+  userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
+  workspaceId: z.string().optional().default("default").describe("Workspace ID"),
+})
+
+export const sheetsValuesClear = fn(SheetsValuesClearInputSchema, async (input) => {
+  const ctx = makeCtx()
+  const userId = input.userId ?? process.env.KILO_USER_ID
+  const workspaceId = input.workspaceId
+
+  if (!userId) throw new Error("userId is required (set via input or KILO_USER_ID environment variable)")
+
+  emitIntent("sheets", "spreadsheets.values.clear")
+  const policy = GWorkspaceAgency.getPolicy("sheets", "spreadsheets.values.clear")
+  if (policy === "DENY") throw new Error("Operation denied by policy")
+
+  if (GWorkspaceAgency.requiresApproval("sheets", "spreadsheets.values.clear")) {
+    const hitlReq = await GWorkspaceHITL.createRequest(
+      "sheets",
+      "spreadsheets.values.clear",
+      "high",
+      `Clear ${input.range} in spreadsheet ${input.spreadsheetId}`,
+      { spreadsheetId: input.spreadsheetId, range: input.range, ...ctx },
+    )
+    const approved = await GWorkspaceHITL.waitForApproval(hitlReq.id)
+    if (!approved) {
+      await GWorkspaceAudit.recordSheets("sheets.clear", "hitl_denied", { ...ctx })
+      throw new Error("HITL request denied")
+    }
+  }
+
+  const brokerCfg = await GWorkspaceBroker.toBrokerConfig({
+    userId,
+    workspaceId,
+    preferNative: true,
+    mcpFallbackEnabled: true,
+  })
+  const result = await GWorkspaceBroker.executeSheets(
+    "valuesClear",
+    { spreadsheetId: input.spreadsheetId, range: input.range },
+    brokerCfg,
+  )
+
+  await GWorkspaceAudit.recordSheets("sheets.clear", result.success ? "success" : "failure", {
+    ...ctx,
+    spreadsheetId: input.spreadsheetId,
+    range: input.range,
+    provider: result.provider,
+  })
+
+  if (!result.success) throw new Error(result.error ?? "Sheets clear failed")
+  return result.data
+})
+
+// ============================================================================
+// Sheets Delete Skill
+// ============================================================================
+
+export const SheetsDeleteInputSchema = z.object({
+  spreadsheetId: z.string().describe("Spreadsheet ID to delete"),
+  userId: z.string().optional().describe("User ID (defaults to KILO_USER_ID)"),
+  workspaceId: z.string().optional().default("default").describe("Workspace ID"),
+})
+
+export const sheetsDelete = fn(SheetsDeleteInputSchema, async (input) => {
+  const ctx = makeCtx()
+  const userId = input.userId ?? process.env.KILO_USER_ID
+  const workspaceId = input.workspaceId
+
+  if (!userId) throw new Error("userId is required (set via input or KILO_USER_ID environment variable)")
+
+  emitIntent("sheets", "spreadsheets.delete")
+  const policy = GWorkspaceAgency.getPolicy("sheets", "spreadsheets.delete")
+  if (policy === "DENY") throw new Error("Operation denied by policy")
+
+  if (GWorkspaceAgency.requiresApproval("sheets", "spreadsheets.delete")) {
+    const hitlReq = await GWorkspaceHITL.createRequest(
+      "sheets",
+      "spreadsheets.delete",
+      "high",
+      `Delete spreadsheet ${input.spreadsheetId}`,
+      { spreadsheetId: input.spreadsheetId, ...ctx },
+    )
+    const approved = await GWorkspaceHITL.waitForApproval(hitlReq.id)
+    if (!approved) {
+      await GWorkspaceAudit.recordSheets("sheets.delete", "hitl_denied", { ...ctx })
+      throw new Error("HITL request denied")
+    }
+  }
+
+  const brokerCfg = await GWorkspaceBroker.toBrokerConfig({
+    userId,
+    workspaceId,
+    preferNative: true,
+    mcpFallbackEnabled: true,
+  })
+  const result = await GWorkspaceBroker.executeSheets("delete", { spreadsheetId: input.spreadsheetId }, brokerCfg)
+
+  await GWorkspaceAudit.recordSheets("sheets.delete", result.success ? "success" : "failure", {
+    ...ctx,
+    spreadsheetId: input.spreadsheetId,
+    provider: result.provider,
+  })
+
+  if (!result.success) throw new Error(result.error ?? "Sheets delete failed")
+  return result.data
+})
