@@ -246,9 +246,19 @@ export {
   type Violation,
 } from "./finance/risk-engine"
 
-// Travel Agency Skills (Sprint 3)
-// Placeholder - actual travel skills will be implemented in Sprint 3
-export const travelSkills: Skill[] = []
+// Travel Agency Skills (Wave 4)
+// Import all travel skills from subdirectory
+export {
+  travelSkills,
+  TravelDestinationDiscoverySkill,
+  TravelFlightSearchSkill,
+  TravelHotelSearchSkill,
+  TravelActivitySearchSkill,
+  TravelRestaurantSearchSkill,
+  TravelTransferSearchSkill,
+  TravelWeatherCheckSkill,
+  TravelItineraryBuilderSkill,
+} from "./travel"
 
 // Aggregate exports for agency registration
 import { CodeReviewSkill } from "./development/code-review"
@@ -289,6 +299,7 @@ import { NbaAnalysisSkill } from "./nba"
 import { FinanceMarketDataSkill } from "./finance/market-data"
 import { FinanceTechnicalAnalysisSkill } from "./finance/technical-analysis"
 import { FinanceRiskEngineSkill } from "./finance/risk-engine"
+import { travelSkills } from "./travel"
 import type { Skill } from "../skill"
 
 // Development agency skills
