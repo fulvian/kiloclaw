@@ -164,19 +164,29 @@ describe("Agency Compliance Audit (Protocol V2)", () => {
     }
 
     // Specialized tools should only belong to one agency
+    // Note: gmail.search is intentionally owned by multiple agencies (gworkspace + travel)
+    // due to cross-agency delegation for travel planning queries
     const specializedTools = [
       "balldontlie.getGames",
       "odds_bet365.getOdds",
       "usda.fooddata",
       "openweathermap.current",
       "twelve_data.prices",
-      "gmail.search",
     ]
+
+    // Cross-agency delegated tools (intentionally owned by multiple agencies)
+    const crossAgencyTools = ["gmail.search", "gmail.read"]
 
     for (const tool of specializedTools) {
       if (toolOwnership[tool]) {
         expect(toolOwnership[tool].length).toBeLessThanOrEqual(1)
       }
+    }
+
+    // Verify cross-agency tools are owned by expected agencies
+    if (toolOwnership["gmail.search"]) {
+      expect(toolOwnership["gmail.search"]).toContain("agency-gworkspace")
+      expect(toolOwnership["gmail.search"]).toContain("agency-travel")
     }
 
     console.log("Tool ownership map:", toolOwnership)

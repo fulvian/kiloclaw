@@ -924,6 +924,21 @@ export const Router = {
         "documento",
         "foglio",
         "cartella",
+        // Italian email keywords
+        "cerca email",
+        "cerca mail",
+        "leggere email",
+        "inbox",
+        "messaggio",
+        "messaggi",
+        "posta",
+        "cerca nelle email",
+        "trova email",
+        // Italian travel email context
+        "volo prenotato",
+        "conferma volo",
+        "email volo",
+        "biglietto aereo",
       ],
       finance: [
         "stock",

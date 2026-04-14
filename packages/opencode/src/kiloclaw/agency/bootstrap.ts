@@ -297,6 +297,10 @@ const agencyDefinitions: AgencyDefinition[] = [
         "emergency-nearby",
         "advisory-monitor",
         "audit-log",
+        // Cross-Agency Email Delegation (gworkspace)
+        "email-search",
+        "messages-search",
+        "email-read",
       ],
       deniedCapabilities: [
         "payment-execution",

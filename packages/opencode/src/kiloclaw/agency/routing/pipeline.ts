@@ -274,6 +274,7 @@ export namespace RoutingPipeline {
     const isFinanceAgency = agencyId === "agency-finance"
     const isNutritionAgency = agencyId === "agency-nutrition"
     const isWeatherAgency = agencyId === "agency-weather"
+    const isTravelAgency = agencyId === "agency-travel"
 
     const nbaCapabilityToTools: Record<string, string[]> = {
       schedule_live: ["nba-games"],
@@ -329,6 +330,54 @@ export namespace RoutingPipeline {
       "weather-alerts": ["openweathermap.alerts"],
     }
 
+    // Travel agency capability mapping - includes CROSS-AGENCY DELEGATION to gworkspace
+    const travelCapabilityToTools: Record<string, string[]> = {
+      // Native travel capabilities
+      "destination-discovery": ["skill"],
+      "destination-compare": ["skill"],
+      "budget-fit-check": ["skill"],
+      "seasonality-analysis": ["skill"],
+      "visa-doc-check": ["skill"],
+      "date-window-optimization": ["skill"],
+      "multi-city-optimizer": ["skill"],
+      // Transport
+      "flight-search": ["skill"],
+      "flight-compare": ["skill"],
+      "rail-search": ["skill"],
+      "bus-search": ["skill"],
+      "transfer-search": ["skill"],
+      // Accommodation
+      "hotel-search": ["skill"],
+      "hotel-compare": ["skill"],
+      "booking-link-hotel": ["skill"],
+      "cancellation-policy-check": ["skill"],
+      // Local mobility
+      "local-transport-plan": ["skill"],
+      "car-rental-search": ["skill"],
+      "parking-check": ["skill"],
+      // Dining & POI
+      "restaurant-search": ["skill"],
+      "restaurant-availability": ["skill"],
+      "poi-search": ["skill"],
+      "poi-alt-search": ["skill"],
+      // Activities & Events
+      "activity-search": ["skill"],
+      "event-search": ["skill"],
+      "event-booking-link": ["skill"],
+      // Itinerary & Risk
+      "itinerary-build": ["skill"],
+      "itinerary-balance": ["skill"],
+      "weather-risk-check": ["skill"],
+      // Emergency & Advisory
+      "emergency-nearby": ["skill"],
+      "advisory-monitor": ["skill"],
+      "audit-log": ["skill"],
+      // CROSS-AGENCY DELEGATION: Travel can use gworkspace email tools
+      "email-search": ["gmail.search"],
+      "messages-search": ["gmail.search"],
+      "email-read": ["gmail.read"],
+    }
+
     const mapped = capabilities.flatMap((cap) => {
       // NBA-specific capability mapping
       if (isNbaAgency && cap in nbaCapabilityToTools) {
@@ -350,13 +399,18 @@ export namespace RoutingPipeline {
         return weatherCapabilityToTools[cap as keyof typeof weatherCapabilityToTools]
       }
 
+      // Travel-specific capability mapping (includes cross-agency delegation)
+      if (isTravelAgency && cap in travelCapabilityToTools) {
+        return travelCapabilityToTools[cap as keyof typeof travelCapabilityToTools]
+      }
+
       // Generic capability mapping (for non-specialized agencies)
       if (["search", "web-search", "academic-research"].includes(cap)) return ["websearch"]
       if (["fact-checking", "verification", "source_grounding"].includes(cap)) return ["webfetch"]
       if (["synthesis", "information_gathering"].includes(cap)) return ["skill"]
       // Don't use generic tools for specialized agencies
       if (["schedule_live", "team_player_stats", "injury_status", "odds_markets", "game_preview"].includes(cap)) {
-        return isNbaAgency || isFinanceAgency || isNutritionAgency || isWeatherAgency
+        return isNbaAgency || isFinanceAgency || isNutritionAgency || isWeatherAgency || isTravelAgency
           ? []
           : ["websearch", "webfetch", "skill"]
       }
@@ -371,7 +425,9 @@ export namespace RoutingPipeline {
           "stake_sizing",
         ].includes(cap)
       ) {
-        return isNbaAgency || isFinanceAgency || isNutritionAgency || isWeatherAgency ? [] : ["skill", "webfetch"]
+        return isNbaAgency || isFinanceAgency || isNutritionAgency || isWeatherAgency || isTravelAgency
+          ? []
+          : ["skill", "webfetch"]
       }
       return []
     })
@@ -461,20 +517,30 @@ export namespace RoutingPipeline {
                         "sheets.update",
                         ...mapped,
                       ]
-                    : agencyId === "agency-development"
+                    : agencyId === "agency-travel"
                       ? [
-                          "read",
-                          "glob",
-                          "grep",
-                          "apply_patch",
-                          "bash",
+                          // Travel agency tools + CROSS-AGENCY gworkspace delegation for email
                           "skill",
-                          "codesearch",
-                          "websearch",
-                          "webfetch",
+                          // Travel native tools via adapters (when implemented)
+                          // Cross-agency delegation: gmail tools from gworkspace
+                          "gmail.search",
+                          "gmail.read",
                           ...mapped,
                         ]
-                      : mapped,
+                      : agencyId === "agency-development"
+                        ? [
+                            "read",
+                            "glob",
+                            "grep",
+                            "apply_patch",
+                            "bash",
+                            "skill",
+                            "codesearch",
+                            "websearch",
+                            "webfetch",
+                            ...mapped,
+                          ]
+                        : mapped,
       ),
     )
     const candidates = requestedTools ?? allowlist
