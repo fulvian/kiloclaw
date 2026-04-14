@@ -246,6 +246,10 @@ export {
   type Violation,
 } from "./finance/risk-engine"
 
+// Travel Agency Skills (Sprint 3)
+// Placeholder - actual travel skills will be implemented in Sprint 3
+export const travelSkills: Skill[] = []
+
 // Aggregate exports for agency registration
 import { CodeReviewSkill } from "./development/code-review"
 import { DebuggingSkill } from "./development/debugging"
@@ -341,7 +345,14 @@ export const nbaSkills: Skill[] = [NbaAnalysisSkill]
 export const financeSkills: Skill[] = [FinanceMarketDataSkill, FinanceTechnicalAnalysisSkill, FinanceRiskEngineSkill]
 
 // All skills combined (including Onda 4 meta skills)
-export const allSkills: Skill[] = [...allWave1Skills, ...allWave2Skills, ...nbaSkills, ...financeSkills, ...metaSkills]
+export const allSkills: Skill[] = [
+  ...allWave1Skills,
+  ...allWave2Skills,
+  ...nbaSkills,
+  ...financeSkills,
+  ...metaSkills,
+  ...travelSkills,
+]
 
 // Skill count constants
 export const DEVELOPMENT_SKILL_COUNT = developmentSkills.length
@@ -351,6 +362,7 @@ export const NUTRITION_SKILL_COUNT = nutritionSkills.length
 export const WEATHER_SKILL_COUNT = weatherSkills.length
 export const NBA_SKILL_COUNT = nbaSkills.length
 export const FINANCE_SKILL_COUNT = financeSkills.length
+export const TRAVEL_SKILL_COUNT = travelSkills.length
 export const TOTAL_WAVE1_SKILL_COUNT = allWave1Skills.length
 export const TOTAL_WAVE2_SKILL_COUNT = allWave2Skills.length
 export const TOTAL_SKILL_COUNT = allSkills.length

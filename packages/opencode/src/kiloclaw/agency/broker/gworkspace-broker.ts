@@ -68,6 +68,14 @@ export namespace GWorkspaceBroker {
           {
             clientId: process.env.GWORKSPACE_CLIENT_ID || "",
             clientSecret: process.env.GWORKSPACE_CLIENT_SECRET,
+            scopes: [
+              "https://www.googleapis.com/auth/gmail.readonly",
+              "https://www.googleapis.com/auth/gmail.send",
+              "https://www.googleapis.com/auth/calendar",
+              "https://www.googleapis.com/auth/drive",
+              "https://www.googleapis.com/auth/documents",
+              "https://www.googleapis.com/auth/spreadsheets",
+            ],
           },
           refreshToken
         )
@@ -75,6 +83,7 @@ export namespace GWorkspaceBroker {
           accessToken: newTokens.accessToken,
           refreshToken: newTokens.refreshToken,
           expiresIn: 3600,
+          tokenType: "Bearer",
         }
       })
     } catch (error) {
@@ -114,6 +123,14 @@ export namespace GWorkspaceBroker {
             {
               clientId: process.env.GWORKSPACE_CLIENT_ID || "",
               clientSecret: process.env.GWORKSPACE_CLIENT_SECRET,
+              scopes: [
+                "https://www.googleapis.com/auth/gmail.readonly",
+                "https://www.googleapis.com/auth/gmail.send",
+                "https://www.googleapis.com/auth/calendar",
+                "https://www.googleapis.com/auth/drive",
+                "https://www.googleapis.com/auth/documents",
+                "https://www.googleapis.com/auth/spreadsheets",
+              ],
             },
             refreshToken
           )

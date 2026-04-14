@@ -28,6 +28,7 @@ import {
   weatherSkills,
   nbaSkills,
   financeSkills,
+  travelSkills,
 } from "../skills"
 
 // Import and register flexible agents
@@ -249,6 +250,73 @@ const agencyDefinitions: AgencyDefinition[] = [
     },
     providers: ["twelve_data", "polygon", "alpha_vantage", "fred", "finnhub", "fmp", "nasdaq"],
     metadata: { wave: 4, description: "Multi-asset financial analysis, trading signals, and risk assessment" },
+  },
+  {
+    id: "agency-travel",
+    name: "Travel Agency",
+    domain: "travel",
+    policies: {
+      allowedCapabilities: [
+        // Destination discovery & comparison
+        "destination-discovery",
+        "destination-compare",
+        "budget-fit-check",
+        "seasonality-analysis",
+        "visa-doc-check",
+        "date-window-optimization",
+        "multi-city-optimizer",
+        // Transport search
+        "flight-search",
+        "flight-compare",
+        "rail-search",
+        "bus-search",
+        "transfer-search",
+        // Accommodation
+        "hotel-search",
+        "hotel-compare",
+        "booking-link-hotel",
+        "cancellation-policy-check",
+        // Local mobility
+        "local-transport-plan",
+        "car-rental-search",
+        "parking-check",
+        // Dining & POI
+        "restaurant-search",
+        "restaurant-availability",
+        "poi-search",
+        "poi-alt-search",
+        // Activities & Events
+        "activity-search",
+        "event-search",
+        "event-booking-link",
+        // Itinerary & Risk
+        "itinerary-build",
+        "itinerary-balance",
+        "weather-risk-check",
+        // Emergency & Advisory
+        "emergency-nearby",
+        "advisory-monitor",
+        "audit-log",
+      ],
+      deniedCapabilities: [
+        "payment-execution",
+        "direct-booking-irreversible",
+        "passport-data-store",
+        "medical-decision-auto",
+        "emergency-decision-auto",
+      ],
+      maxRetries: 3,
+      requiresApproval: true,
+      dataClassification: "confidential",
+    },
+    providers: ["amadeus", "ticketmaster", "openweather", "google_places", "opentripmap", "aviationstack"],
+    metadata: {
+      wave: 5,
+      description:
+        "End-to-end travel planning: destination selection, transport search, accommodation booking, activities, and emergency support",
+      policyEnforced: true,
+      denyByDefault: true,
+    },
   },
 ]
 

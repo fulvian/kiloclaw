@@ -166,7 +166,7 @@ export namespace TokenDatabase {
         .delete(GWorkspaceTokenTable)
         .where(lt(GWorkspaceTokenTable.expires_at, cutoffTime))
 
-      const deletedCount = result.changes || 0
+      const deletedCount = (result as any).changes || 0
       log.info("cleanupExpiredTokens completed", { deletedCount, cutoffTime })
       return deletedCount
     } catch (error) {
@@ -239,7 +239,7 @@ export namespace TokenDatabase {
         .delete(GWorkspaceIdempotencyKeyTable)
         .where(lt(GWorkspaceIdempotencyKeyTable.expires_at, now))
 
-      const deletedCount = result.changes || 0
+      const deletedCount = (result as any).changes || 0
       log.debug("cleanupIdempotencyKeys completed", { deletedCount })
       return deletedCount
     } catch (error) {

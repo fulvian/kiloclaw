@@ -13,7 +13,6 @@ import { GWorkspaceOAuth } from "./gworkspace-oauth"
 export interface BrokerTokenConfig {
   userId: string
   workspaceId: string
-  getRefreshToken?: () => Promise<string> // For token refresh callback
 }
 
 // ============================================================================
@@ -29,27 +28,34 @@ export namespace BrokerTokenIntegration {
    */
   export async function getAccessToken(config: BrokerTokenConfig): Promise<string> {
     try {
-      // Option 1: Use TokenManager (persistent storage)
-      // This is preferred - tokens persisted in DB
+      // Use TokenManager (persistent storage)
+      // Tokens are persisted in encrypted database with automatic refresh
       const token = await TokenManager.getValidAccessToken(
         config.userId,
         config.workspaceId,
-        config.getRefreshToken
-          ? async (refreshToken) => {
-              const newTokens = await GWorkspaceOAuth.refreshTokens(
-                {
-                  clientId: process.env.GWORKSPACE_CLIENT_ID || "",
-                  clientSecret: process.env.GWORKSPACE_CLIENT_SECRET,
-                },
-                refreshToken
-              )
-              return {
-                accessToken: newTokens.accessToken,
-                refreshToken: newTokens.refreshToken,
-                expiresIn: 3600,
-              }
-            }
-          : undefined
+        async (refreshToken) => {
+          const newTokens = await GWorkspaceOAuth.refreshTokens(
+            {
+              clientId: process.env.GWORKSPACE_CLIENT_ID || "",
+              clientSecret: process.env.GWORKSPACE_CLIENT_SECRET,
+              scopes: [
+                "https://www.googleapis.com/auth/gmail.readonly",
+                "https://www.googleapis.com/auth/gmail.send",
+                "https://www.googleapis.com/auth/calendar",
+                "https://www.googleapis.com/auth/drive",
+                "https://www.googleapis.com/auth/documents",
+                "https://www.googleapis.com/auth/spreadsheets",
+              ],
+            },
+            refreshToken
+          )
+          return {
+            accessToken: newTokens.accessToken,
+            refreshToken: newTokens.refreshToken,
+            expiresIn: 3600,
+            tokenType: "Bearer",
+          }
+        }
       )
 
       return token

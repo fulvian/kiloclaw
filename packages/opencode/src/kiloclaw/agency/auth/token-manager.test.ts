@@ -48,6 +48,7 @@ describe("TokenManager", () => {
       const tokens: TokenPayload = {
         accessToken: "test-access-token-12345",
         expiresIn: 3600,
+        tokenType: "Bearer",
       }
 
       const stored = await TokenManager.store("user-123", "workspace-abc", tokens)
@@ -61,6 +62,7 @@ describe("TokenManager", () => {
       const tokens: TokenPayload = {
         accessToken: "test-token",
         expiresIn: customExpiresIn,
+        tokenType: "Bearer",
       }
 
       const stored = await TokenManager.store("user-123", "workspace-abc", tokens)
@@ -81,6 +83,7 @@ describe("TokenManager", () => {
       const tokens: TokenPayload = {
         accessToken: "test-access-token",
         expiresIn: 3600,
+        tokenType: "Bearer",
       }
 
       await TokenManager.store("user-123", "workspace-abc", tokens)
@@ -154,6 +157,7 @@ describe("TokenManager", () => {
       const tokens: TokenPayload = {
         accessToken: "test-access-token",
         expiresIn: 3600,
+        tokenType: "Bearer",
       }
 
       await TokenManager.store("user-123", "workspace-abc", tokens)
@@ -200,6 +204,7 @@ describe("TokenManager", () => {
       const tokens: TokenPayload = {
         accessToken: "test-access-token",
         expiresIn: 3600,
+        tokenType: "Bearer",
       }
 
       await TokenManager.store("user-123", "workspace-abc", tokens)
@@ -213,6 +218,7 @@ describe("TokenManager", () => {
       const tokens: TokenPayload = {
         accessToken: "test-access-token",
         expiresIn: 3600,
+        tokenType: "Bearer",
       }
 
       await TokenManager.store("user-123", "workspace-abc", tokens)

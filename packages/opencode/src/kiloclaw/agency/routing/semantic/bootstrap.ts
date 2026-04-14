@@ -10,6 +10,7 @@ import {
   weatherSkills,
   nbaSkills,
   financeSkills,
+  travelSkills,
   allSkills,
 } from "@/kiloclaw/skills"
 import type { Skill } from "@/kiloclaw/skill"

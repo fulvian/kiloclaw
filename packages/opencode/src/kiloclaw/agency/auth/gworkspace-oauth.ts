@@ -156,6 +156,36 @@ export namespace GWorkspaceOAuth {
   }
 
   /**
+   * Revoke tokens with OAuth provider
+   */
+  export async function revokeToken(config: OAuthConfig, refreshToken: string): Promise<void> {
+    try {
+      const REVOKE_URL = "https://oauth2.googleapis.com/revoke"
+      const params = new URLSearchParams({
+        token: refreshToken,
+        client_id: config.clientId,
+        client_secret: config.clientSecret || "",
+      })
+
+      const response = await fetch(REVOKE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: params.toString(),
+      })
+
+      if (!response.ok) {
+        log.warn("token revocation failed", { status: response.status })
+        // Don't throw - revocation failure shouldn't block logout
+      } else {
+        log.info("token revoked successfully")
+      }
+    } catch (err) {
+      log.warn("token revocation error", { error: err })
+      // Don't throw - revocation failure shouldn't block logout
+    }
+  }
+
+  /**
    * Store tokens for user
    */
   export function storeTokens(userId: string, tokens: TokenStore): void {

@@ -59,21 +59,6 @@ export namespace UpdatedGWorkspaceBroker {
     return BrokerTokenIntegration.getAccessToken({
       userId: config.userId,
       workspaceId: config.workspaceId,
-      getRefreshToken: async (refreshToken) => {
-        // Call Google OAuth to get new token
-        const newTokens = await GWorkspaceOAuth.refreshTokens(
-          {
-            clientId: process.env.GWORKSPACE_CLIENT_ID || "",
-            clientSecret: process.env.GWORKSPACE_CLIENT_SECRET,
-          },
-          refreshToken
-        )
-        return {
-          accessToken: newTokens.accessToken,
-          refreshToken: newTokens.refreshToken,
-          expiresIn: 3600,
-        }
-      },
     })
   }
 

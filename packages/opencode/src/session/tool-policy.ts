@@ -52,7 +52,7 @@ export function getAgencyCanonicalToolIds(agencyId: string): CanonicalToolId[] {
     case "agency-knowledge":
       return ["websearch", "webfetch", "skill"]
     case "agency-nba":
-      return ["nba-games", "nba-odds", "nba-injuries", "skill"]
+      return ["nba-games", "nba-odds", "nba-injuries", "skill", "task"]
     case "agency-gworkspace":
       return [
         "gmail.search",
@@ -91,7 +91,7 @@ export function isCanonicalAlias(toolId: string): boolean {
 }
 
 export const KNOWLEDGE_TOOL_ALLOWLIST = ["websearch", "webfetch", "skill"] as const
-export const NBA_TOOL_ALLOWLIST = ["nba-games", "nba-odds", "nba-injuries", "skill"] as const
+export const NBA_TOOL_ALLOWLIST = ["nba-games", "nba-odds", "nba-injuries", "skill", "task"] as const
 export const GWORKSPACE_TOOL_ALLOWLIST = [
   "task",
   "gmail.search",

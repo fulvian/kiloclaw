@@ -27,7 +27,7 @@ export const TokenPayloadSchema = z.object({
   accessToken: z.string(),
   refreshToken: z.string().optional(),
   expiresIn: z.number(),
-  tokenType: z.string().optional().default("Bearer"),
+  tokenType: z.string().default("Bearer"),
 })
 
 export type TokenPayload = z.infer<typeof TokenPayloadSchema>
