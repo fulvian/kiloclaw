@@ -13,6 +13,7 @@ import {
   weatherSkills,
   nbaSkills,
   financeSkills,
+  travelSkills,
 } from "../kiloclaw/skills" // kilocode_change - agency skills
 import type { Skill as KiloclawSkill } from "../kiloclaw/skill" // kilocode_change
 import { SKILL_TOOL_EXECUTE_MODE_ENABLED, SKILL_NO_SILENT_FALLBACK_ENABLED } from "../session/runtime-flags" // kilocode_change - P1 skill execute mode
@@ -64,6 +65,12 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
       content: "",
     })),
     ...financeSkills.map((s) => ({
+      name: s.id as string,
+      description: buildAgencySkillDescription(s),
+      location: "builtin" as const,
+      content: "",
+    })),
+    ...travelSkills.map((s) => ({
       name: s.id as string,
       description: buildAgencySkillDescription(s),
       location: "builtin" as const,
@@ -162,6 +169,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
         ...weatherSkills,
         ...nbaSkills,
         ...financeSkills,
+        ...travelSkills,
       ]
       const agencySkill = allKiloclawSkills.find((s) => s.id === params.name)
 

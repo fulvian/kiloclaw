@@ -2212,18 +2212,18 @@ export const slidesAddSlide = fn(SlidesAddSlideInputSchema, async (input) => {
 
   if (!userId) throw new Error("userId is required (set via input or KILO_USER_ID environment variable)")
 
-  emitIntent("slides", "presentations.addSlide")
-  const policy = GWorkspaceAgency.getPolicy("slides", "presentations.addSlide")
+  emitIntent("slides", "presentations.addslide")
+  const policy = GWorkspaceAgency.getPolicy("slides", "presentations.addslide")
   if (policy === "DENY") throw new Error("Operation denied by policy")
 
   const idempotencyKey = input.idempotencyKey ?? await GWorkspaceIdempotency.generateKey("slides.addSlide", { presentationId: input.presentationId, insertIndex: input.insertIndex })
   const cached = await GWorkspaceIdempotency.getCachedResult(idempotencyKey, userId, workspaceId, "slides.addSlide")
   if (cached) return cached
 
-  if (GWorkspaceAgency.requiresApproval("slides", "presentations.addSlide")) {
+  if (GWorkspaceAgency.requiresApproval("slides", "presentations.addslide")) {
     const hitlReq = await GWorkspaceHITL.createRequest(
       "slides",
-      "presentations.addSlide",
+      "presentations.addslide",
       "high",
       `Add slide to presentation ${input.presentationId}`,
       { presentationId: input.presentationId, ...ctx },

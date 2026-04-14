@@ -36,6 +36,19 @@ import { NbaOddsTool } from "./nba-odds"
 import { NbaInjuriesTool } from "./nba-injuries"
 import { NbaStatsTool } from "./nba-stats"
 
+// Travel tools import
+import {
+  TravelDestinationSearchTool,
+  TravelFlightSearchTool,
+  TravelHotelSearchTool,
+  TravelRestaurantSearchTool,
+  TravelActivitySearchTool,
+  TravelTransferSearchTool,
+  TravelItineraryBuilderTool,
+  TravelEmergencyInfoTool,
+  TravelWeatherTool,
+} from "./travel"
+
 export namespace ToolRegistry {
   const log = Log.create({ service: "tool.registry" })
 
@@ -131,6 +144,16 @@ export namespace ToolRegistry {
       NbaOddsTool,
       NbaInjuriesTool,
       NbaStatsTool,
+      // Travel Agency tools
+      TravelDestinationSearchTool,
+      TravelFlightSearchTool,
+      TravelHotelSearchTool,
+      TravelRestaurantSearchTool,
+      TravelActivitySearchTool,
+      TravelTransferSearchTool,
+      TravelItineraryBuilderTool,
+      TravelEmergencyInfoTool,
+      TravelWeatherTool,
       ...custom,
     ]
   }
