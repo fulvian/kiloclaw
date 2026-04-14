@@ -8,6 +8,7 @@ import { Bus } from "@/bus"
 import { BusEvent } from "@/bus/bus-event"
 import z from "zod"
 import { GWorkspaceAdapter } from "../adapters/gworkspace-adapter"
+import { GWorkspaceCircuitBreaker } from "../services/gworkspace-resilience"
 
 // ============================================================================
 // Configuration
@@ -205,7 +206,9 @@ export namespace GWorkspaceBroker {
           provider: "native",
           reason: "prefer_native",
         })
-        return await executeNativeGmail(config.accessToken, operation, args)
+        return await GWorkspaceCircuitBreaker.execute("gmail", () =>
+          executeNativeGmail(config.accessToken!, operation, args),
+        )
       }
     } catch (error) {
       if (shouldFallback(error as Error, config)) {
@@ -237,7 +240,9 @@ export namespace GWorkspaceBroker {
           provider: "native",
           reason: "prefer_native",
         })
-        return await executeNativeCalendar(config.accessToken, operation, args)
+        return await GWorkspaceCircuitBreaker.execute("calendar", () =>
+          executeNativeCalendar(config.accessToken!, operation, args),
+        )
       }
     } catch (error) {
       if (shouldFallback(error as Error, config)) {
@@ -269,7 +274,9 @@ export namespace GWorkspaceBroker {
           provider: "native",
           reason: "prefer_native",
         })
-        return await executeNativeDrive(config.accessToken, operation, args)
+        return await GWorkspaceCircuitBreaker.execute("drive", () =>
+          executeNativeDrive(config.accessToken!, operation, args),
+        )
       }
     } catch (error) {
       if (shouldFallback(error as Error, config)) {
@@ -301,7 +308,9 @@ export namespace GWorkspaceBroker {
           provider: "native",
           reason: "prefer_native",
         })
-        return await executeNativeDocs(config.accessToken, operation, args)
+        return await GWorkspaceCircuitBreaker.execute("docs", () =>
+          executeNativeDocs(config.accessToken!, operation, args),
+        )
       }
     } catch (error) {
       if (shouldFallback(error as Error, config)) {
@@ -333,7 +342,9 @@ export namespace GWorkspaceBroker {
           provider: "native",
           reason: "prefer_native",
         })
-        return await executeNativeSheets(config.accessToken, operation, args)
+        return await GWorkspaceCircuitBreaker.execute("sheets", () =>
+          executeNativeSheets(config.accessToken!, operation, args),
+        )
       }
     } catch (error) {
       if (shouldFallback(error as Error, config)) {
@@ -1008,8 +1019,21 @@ export namespace GWorkspaceBroker {
    */
   function shouldFallback(error: Error, config: BrokerConfig): boolean {
     if (!config.mcpFallbackEnabled) return false
-    if (error.message.includes("429") || error.message.includes("503")) return true
-    if (error.message.includes("network") || error.message.includes("ECONNREFUSED")) return true
-    return false
+
+    // Check for GoogleAPIError with specific status codes
+    if ("status" in error && typeof (error as any).status === "number") {
+      const status = (error as any).status
+      return status === 429 || status === 500 || status === 502 || status === 503 || status === 504
+    }
+
+    // Fallback to message matching for network errors
+    const msg = error.message.toLowerCase()
+    return (
+      msg.includes("econnreset") ||
+      msg.includes("econnrefused") ||
+      msg.includes("aborterror") ||
+      msg.includes("network") ||
+      msg.includes("timeout")
+    )
   }
 }

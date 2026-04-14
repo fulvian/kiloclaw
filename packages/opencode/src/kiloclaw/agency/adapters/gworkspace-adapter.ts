@@ -29,6 +29,7 @@ export class GoogleAPIError extends Error {
     public readonly status: number,
     public readonly statusText: string,
     public readonly body: string,
+    public readonly retryAfterMs?: number,
   ) {
     super(`Google API error ${status}: ${statusText}`)
     this.name = "GoogleAPIError"
@@ -91,7 +92,23 @@ export namespace GWorkspaceAdapter {
 
     if (!response.ok) {
       const error = await response.text()
-      throw new GoogleAPIError(response.status, response.statusText, error)
+      // Capture Retry-After header (RFC 7231 format: seconds or HTTP-date)
+      const retryAfter = response.headers.get("Retry-After")
+      let retryAfterMs: number | undefined
+      if (retryAfter) {
+        const seconds = parseInt(retryAfter, 10)
+        if (!isNaN(seconds)) {
+          retryAfterMs = seconds * 1000
+        } else {
+          // Try parsing as HTTP-date
+          const date = new Date(retryAfter)
+          const dateMs = date.getTime()
+          if (!isNaN(dateMs)) {
+            retryAfterMs = Math.max(0, dateMs - Date.now())
+          }
+        }
+      }
+      throw new GoogleAPIError(response.status, response.statusText, error, retryAfterMs)
     }
 
     return response.json()
@@ -109,9 +126,26 @@ export namespace GWorkspaceAdapter {
   /**
    * Check if should retry
    */
-  function shouldRetry(error: GoogleAPIError, attempts: number, maxRetries: number): boolean {
+  function shouldRetry(error: unknown, attempts: number, maxRetries: number): boolean {
     if (attempts >= maxRetries) return false
-    if (error.status === 429 || (error.status >= 500 && error.status < 600)) return true
+
+    // Google API errors: retry on 429 (rate limit) and 5xx (server errors)
+    if (error instanceof GoogleAPIError) {
+      return error.status === 429 || (error.status >= 500 && error.status < 600)
+    }
+
+    // Network and timeout errors: safe to retry
+    if (error instanceof Error) {
+      const msg = error.message.toLowerCase()
+      return (
+        msg.includes("econnreset") ||
+        msg.includes("econnrefused") ||
+        msg.includes("aborterror") ||
+        msg.includes("timeout") ||
+        msg.includes("network")
+      )
+    }
+
     return false
   }
 
@@ -124,6 +158,7 @@ export namespace GWorkspaceAdapter {
 
   /**
    * Execute with retry
+   * Honors Retry-After header from Google API (RFC 7231)
    */
   async function withRetry<T>(
     accessToken: string,
@@ -135,17 +170,25 @@ export namespace GWorkspaceAdapter {
     try {
       return await request<T>(accessToken, endpoint, options, config)
     } catch (error) {
-      const err = error as GoogleAPIError
-      if (!shouldRetry(err, attempts, config.retryConfig.maxRetries)) {
+      if (!shouldRetry(error, attempts, config.retryConfig.maxRetries)) {
         throw error
       }
-      const backoff = calculateBackoff(
-        attempts + 1,
-        config.retryConfig.baseBackoffMs,
-        config.retryConfig.maxBackoffMs,
-        config.retryConfig.jitterFactor,
-      )
-      log.info("retrying request", { attempt: attempts + 1, backoffMs: backoff })
+
+      // Prefer Retry-After header (from Google) over calculated backoff
+      let backoff: number
+      if (error instanceof GoogleAPIError && error.retryAfterMs !== undefined) {
+        backoff = error.retryAfterMs
+        log.info("retrying request", { attempt: attempts + 1, backoffMs: backoff, source: "Retry-After header" })
+      } else {
+        backoff = calculateBackoff(
+          attempts + 1,
+          config.retryConfig.baseBackoffMs,
+          config.retryConfig.maxBackoffMs,
+          config.retryConfig.jitterFactor,
+        )
+        log.info("retrying request", { attempt: attempts + 1, backoffMs: backoff, source: "exponential backoff" })
+      }
+
       await sleep(backoff)
       return withRetry<T>(accessToken, endpoint, options, config, attempts + 1)
     }
