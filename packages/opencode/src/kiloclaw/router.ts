@@ -829,16 +829,6 @@ export const Router = {
         "venerdì",
         "sabato",
         "domenica",
-        // Italian cities
-        "Roma",
-        "Milano",
-        "Napoli",
-        "Torino",
-        "Firenze",
-        "Venezia",
-        "Bologna",
-        "Genova",
-        "Palermo",
       ],
       development: [
         "code",

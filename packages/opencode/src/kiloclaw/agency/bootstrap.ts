@@ -311,7 +311,7 @@ const agencyDefinitions: AgencyDefinition[] = [
     },
     providers: ["amadeus", "ticketmaster", "openweather", "google_places", "opentripmap", "aviationstack"],
     metadata: {
-      wave: 5,
+      wave: 4,
       description:
         "End-to-end travel planning: destination selection, transport search, accommodation booking, activities, and emergency support",
       policyEnforced: true,

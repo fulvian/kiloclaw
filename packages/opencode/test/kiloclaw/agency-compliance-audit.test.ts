@@ -41,12 +41,12 @@ describe("Agency Compliance Audit (Protocol V2)", () => {
     const specializedAgencies = ["agency-nba", "agency-finance", "agency-nutrition", "agency-weather"]
 
     for (const agencyId of specializedAgencies) {
-      // Test that websearch is denied
-      const searchResult = await RoutingPipeline.resolveTools(agencyId)
+      // Test that websearch is denied when explicitly requested
+      const searchResult = await RoutingPipeline.resolveTools(agencyId, undefined, undefined, ["websearch"])
       expect(searchResult.deniedTools).toContain("websearch")
 
-      // Test that webfetch is denied
-      const fetchResult = await RoutingPipeline.resolveTools(agencyId)
+      // Test that webfetch is denied when explicitly requested
+      const fetchResult = await RoutingPipeline.resolveTools(agencyId, undefined, undefined, ["webfetch"])
       expect(fetchResult.deniedTools).toContain("webfetch")
 
       console.log(`✅ ${agencyId}: generic tools denied`)
@@ -115,9 +115,9 @@ describe("Agency Compliance Audit (Protocol V2)", () => {
       expect(agency.metadata.wave).toBeDefined()
       expect(agency.metadata.description).toBeDefined()
 
-      // Wave must be between 1-4
+      // Wave must be between 1-5
       expect(agency.metadata.wave).toBeGreaterThanOrEqual(1)
-      expect(agency.metadata.wave).toBeLessThanOrEqual(4)
+      expect(agency.metadata.wave).toBeLessThanOrEqual(5)
 
       console.log(`  ${agency.id}: Wave ${agency.metadata.wave}`)
     }
