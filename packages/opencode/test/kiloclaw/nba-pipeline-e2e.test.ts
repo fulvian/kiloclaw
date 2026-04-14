@@ -107,8 +107,8 @@ describe("NBA Pipeline Full E2E (L0-L3)", () => {
 
       // Verify no generic websearch/webfetch in denied list
       // (they should be denied because NBA doesn't use them)
-      const deniedIncludesGeneric = result.layers.L3.deniedTools.includes("websearch") ||
-        result.layers.L3.deniedTools.includes("webfetch")
+      const deniedIncludesGeneric =
+        result.layers.L3.deniedTools.includes("websearch") || result.layers.L3.deniedTools.includes("webfetch")
 
       console.log("Generic tools in denied:", deniedIncludesGeneric)
       // If websearch/webfetch were requested, they should be denied
@@ -120,12 +120,11 @@ describe("NBA Pipeline Full E2E (L0-L3)", () => {
     bootstrapRegistries()
 
     // Simulate a request for unknown tools
-    const l3Result = await RoutingPipeline.resolveTools(
-      "agency-nba",
-      "nba-analysis",
-      undefined,
-      ["unknown.adapter", "websearch", "webfetch"],
-    )
+    const l3Result = await RoutingPipeline.resolveTools("agency-nba", "nba-analysis", undefined, [
+      "unknown.adapter",
+      "websearch",
+      "webfetch",
+    ])
 
     console.log("Deny-by-default test:", {
       requested: ["unknown.adapter", "websearch", "webfetch"],
@@ -144,17 +143,19 @@ describe("NBA Pipeline Full E2E (L0-L3)", () => {
     const authorizedNbaTools = [
       "balldontlie.getGames",
       "balldontlie.getInjuries",
-      "odds_bet365.getOdds",
+      "balldontlie.getStats",
       "espn.getScoreboard",
+      "espn.getInjuries",
+      "espn.getStandings",
+      "nba_api.getStats",
+      "odds_bet365.getOdds",
+      "odds_api.getOdds",
+      "parlay.getOdds",
+      "polymarket.getOdds",
       "skill",
     ]
 
-    const l3Result = await RoutingPipeline.resolveTools(
-      "agency-nba",
-      "nba-analysis",
-      undefined,
-      authorizedNbaTools,
-    )
+    const l3Result = await RoutingPipeline.resolveTools("agency-nba", "nba-analysis", undefined, authorizedNbaTools)
 
     console.log("Authorized tools test:", {
       requested: authorizedNbaTools,

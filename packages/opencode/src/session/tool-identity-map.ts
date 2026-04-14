@@ -90,13 +90,14 @@ export namespace ToolIdentityMap {
 
   /**
    * NBA agency uses native tools directly.
-   * Native tool IDs: nba-games, nba-odds, nba-injuries
+   * Native tool IDs: nba-games, nba-odds, nba-injuries, nba-stats
    */
   export const NBA_TOOL_MAP: Record<string, string> = {
     // NBA native tools - same ID as native tool
     "nba-games": "nba-games",
     "nba-odds": "nba-odds",
     "nba-injuries": "nba-injuries",
+    "nba-stats": "nba-stats",
   }
 
   // =============================================================================

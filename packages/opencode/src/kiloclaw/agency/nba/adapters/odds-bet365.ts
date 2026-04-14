@@ -159,7 +159,11 @@ export class OddsBet365Adapter implements OddsAdapter {
     return { data: [], error: null, metadata: { provider: PROVIDER, latencyMs: 0, cached: false, freshnessSeconds: 0 } }
   }
 
-  async getOdds(options?: { gameIds?: string[]; markets?: string[] }): Promise<AdapterResult<Odds[]>> {
+  async getOdds(options?: {
+    gameIds?: string[]
+    markets?: string[]
+    regions?: string[]
+  }): Promise<AdapterResult<Odds[]>> {
     const startTime = Date.now()
 
     if (!this.config.circuitBreaker.allow(PROVIDER)) {
@@ -177,8 +181,9 @@ export class OddsBet365Adapter implements OddsAdapter {
       const markets = options?.markets || ["h2h", "spreads", "totals"]
       params.set("markets", markets.join(","))
 
-      // Bet365 is primarily available in these regions
-      params.set("regions", "uk,us,au")
+      // Use provided regions or default to Bet365-friendly regions
+      const regions = options?.regions?.length ? options.regions : ["uk", "us", "au"]
+      params.set("regions", regions.join(","))
 
       params.set("oddsFormat", "decimal")
 
@@ -254,6 +259,10 @@ export class OddsBet365Adapter implements OddsAdapter {
   }
 
   async getInjuries(): Promise<AdapterResult<never[]>> {
+    return { data: [], error: null, metadata: { provider: PROVIDER, latencyMs: 0, cached: false, freshnessSeconds: 0 } }
+  }
+
+  async getStats(): Promise<AdapterResult<never[]>> {
     return { data: [], error: null, metadata: { provider: PROVIDER, latencyMs: 0, cached: false, freshnessSeconds: 0 } }
   }
 

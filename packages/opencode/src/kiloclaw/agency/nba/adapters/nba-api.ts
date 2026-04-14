@@ -95,6 +95,11 @@ export class NbaApiAdapter implements NbaAdapter {
     return { data: [], error: null, metadata: { provider: PROVIDER, latencyMs: 0, cached: false, freshnessSeconds: 0 } }
   }
 
+  async getStats(): Promise<AdapterResult<never[]>> {
+    // nba_api stats require Python subprocess - not yet implemented
+    return { data: [], error: null, metadata: { provider: PROVIDER, latencyMs: 0, cached: false, freshnessSeconds: 0 } }
+  }
+
   // Advanced stats endpoints that nba_api provides:
   // - stats.endpoints.playercareerstats.PlayerCareerStats
   // - stats.endpoints.playergamelog.PlayerGameLog

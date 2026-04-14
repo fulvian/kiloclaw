@@ -211,6 +211,10 @@ export class PolymarketAdapter implements NbaAdapter {
     // Polymarket doesn't provide injury data
     return { data: [], error: null, metadata: { provider: PROVIDER, latencyMs: 0, cached: false, freshnessSeconds: 0 } }
   }
+
+  async getStats(): Promise<AdapterResult<never[]>> {
+    return { data: [], error: null, metadata: { provider: PROVIDER, latencyMs: 0, cached: false, freshnessSeconds: 0 } }
+  }
 }
 
 export const createPolymarketAdapter = (circuitBreaker: NbaCircuitBreaker.Instance) =>

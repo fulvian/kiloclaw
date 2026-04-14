@@ -274,6 +274,11 @@ export class OddsApiAdapter implements OddsAdapter {
     return { data: [], error: null, metadata: { provider: PROVIDER, latencyMs: 0, cached: false, freshnessSeconds: 0 } }
   }
 
+  async getStats(): Promise<AdapterResult<never[]>> {
+    // Odds API doesn't provide stats
+    return { data: [], error: null, metadata: { provider: PROVIDER, latencyMs: 0, cached: false, freshnessSeconds: 0 } }
+  }
+
   private mapMarket(key: string): Odds["market"] {
     switch (key) {
       case "h2h":

@@ -252,30 +252,32 @@ export class EspnAdapter implements NbaAdapter {
 
     try {
       // ESPN injuries are fetched per-team
-      // If no team specified, we need to fetch all teams first
       const injuries: Injury[] = []
 
-      if (options?.teamIds?.length) {
-        for (const teamId of options.teamIds) {
+      // If no teamIds provided, fetch all NBA team IDs first
+      const teamIds = options?.teamIds?.length ? options.teamIds : await this.getAllNbaTeamIds()
+
+      for (const teamId of teamIds) {
+        try {
           const url = `${CORE_API}/sports/basketball/nba/teams/${teamId}/injuries`
           const response = await this.fetch<EspnInjuryResponse>(url)
           const now = Date.now()
 
           for (const inj of response.injuries) {
-            const injuryDate = new Date(inj.date).getTime()
+            const injuryDate = inj.date ? new Date(inj.date).getTime() : now
             const freshnessSeconds = Math.max(0, Math.floor((now - injuryDate) / 1000))
 
             injuries.push(
               InjurySchema.parse({
-                injury_id: `${inj.athlete.id}-${inj.date}`,
+                injury_id: `${inj.athlete.id}-${inj.date ?? Date.now()}`,
                 player_id: inj.athlete.id,
                 player_name: inj.athlete.displayName,
                 team_id: inj.team.id,
                 team_name: inj.team.name,
                 status: this.mapInjuryStatus(inj.status),
-                injury: inj.injury.name,
-                description: inj.details || inj.injury.detail,
-                date: inj.date,
+                injury: inj.injury?.name || "Unspecified",
+                description: inj.details || inj.injury?.detail || "No details available",
+                date: inj.date || new Date().toISOString().split("T")[0],
                 source: "espn",
                 freshness_seconds: freshnessSeconds,
                 freshness_state: assessFreshness("espn_injuries", freshnessSeconds).state,
@@ -283,6 +285,8 @@ export class EspnAdapter implements NbaAdapter {
               }),
             )
           }
+        } catch {
+          // Individual team failure shouldn't block others - continue
         }
       }
 
@@ -303,6 +307,45 @@ export class EspnAdapter implements NbaAdapter {
     }
   }
 
+  // All 30 NBA team ESPN IDs
+  private static readonly NBA_TEAM_IDS = [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "20",
+    "21",
+    "22",
+    "23",
+    "24",
+    "25",
+    "26",
+    "27",
+    "28",
+    "29",
+    "30",
+  ]
+
+  private async getAllNbaTeamIds(): Promise<string[]> {
+    // ESPN uses numeric IDs 1-30 for NBA teams
+    return EspnAdapter.NBA_TEAM_IDS
+  }
+
   private mapInjuryStatus(status: string): Injury["status"] {
     const s = status.toLowerCase()
     if (s.includes("out")) return "out"
@@ -310,6 +353,11 @@ export class EspnAdapter implements NbaAdapter {
     if (s.includes("doubtful")) return "doubtful"
     if (s.includes("probable")) return "probable"
     return "game_time_decision"
+  }
+
+  async getStats(): Promise<AdapterResult<never[]>> {
+    // ESPN adapter doesn't provide detailed stats - use BallDontLie
+    return { data: [], error: null, metadata: { provider: PROVIDER, latencyMs: 0, cached: false, freshnessSeconds: 0 } }
   }
 }
 

@@ -282,8 +282,10 @@ export const NbaAnalysisSkill: Skill = {
       }
     }
 
-    // Step 2: Fetch games
+    // Step 2: Fetch games (default to today if no teamIds filter)
+    const today = new Date().toISOString().split("T")[0]
     const gamesResult = await NbaOrchestrator.getGames({
+      dates: [today],
       teamIds,
     })
 
@@ -308,10 +310,30 @@ export const NbaAnalysisSkill: Skill = {
     let injuriesFreshnessSeconds = 0
     if (includeInjuries) {
       const injuriesResult = await NbaOrchestrator.getInjuries({
-        teamIds,
+        teamIds: games.flatMap((g) => [g.home_team.id, g.away_team.id]).length
+          ? [...new Set(games.flatMap((g) => [g.home_team.id, g.away_team.id]))]
+          : undefined,
       })
       injuriesFreshnessSeconds = injuriesResult.combinedFreshnessSeconds
     }
+
+    // Step 4b: Fetch recent games for each team (last 5 games for form analysis)
+    const teamIdsInGames = [...new Set(games.flatMap((g) => [g.home_team.id, g.away_team.id]))]
+    const recentGamesResult = teamIdsInGames.length
+      ? await NbaOrchestrator.getStats({
+          type: "recent_games",
+          teamIds: teamIdsInGames,
+          lastNGames: 5,
+        })
+      : { data: [], provider: "none" }
+
+    // Step 4c: Fetch player season averages for top scorers
+    const playerStatsResult = teamIdsInGames.length
+      ? await NbaOrchestrator.getStats({
+          type: "team_stats",
+          teamIds: teamIdsInGames,
+        })
+      : { data: [], provider: "none" }
 
     // Step 5: Generate signals for each game
     const signals: Signal[] = []

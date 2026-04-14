@@ -69,8 +69,11 @@ export const NbaGamesTool = Tool.define("nba-games", async () => {
         metadata: { operation: "nba-games", date: params.date },
       })
 
+      // Default to today's date if none provided (BDL API returns ALL games without date)
+      const dates = params.date ? [params.date] : [new Date().toISOString().split("T")[0]]
+
       const result = await NbaOrchestrator.getGames({
-        dates: params.date ? [params.date] : undefined,
+        dates,
         teamIds: params.teamIds,
       })
 

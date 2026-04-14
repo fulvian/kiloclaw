@@ -34,6 +34,7 @@ import { pathToFileURL } from "url"
 import { NbaGamesTool } from "./nba-games"
 import { NbaOddsTool } from "./nba-odds"
 import { NbaInjuriesTool } from "./nba-injuries"
+import { NbaStatsTool } from "./nba-stats"
 
 export namespace ToolRegistry {
   const log = Log.create({ service: "tool.registry" })
@@ -129,6 +130,7 @@ export namespace ToolRegistry {
       NbaGamesTool,
       NbaOddsTool,
       NbaInjuriesTool,
+      NbaStatsTool,
       ...custom,
     ]
   }

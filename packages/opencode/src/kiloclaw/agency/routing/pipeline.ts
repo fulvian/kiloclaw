@@ -277,10 +277,10 @@ export namespace RoutingPipeline {
 
     const nbaCapabilityToTools: Record<string, string[]> = {
       schedule_live: ["nba-games"],
-      team_player_stats: ["nba-games"],
+      team_player_stats: ["nba-games", "nba-stats"],
       injury_status: ["nba-injuries"],
       odds_markets: ["nba-odds"],
-      game_preview: ["skill"],
+      game_preview: ["nba-games", "nba-stats", "nba-injuries", "skill"],
       probability_estimation: ["skill"],
       vig_removal: ["skill"],
       edge_detection: ["skill"],
@@ -386,11 +386,19 @@ export namespace RoutingPipeline {
                 "nba-games",
                 "nba-odds",
                 "nba-injuries",
-                // Fallback: adapter names resolved by tool-identity-map
+                "nba-stats",
+                // Adapter names resolved by tool-identity-map for all providers in orchestrator chain
                 "balldontlie.getGames",
                 "balldontlie.getInjuries",
+                "balldontlie.getStats",
+                "espn.getScoreboard",
+                "espn.getInjuries",
+                "espn.getStandings",
                 "odds_bet365.getOdds",
                 "odds_api.getOdds",
+                "parlay.getOdds",
+                "polymarket.getOdds",
+                "nba_api.getStats",
                 ...mapped,
               ]
             : agencyId === "agency-finance"

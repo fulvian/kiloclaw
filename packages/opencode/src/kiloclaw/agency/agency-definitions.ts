@@ -781,6 +781,7 @@ const agentDefinitions: FlexibleAgentDefinition[] = [
       "nba-games": "allow",
       "nba-odds": "allow",
       "nba-injuries": "allow",
+      "nba-stats": "allow",
       skill: "allow",
       websearch: "allow",
       webfetch: "allow",

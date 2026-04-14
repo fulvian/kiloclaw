@@ -330,4 +330,59 @@ export namespace NbaOrchestrator {
 
     return results
   }
+
+  // Fetch stats (player stats, team stats, season averages, recent games)
+  export async function getStats(options: {
+    type: "player_stats" | "player_season_averages" | "team_stats" | "recent_games"
+    playerIds?: string[]
+    teamIds?: string[]
+    season?: number
+    startDate?: string
+    endDate?: string
+    lastNGames?: number
+    postseason?: boolean
+  }): Promise<OrchestratorResult<Record<string, unknown>>> {
+    const cb =
+      config?.circuitBreaker ??
+      NbaCircuitBreaker.create({
+        failureThreshold: 5,
+        halfOpenAfterMs: 30000,
+        successThreshold: 2,
+      })
+
+    const adps = getAdapters(cb)
+    const providers = [...ADAPTER_PRIORITY.stats] as string[]
+    const results: Record<string, unknown>[] = []
+    let bestProvider = providers[0] ?? "balldontlie"
+    let staleCount = 0
+    let errorCount = 0
+
+    for (const provider of providers) {
+      const adapter = adps.get(provider)
+      if (!adapter) continue
+
+      try {
+        const result = await adapter.getStats(options)
+
+        if (result.data && result.data.length > 0) {
+          for (const item of result.data) {
+            results.push(item as Record<string, unknown>)
+          }
+          bestProvider = provider
+        }
+
+        if (result.error) errorCount++
+      } catch {
+        errorCount++
+      }
+    }
+
+    return {
+      data: results,
+      provider: bestProvider,
+      combinedFreshnessSeconds: 0,
+      staleCount,
+      errorCount,
+    }
+  }
 }

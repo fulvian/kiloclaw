@@ -55,10 +55,27 @@ export interface NbaAdapter {
   getGames(options?: { dates?: string[]; teamIds?: string[] }): Promise<AdapterResult<Game[]>>
 
   // Fetch odds
-  getOdds(options?: { gameIds?: string[]; markets?: string[]; bookmakers?: string[] }): Promise<AdapterResult<Odds[]>>
+  getOdds(options?: {
+    gameIds?: string[]
+    markets?: string[]
+    bookmakers?: string[]
+    regions?: string[]
+  }): Promise<AdapterResult<Odds[]>>
 
   // Fetch injuries
   getInjuries(options?: { teamIds?: string[] }): Promise<AdapterResult<Injury[]>>
+
+  // Fetch stats (player stats, team stats, season averages, recent games)
+  getStats(options: {
+    type: "player_stats" | "player_season_averages" | "team_stats" | "recent_games"
+    playerIds?: string[]
+    teamIds?: string[]
+    season?: number
+    startDate?: string
+    endDate?: string
+    lastNGages?: number
+    postseason?: boolean
+  }): Promise<AdapterResult<Record<string, unknown>[]>>
 }
 
 // Odds adapter specific interface
