@@ -43,6 +43,7 @@ export type CanonicalToolId =
   | "nba-games"
   | "nba-odds"
   | "nba-injuries"
+  | "nba-stats"
   // Travel Agency
   | "travel-destination-search"
   | "travel-destination-compare"
@@ -84,7 +85,7 @@ export function getAgencyCanonicalToolIds(agencyId: string): CanonicalToolId[] {
     case "agency-knowledge":
       return ["websearch", "webfetch", "skill"]
     case "agency-nba":
-      return ["nba-games", "nba-odds", "nba-injuries", "skill", "task"]
+      return ["nba-games", "nba-odds", "nba-injuries", "nba-stats", "skill", "task"]
     case "agency-gworkspace":
       return [
         "gmail.search",
@@ -159,7 +160,7 @@ export function isCanonicalAlias(toolId: string): boolean {
 }
 
 export const KNOWLEDGE_TOOL_ALLOWLIST = ["websearch", "webfetch", "skill"] as const
-export const NBA_TOOL_ALLOWLIST = ["nba-games", "nba-odds", "nba-injuries", "skill", "task"] as const
+export const NBA_TOOL_ALLOWLIST = ["nba-games", "nba-odds", "nba-injuries", "nba-stats", "skill", "task"] as const
 export const GWORKSPACE_TOOL_ALLOWLIST = [
   "task",
   "gmail.search",
@@ -283,7 +284,7 @@ export function mapKnowledgeCapabilitiesToTools(capabilities: string[]) {
 export function mapNbaCapabilitiesToTools(capabilities: string[]) {
   const tools = capabilities.flatMap((cap) => {
     if (["schedule_live", "team_player_stats", "game_preview"].includes(cap)) {
-      return ["nba-games", "skill"]
+      return ["nba-games", "nba-stats", "skill"]
     }
     if (["injury_status"].includes(cap)) {
       return ["nba-injuries", "skill"]
