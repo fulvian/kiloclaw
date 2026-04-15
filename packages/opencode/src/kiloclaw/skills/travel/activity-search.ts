@@ -1,10 +1,12 @@
 // Travel Activity Search Skill
-// Searches for activities, tours, and attractions
+// Searches for activities, tours, and attractions using Google Places + Ticketmaster
 
 import { Log } from "@/util/log"
 import type { Skill } from "../../skill"
 import type { SkillContext } from "../../skill"
 import { SkillId } from "../../types"
+import { googlePlacesAdapter } from "../../agency/travel/adapters/google-places"
+import { ticketmasterAdapter } from "../../agency/travel/adapters/ticketmaster"
 
 const log = Log.create({ service: "kiloclaw.skill.travel-activity-search" })
 
@@ -29,6 +31,8 @@ interface ActivityOffer {
   included: string[]
   instantConfirmation: boolean
   freeCancellation: boolean
+  url?: string
+  images?: string[]
 }
 
 interface ActivitySearchOutput {
@@ -39,124 +43,55 @@ interface ActivitySearchOutput {
   meta: { generationTimeMs: number; resultsCount: number }
 }
 
-const ACTIVITIES_DB: ActivityOffer[] = [
-  {
-    id: "act-1",
-    name: "Tour Colosseo e Foro Romano",
-    description: "Tour guidato con biglietto skip-the-line",
-    category: "sightseeing",
-    city: "Roma",
-    price: 65,
-    currency: "EUR",
-    duration: "3h",
-    rating: 4.8,
-    included: ["Biglietto skip-the-line", "Guida"],
-    instantConfirmation: true,
-    freeCancellation: true,
-  },
-  {
-    id: "act-2",
-    name: "Tour Vatican Museums",
-    description: "Visita guidata ai Musei Vaticani e Cappella Sistina",
-    category: "culture",
-    city: "Roma",
-    price: 45,
-    currency: "EUR",
-    duration: "4h",
-    rating: 4.9,
-    included: ["Biglietto", "Guida"],
-    instantConfirmation: true,
-    freeCancellation: true,
-  },
-  {
-    id: "act-3",
-    name: "Food Tour Trastevere",
-    description: "Tour gastronomico di 3 ore",
-    category: "food",
-    city: "Roma",
-    price: 85,
-    currency: "EUR",
-    duration: "3h",
-    rating: 4.7,
-    included: ["5 degustazioni", "Vino"],
-    instantConfirmation: true,
-    freeCancellation: true,
-  },
-  {
-    id: "act-4",
-    name: "Tour per famiglie - Roma giocosa",
-    description: "Tour dedicato alle famiglie con attività per bambini",
-    category: "family",
-    city: "Roma",
-    price: 55,
-    currency: "EUR",
-    duration: "2.5h",
-    rating: 4.6,
-    included: ["Guida per bambini", "Attività"],
-    instantConfirmation: true,
-    freeCancellation: true,
-  },
-  {
-    id: "act-5",
-    name: "Tour Uffizi e Accademia",
-    description: "Tour guidato dei principali musei",
-    category: "culture",
-    city: "Firenze",
-    price: 95,
-    currency: "EUR",
-    duration: "5h",
-    rating: 4.9,
-    included: ["Biglietti", "Guida"],
-    instantConfirmation: true,
-    freeCancellation: true,
-  },
-  {
-    id: "act-6",
-    name: "Tour Last Supper e Duomo",
-    description: "Tour combinato della Cena del Signore e del Duomo",
-    category: "culture",
-    city: "Milano",
-    price: 75,
-    currency: "EUR",
-    duration: "4h",
-    rating: 4.8,
-    included: ["Biglietti", "Guida"],
-    instantConfirmation: true,
-    freeCancellation: true,
-  },
-  {
-    id: "act-7",
-    name: "Tour Pompei e Ercolano",
-    description: "Giornata completa agli scavi archeologici",
-    category: "culture",
-    city: "Napoli",
-    price: 110,
-    currency: "EUR",
-    duration: "8h",
-    rating: 4.9,
-    included: ["Trasporto", "Guida", "Pranzo"],
-    instantConfirmation: true,
-    freeCancellation: true,
-  },
-  {
-    id: "act-8",
-    name: "Tour Louvre senza code",
-    description: "Tour guidato del Louvre con skip-the-line",
-    category: "culture",
-    city: "Parigi",
-    price: 75,
-    currency: "EUR",
-    duration: "3h",
-    rating: 4.8,
-    included: ["Biglietto prioritario", "Guida"],
-    instantConfirmation: true,
-    freeCancellation: true,
-  },
-]
+// Map our category to Google Places types
+function mapCategoryToPlaceTypes(category?: string): string {
+  const categoryMap: Record<string, string> = {
+    sightseeing: "tourist_attraction",
+    culture: "museum",
+    food: "restaurant",
+    adventure: "amusement_park",
+    family: "amusement_park",
+    nightlife: "night_club",
+  }
+  return category ? categoryMap[category] || category : ""
+}
+
+// Map our category to Ticketmaster classification
+function mapCategoryToTicketmaster(category?: string): string {
+  const categoryMap: Record<string, string> = {
+    culture: "Arts",
+    sightseeing: "Miscellaneous",
+    nightlife: "Nightlife",
+    adventure: "Sports",
+    family: "Family",
+    food: "Food & Dining",
+  }
+  return category ? categoryMap[category] || category : ""
+}
+
+// Map duration input to expected duration string
+function mapDuration(duration?: string): string {
+  const durationMap: Record<string, string> = {
+    short: "1-2h",
+    medium: "2-4h",
+    full_day: "6-8h",
+  }
+  return duration ? durationMap[duration] || duration : "2-4h"
+}
+
+// Infer included items from place types
+function inferIncluded(types: string[]): string[] {
+  const included: string[] = []
+  if (types.includes("tourist_attraction")) included.push("Admission included")
+  if (types.includes("museum")) included.push("Museum entry")
+  if (types.includes("amusement_park")) included.push("Park entry")
+  if (types.includes("zoo")) included.push("Zoo entry")
+  return included.length > 0 ? included : ["Entry ticket"]
+}
 
 export const TravelActivitySearchSkill: Skill = {
   id: "travel-activity-search" as SkillId,
-  version: "1.0.0",
+  version: "1.1.0",
   name: "Travel Activity Search",
   inputSchema: {
     type: "object",
@@ -189,39 +124,142 @@ export const TravelActivitySearchSkill: Skill = {
     log.info("activity search", { correlationId: context.correlationId, destination, category })
 
     try {
-      const destNormalized = destination.toLowerCase()
-      let results = ACTIVITIES_DB.filter(
-        (a) => a.city.toLowerCase().includes(destNormalized) || destNormalized.includes(a.city.toLowerCase()),
-      )
+      const allOffers: ActivityOffer[] = []
 
-      if (results.length === 0) {
-        results = [...ACTIVITIES_DB]
-        errors.push({
-          provider: "fallback",
-          error: `No specific activities for ${destination}`,
-          timestamp: new Date().toISOString(),
+      // Search Google Places for attractions/POI (for sightseeing, culture, etc.)
+      if (!category || category !== "nightlife") {
+        const placeTypes = mapCategoryToPlaceTypes(category)
+        const query = placeTypes ? `${placeTypes} in ${destination}` : `attractions in ${destination}`
+
+        const placesResult = await googlePlacesAdapter.searchActivities({
+          city: destination,
+          category: placeTypes,
+          limit: 15,
         })
+
+        if (placesResult.success && placesResult.data && placesResult.data.length > 0) {
+          const placeOffers = placesResult.data.map((place) => {
+            const types = place.types || []
+            return {
+              id: place.id,
+              name: place.name,
+              description: place.description || `Visit ${place.name}`,
+              category: category || "sightseeing",
+              city: destination,
+              price: 0, // Google Places doesn't provide prices
+              currency: "EUR",
+              duration: mapDuration(),
+              rating: place.rating || 0,
+              included: inferIncluded(types),
+              instantConfirmation: types.includes("museum") || types.includes("tourist_attraction"),
+              freeCancellation: true,
+              url: place.url,
+              images: place.images,
+            }
+          })
+          allOffers.push(...placeOffers)
+        } else if (placesResult.error) {
+          errors.push({
+            provider: placesResult.provider,
+            error: `Google Places: ${placesResult.error.message}`,
+            timestamp: new Date().toISOString(),
+          })
+        }
       }
 
-      if (category) results = results.filter((a) => a.category === category)
+      // Search Ticketmaster for events (concerts, shows, sports - especially for nightlife)
+      if (
+        !category ||
+        category === "nightlife" ||
+        category === "culture" ||
+        category === "adventure" ||
+        category === "family"
+      ) {
+        const tmCategory = mapCategoryToTicketmaster(category)
+
+        const eventsResult = await ticketmasterAdapter.searchEvents({
+          city: destination,
+          date: date,
+          category: tmCategory,
+          limit: 10,
+        })
+
+        if (eventsResult.success && eventsResult.data && eventsResult.data.length > 0) {
+          const eventOffers = eventsResult.data.map((event) => {
+            return {
+              id: event.id,
+              name: event.name,
+              description: event.description || `Event at ${event.venue}`,
+              category: category || event.category || "event",
+              city: destination,
+              price: event.price,
+              currency: event.currency,
+              duration: "2-3h",
+              rating: 0, // Ticketmaster doesn't provide ratings
+              included: ["Event ticket"],
+              instantConfirmation: true,
+              freeCancellation: false,
+              url: event.url,
+              images: event.image ? [event.image] : [],
+            }
+          })
+          allOffers.push(...eventOffers)
+        } else if (eventsResult.error) {
+          errors.push({
+            provider: eventsResult.provider,
+            error: `Ticketmaster: ${eventsResult.error.message}`,
+            timestamp: new Date().toISOString(),
+          })
+        }
+      }
+
+      // Filter by price range if specified
       if (priceRange) {
         const ranges: Record<string, { min: number; max: number }> = {
           budget: { min: 0, max: 50 },
           "mid-range": { min: 40, max: 100 },
-          luxury: { min: 80, max: 1000 },
+          luxury: { min: 80, max: 10000 },
         }
         const range = ranges[priceRange]
-        if (range) results = results.filter((a) => a.price >= range.min && a.price <= range.max)
+        if (range) {
+          const filtered = allOffers.filter((o) => o.price >= range.min && o.price <= range.max)
+          // If we filtered too much, keep the original results
+          if (filtered.length > 0) {
+            allOffers.length = 0
+            allOffers.push(...filtered)
+          }
+        }
       }
 
-      results.sort((a, b) => b.rating - a.rating)
+      // Sort by rating (places with rating first), then by price
+      allOffers.sort((a, b) => {
+        if (a.rating !== b.rating) return b.rating - a.rating
+        return a.price - b.price
+      })
+
+      // Determine primary provider
+      const provider =
+        errors.length > 0 && allOffers.length === 0
+          ? { id: "error", name: "Error" }
+          : errors.length > 0
+            ? { id: "mixed", name: "Google Places + Ticketmaster" }
+            : { id: "google_places+ticketmaster", name: "Google Places + Ticketmaster" }
+
+      log.info("activity search completed", {
+        correlationId: context.correlationId,
+        results: allOffers.length,
+        errors: errors.length,
+      })
 
       return {
-        offers: results.slice(0, 10),
+        offers: allOffers.slice(0, 10),
         searchParams: { destination, date, category, priceRange },
-        provider: { id: "internal", name: "Activity Database" },
+        provider,
         errors,
-        meta: { generationTimeMs: Date.now() - startTime, resultsCount: results.length },
+        meta: {
+          generationTimeMs: Date.now() - startTime,
+          resultsCount: allOffers.length,
+        },
       }
     } catch (err) {
       log.error("activity search failed", { error: err instanceof Error ? err.message : String(err) })

@@ -26,3 +26,43 @@ export FIRECRAWL_API_KEY_3="fc-XXXX"  # Account 3
 export FIRECRAWL_API_KEY_4="fc-XXXX"  # Account 4
 export FIRECRAWL_API_KEY_5="fc-XXXX"  # Account 5
 export FIRECRAWL_API_KEY_6="fc-XXXX"  # Account 6
+
+# ===========================================
+# Travel Agency API Keys
+# ===========================================
+# Amadeus - Flights, Hotels, Activities
+# Get keys at: https://developers.amadeus.com/
+export AMADEUS_API_KEY_1="your_amadeus_api_key"
+export AMADEUS_API_SECRET_1="your_amadeus_api_secret"
+
+# Ticketmaster - Events and attractions
+# Get key at: https://developer.ticketmaster.com/
+export TICKETMASTER_API_KEY_1="your_ticketmaster_api_key"
+
+# Google Maps Platform - Places, Geocoding, Routes
+# Get key at: https://console.cloud.google.com/apis/credentials
+export GOOGLE_API_KEY_1="your_google_maps_api_key"
+
+# OpenTripMap - POI fallback (optional)
+# Get key at: https://opentripmap.org/
+export OPENTRIPMAP_API_KEY_1="your_opentripmap_api_key"
+
+# Aviationstack - Flight status (optional)
+# Get key at: https://aviationstack.com/
+export AVIATIONSTACK_API_KEY_1="your_aviationstack_api_key"
+
+# OpenWeatherMap - Weather alerts
+# Get key at: https://openweathermap.org/api
+export OPENWEATHERMAP_API_KEY_1="your_openweathermap_api_key"
+
+# ===========================================
+# Google Workspace Agency
+# ===========================================
+# AES-256-GCM encryption key for SQLite token storage (generate with: openssl rand -hex 32)
+export GWORKSPACE_TOKEN_KEY="your_hex_32_byte_key"
+# OAuth2 credentials from Google Cloud Console (same client used in kilo.jsonc MCP config)
+export GWORKSPACE_CLIENT_ID="your_google_oauth_client_id"
+export GWORKSPACE_CLIENT_SECRET="your_google_oauth_client_secret"
+# Aliases expected by workspace-mcp startup
+export GOOGLE_OAUTH_CLIENT_ID="your_google_oauth_client_id"
+export GOOGLE_OAUTH_CLIENT_SECRET="your_google_oauth_client_secret"

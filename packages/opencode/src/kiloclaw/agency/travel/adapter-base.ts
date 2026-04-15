@@ -58,6 +58,7 @@ type ActivityOffer = {
   url?: string
   images: string[]
   openingHours?: string
+  types?: string[] // Google Places types for POI
 }
 
 type EventOffer = {
@@ -90,6 +91,7 @@ type RestaurantOffer = {
   url?: string
   phone?: string
   coordinates: { lat: number; lng: number }
+  types?: string[] // Google Places types (e.g., restaurant, cafe, bar)
 }
 
 type ProviderTrace = {
@@ -357,8 +359,20 @@ export function createProviderTrace(
 // ============================================================================
 
 export async function getApiKey(provider: string): Promise<string | undefined> {
-  // Load from key-pool or environment
-  // TODO: Integrate with key-pool.ts
+  // Use KeyManager for proper key rotation and rate limiting
+  try {
+    const { KeyManager } = await import("../key-pool")
+    const manager = KeyManager.getInstance()
+    const pool = manager.getPool(provider.toUpperCase())
+    const keyState = pool.getKey()
+    if (keyState) {
+      return keyState.key
+    }
+  } catch (err) {
+    log.debug(`KeyManager not available, falling back to env: ${err}`)
+  }
+
+  // Fallback to direct env var
   const envKey = process.env[`${provider.toUpperCase()}_API_KEY`]
   if (envKey) return envKey
 
@@ -367,7 +381,21 @@ export async function getApiKey(provider: string): Promise<string | undefined> {
 }
 
 export async function getApiSecret(provider: string): Promise<string | undefined> {
-  // Load from key-pool or environment
+  // Use KeyManager for proper key rotation
+  try {
+    const { KeyManager } = await import("../key-pool")
+    const manager = KeyManager.getInstance()
+    // Secrets are stored with _SECRET suffix
+    const pool = manager.getPool(`${provider.toUpperCase()}_SECRET`)
+    const keyState = pool.getKey()
+    if (keyState) {
+      return keyState.key
+    }
+  } catch (err) {
+    log.debug(`KeyManager not available for secret, falling back to env: ${err}`)
+  }
+
+  // Fallback to direct env var
   const envSecret = process.env[`${provider.toUpperCase()}_API_SECRET`]
   if (envSecret) return envSecret
 

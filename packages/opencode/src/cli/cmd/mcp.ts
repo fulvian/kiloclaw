@@ -6,7 +6,8 @@ import * as prompts from "@clack/prompts"
 import { UI } from "../ui"
 import { MCP } from "../../mcp"
 import { McpAuth } from "../../mcp/auth"
-import { McpOAuthProvider } from "../../mcp/oauth-provider"
+import { McpOAuthProvider, OAUTH_CALLBACK_PORT, OAUTH_CALLBACK_PATH } from "../../mcp/oauth-provider"
+import { McpOAuthCallback } from "../../mcp/oauth-callback"
 import { Config } from "../../config/config"
 import { Instance } from "../../project/instance"
 import { Installation } from "../../installation"
@@ -16,6 +17,9 @@ import { modify, applyEdits } from "jsonc-parser"
 import { Filesystem } from "../../util/filesystem"
 import { Bus } from "../../bus"
 import { Process } from "@/util/process"
+import { TokenManager } from "@/kiloclaw/agency/auth/token-manager"
+import { GWorkspaceOAuth } from "@/kiloclaw/agency/auth/gworkspace-oauth"
+import open from "open"
 
 function setDefaultEnv(name: string, value: string) {
   if (process.env[name] !== undefined) return
@@ -80,16 +84,31 @@ async function ensureGoogleWorkspaceMcpRunning(name: string, config: McpRemote):
 
   await loadDefaultSessionEnv()
 
-  const hasOAuth = !!process.env.GOOGLE_OAUTH_CLIENT_ID && !!process.env.GOOGLE_OAUTH_CLIENT_SECRET
-  if (!hasOAuth) return
+  // Accept credentials from env vars OR directly from MCP config
+  const oauthCfg = typeof config.oauth === "object" ? config.oauth : undefined
+  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID || oauthCfg?.clientId
+  const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET || oauthCfg?.clientSecret
+  if (!clientId || !clientSecret) return
 
   const port = new URL(url).port || "8000"
   const base = process.env.WORKSPACE_MCP_BASE_URI ?? "http://localhost"
   setDefaultEnv("WORKSPACE_MCP_PORT", port)
   setDefaultEnv("WORKSPACE_MCP_BASE_URI", base)
+  setDefaultEnv("GOOGLE_OAUTH_CLIENT_ID", clientId)
+  setDefaultEnv("GOOGLE_OAUTH_CLIENT_SECRET", clientSecret)
   setDefaultEnv("GOOGLE_OAUTH_REDIRECT_URI", `${base}:${port}/oauth2callback`)
   setDefaultEnv("MCP_ENABLE_OAUTH21", "true")
   setDefaultEnv("OAUTHLIB_INSECURE_TRANSPORT", "1")
+
+  // Try to load pre-authenticated token from database
+  try {
+    const token = await TokenManager.getValidAccessToken("fulviold@gmail.com", "default")
+    if (token) {
+      setDefaultEnv("GWORKSPACE_ACCESS_TOKEN", token)
+    }
+  } catch {
+    // If token not available, workspace-mcp will fall back to OAuth
+  }
 
   Process.spawn(
     ["uvx", "--from", "workspace-mcp", "workspace-mcp", "--transport", "streamable-http", "--tool-tier", "core"],
@@ -137,6 +156,127 @@ function isMcpConfigured(config: McpEntry): config is McpConfigured {
 type McpRemote = Extract<McpConfigured, { type: "remote" }>
 function isMcpRemote(config: McpEntry): config is McpRemote {
   return isMcpConfigured(config) && config.type === "remote"
+}
+
+const GWORKSPACE_SCOPES = [
+  "https://www.googleapis.com/auth/gmail.readonly",
+  "https://www.googleapis.com/auth/gmail.send",
+  "https://www.googleapis.com/auth/calendar",
+  "https://www.googleapis.com/auth/drive",
+  "https://www.googleapis.com/auth/spreadsheets",
+  "https://www.googleapis.com/auth/presentations",
+]
+
+/**
+ * Direct Google OAuth flow for google-workspace MCP server.
+ * Bypasses workspace-mcp's CSRF-broken consent page by authenticating
+ * directly with Google OAuth 2.0 endpoints and storing tokens in both
+ * TokenManager (SQLite) and McpAuth (JSON) stores.
+ */
+async function authenticateGoogleWorkspaceDirect(serverName: string, serverConfig: McpRemote): Promise<void> {
+  const oauthCfg = typeof serverConfig.oauth === "object" ? serverConfig.oauth : undefined
+  const clientId =
+    process.env.GOOGLE_OAUTH_CLIENT_ID || process.env.GWORKSPACE_CLIENT_ID || oauthCfg?.clientId
+  const clientSecret =
+    process.env.GOOGLE_OAUTH_CLIENT_SECRET || process.env.GWORKSPACE_CLIENT_SECRET || oauthCfg?.clientSecret
+
+  if (!clientId || !clientSecret) {
+    prompts.log.error("Missing Google OAuth credentials")
+    prompts.log.info("Set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET in .envrc")
+    return
+  }
+
+  // Check existing valid token — offer to skip re-auth
+  const existingToken = await TokenManager.getValidAccessToken("fulviold@gmail.com", "default").catch(() => null)
+  if (existingToken) {
+    const reauth = await prompts.confirm({
+      message: "Google Workspace already has a valid token. Re-authenticate?",
+      initialValue: false,
+    })
+    if (prompts.isCancel(reauth) || !reauth) {
+      prompts.log.success("Google Workspace authenticated (existing token)")
+      return
+    }
+  }
+
+  await McpOAuthCallback.ensureRunning()
+
+  const verifier = GWorkspaceOAuth.generateCodeVerifier()
+  const challenge = await GWorkspaceOAuth.generateCodeChallenge(verifier)
+  const oauthState = GWorkspaceOAuth.generateState()
+  const redirectUri = `http://127.0.0.1:${OAUTH_CALLBACK_PORT}${OAUTH_CALLBACK_PATH}`
+
+  const oauthConfig = { clientId, clientSecret, redirectUri, scopes: GWORKSPACE_SCOPES }
+  const authUrl = GWorkspaceOAuth.getAuthorizationUrl(oauthConfig, oauthState, challenge)
+
+  // Register callback BEFORE opening browser to prevent race conditions
+  const callbackPromise = McpOAuthCallback.waitForCallback(oauthState)
+
+  const spinner = prompts.spinner()
+  spinner.start("Opening browser for Google authorization...")
+
+  const unsubscribe = Bus.subscribe(MCP.BrowserOpenFailed, (evt) => {
+    if (evt.properties.mcpName !== serverName) return
+    spinner.stop("Could not open browser automatically")
+    prompts.log.warn("Please open this URL in your browser to authenticate:")
+    prompts.log.info(evt.properties.url)
+    spinner.start("Waiting for Google authorization...")
+  })
+
+  try {
+    const subprocess = await open(authUrl)
+    await new Promise<void>((resolve, reject) => {
+      const t = setTimeout(() => resolve(), 500)
+      subprocess.on("error", (err) => { clearTimeout(t); reject(err) })
+      subprocess.on("exit", (code) => {
+        if (code !== null && code !== 0) { clearTimeout(t); reject(new Error(`exit ${code}`)) }
+      })
+    })
+    spinner.stop("Browser opened")
+    spinner.start("Waiting for Google authorization...")
+  } catch {
+    Bus.publish(MCP.BrowserOpenFailed, { mcpName: serverName, url: authUrl })
+  }
+
+  const code = await callbackPromise.catch((err: unknown) => {
+    unsubscribe()
+    spinner.stop("Authorization failed", 1)
+    prompts.log.error(err instanceof Error ? err.message : String(err))
+    return null
+  })
+  if (!code) return
+
+  spinner.stop("Exchanging code with Google...")
+  spinner.start("Exchanging authorization code...")
+
+  try {
+    const tokens = await GWorkspaceOAuth.exchangeCode(oauthConfig, code, verifier)
+    const expiresIn = Math.max(60, Math.floor((tokens.expiresAt - Date.now()) / 1000))
+
+    // Store in TokenManager (native tools — SQLite, AES-256-GCM encrypted)
+    await TokenManager.store("fulviold@gmail.com", "default", {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      expiresIn,
+      tokenType: "Bearer",
+    })
+
+    // Store in McpAuth (MCP server — JSON file)
+    await McpAuth.updateTokens(serverName, {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      expiresAt: tokens.expiresAt / 1000,
+    })
+
+    spinner.stop("Authentication successful!")
+    prompts.log.success("Google Workspace authenticated!")
+    prompts.log.info("Tokens stored in native database and MCP auth store")
+  } catch (err) {
+    spinner.stop("Token exchange failed", 1)
+    prompts.log.error(err instanceof Error ? err.message : String(err))
+  } finally {
+    unsubscribe()
+  }
 }
 
 export const McpCommand = cmd({
@@ -302,6 +442,13 @@ export const McpAuthCommand = cmd({
         }
 
         await ensureGoogleWorkspaceMcpRunning(serverName, serverConfig)
+
+        // For google-workspace, bypass workspace-mcp's consent page with direct Google OAuth
+        if (serverName === "google-workspace") {
+          await authenticateGoogleWorkspaceDirect(serverName, serverConfig)
+          prompts.outro("Done")
+          return
+        }
 
         // Check if already authenticated
         const authStatus = await MCP.getAuthStatus(serverName)

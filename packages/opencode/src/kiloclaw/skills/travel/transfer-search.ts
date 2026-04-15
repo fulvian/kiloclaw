@@ -41,89 +41,171 @@ interface TransferSearchOutput {
 }
 
 function generateMockTransfers(from: string, to: string, date: string): TransferOffer[] {
-  const isRome =
-    from.toLowerCase().includes("fiumicino") ||
-    from.toLowerCase().includes("fco") ||
-    from.toLowerCase().includes("roma") ||
-    to.toLowerCase().includes("fiumicino") ||
-    to.toLowerCase().includes("fco") ||
-    to.toLowerCase().includes("roma")
+  const fromLower = from.toLowerCase()
+  const toLower = to.toLowerCase()
+
+  // Determine if this is a Rome airport transfer
+  const isToAirport = toLower.includes("fiumicino") || toLower.includes("fco") || toLower.includes("airport")
+  const isFromAirport = fromLower.includes("fiumicino") || fromLower.includes("fco") || fromLower.includes("airport")
+  const isInRome =
+    fromLower.includes("roma") || toLower.includes("roma") || fromLower.includes("centro") || toLower.includes("centro")
 
   const transfers: TransferOffer[] = []
 
-  if (isRome) {
-    transfers.push(
-      {
-        id: "transfer-1",
-        type: "public",
-        provider: "Trenitalia",
-        vehicleType: "Train",
-        price: 14,
-        currency: "EUR",
-        duration: "32 min",
-        distance: 30,
-        pickup: { address: "Fiumicino Airport", time: `${date}T06:00:00` },
-        dropoff: { address: "Roma Termini", time: `${date}T06:32:00` },
-        features: ["Air conditioning", "WiFi"],
-        freeCancellation: false,
-      },
-      {
-        id: "transfer-2",
-        type: "shared",
-        provider: "TerraVision",
-        vehicleType: "Bus",
-        price: 7,
-        currency: "EUR",
-        duration: "55 min",
-        distance: 35,
-        pickup: { address: "Fiumicino Airport", time: `${date}T08:00:00` },
-        dropoff: { address: "Roma Termini", time: `${date}T08:55:00` },
-        features: ["Air conditioning", "WiFi", "XL luggage"],
-        freeCancellation: true,
-      },
-      {
-        id: "transfer-3",
-        type: "private",
-        provider: "Welcome Limousine",
-        vehicleType: "Sedan",
-        price: 55,
-        currency: "EUR",
-        duration: "40 min",
-        distance: 30,
-        pickup: { address: "Fiumicino Airport", time: `${date}T10:00:00` },
-        dropoff: { address: "City Center", time: `${date}T10:40:00` },
-        features: ["Meet & greet", "Flight tracking", "Free waiting 60min"],
-        freeCancellation: true,
-      },
-      {
-        id: "transfer-4",
-        type: "private",
-        provider: "Black Lane",
-        vehicleType: "Mercedes E-Class",
-        price: 89,
-        currency: "EUR",
-        duration: "35 min",
-        distance: 28,
-        pickup: { address: "Fiumicino Airport", time: `${date}T10:00:00` },
-        dropoff: { address: "Roma City Center", time: `${date}T10:35:00` },
-        features: ["Premium sedan", "Champagne", "WiFi"],
-        freeCancellation: true,
-      },
-      {
-        id: "transfer-5",
-        type: "private",
-        provider: "Rome Airport Shuttle",
-        vehicleType: "Van (up to 8 passengers)",
-        price: 75,
-        currency: "EUR",
-        duration: "45 min",
-        distance: 32,
-        pickup: { address: "Fiumicino Airport", time: `${date}T10:15:00` },
-        dropoff: { address: "Hotel District", time: `${date}T11:00:00` },
-        features: ["Child seats available", "Large luggage"],
-        freeCancellation: true,
-      },
-    )
+  // Determine direction: airport → city OR city → airport
+  const isAirportToCity = isFromAirport && !isToAirport
+  const isCityToAirport = isToAirport && !isFromAirport
+
+  if (isInRome && (isAirportToCity || isCityToAirport)) {
+    if (isAirportToCity) {
+      // Airport → City Center
+      transfers.push(
+        {
+          id: "transfer-1",
+          type: "public",
+          provider: "Trenitalia",
+          vehicleType: "Train",
+          price: 14,
+          currency: "EUR",
+          duration: "32 min",
+          distance: 30,
+          pickup: { address: "Fiumicino Airport", time: `${date}T06:00:00` },
+          dropoff: { address: "Roma Termini", time: `${date}T06:32:00` },
+          features: ["Air conditioning", "WiFi"],
+          freeCancellation: false,
+        },
+        {
+          id: "transfer-2",
+          type: "shared",
+          provider: "TerraVision",
+          vehicleType: "Bus",
+          price: 7,
+          currency: "EUR",
+          duration: "55 min",
+          distance: 35,
+          pickup: { address: "Fiumicino Airport", time: `${date}T08:00:00` },
+          dropoff: { address: "Roma Termini", time: `${date}T08:55:00` },
+          features: ["Air conditioning", "WiFi", "XL luggage"],
+          freeCancellation: true,
+        },
+        {
+          id: "transfer-3",
+          type: "private",
+          provider: "Welcome Limousine",
+          vehicleType: "Sedan",
+          price: 55,
+          currency: "EUR",
+          duration: "40 min",
+          distance: 30,
+          pickup: { address: "Fiumicino Airport", time: `${date}T10:00:00` },
+          dropoff: { address: "City Center", time: `${date}T10:40:00` },
+          features: ["Meet & greet", "Flight tracking", "Free waiting 60min"],
+          freeCancellation: true,
+        },
+        {
+          id: "transfer-4",
+          type: "private",
+          provider: "Black Lane",
+          vehicleType: "Mercedes E-Class",
+          price: 89,
+          currency: "EUR",
+          duration: "35 min",
+          distance: 28,
+          pickup: { address: "Fiumicino Airport", time: `${date}T10:00:00` },
+          dropoff: { address: "Roma City Center", time: `${date}T10:35:00` },
+          features: ["Premium sedan", "Champagne", "WiFi"],
+          freeCancellation: true,
+        },
+        {
+          id: "transfer-5",
+          type: "private",
+          provider: "Rome Airport Shuttle",
+          vehicleType: "Van (up to 8 passengers)",
+          price: 75,
+          currency: "EUR",
+          duration: "45 min",
+          distance: 32,
+          pickup: { address: "Fiumicino Airport", time: `${date}T10:15:00` },
+          dropoff: { address: "Hotel District", time: `${date}T11:00:00` },
+          features: ["Child seats available", "Large luggage"],
+          freeCancellation: true,
+        },
+      )
+    } else {
+      // City Center → Airport (reverse direction!)
+      transfers.push(
+        {
+          id: "transfer-r1",
+          type: "public",
+          provider: "Trenitalia",
+          vehicleType: "Train",
+          price: 14,
+          currency: "EUR",
+          duration: "32 min",
+          distance: 30,
+          pickup: { address: "Roma Termini", time: `${date}T06:00:00` },
+          dropoff: { address: "Fiumicino Airport", time: `${date}T06:32:00` },
+          features: ["Air conditioning", "WiFi"],
+          freeCancellation: false,
+        },
+        {
+          id: "transfer-r2",
+          type: "shared",
+          provider: "TerraVision",
+          vehicleType: "Bus",
+          price: 7,
+          currency: "EUR",
+          duration: "55 min",
+          distance: 35,
+          pickup: { address: "Roma Termini", time: `${date}T08:00:00` },
+          dropoff: { address: "Fiumicino Airport", time: `${date}T08:55:00` },
+          features: ["Air conditioning", "WiFi", "XL luggage"],
+          freeCancellation: true,
+        },
+        {
+          id: "transfer-r3",
+          type: "private",
+          provider: "Welcome Limousine",
+          vehicleType: "Sedan",
+          price: 55,
+          currency: "EUR",
+          duration: "40 min",
+          distance: 30,
+          pickup: { address: "City Center", time: `${date}T10:00:00` },
+          dropoff: { address: "Fiumicino Airport", time: `${date}T10:40:00` },
+          features: ["Meet & greet", "Flight tracking", "Free waiting 60min"],
+          freeCancellation: true,
+        },
+        {
+          id: "transfer-r4",
+          type: "private",
+          provider: "Black Lane",
+          vehicleType: "Mercedes E-Class",
+          price: 89,
+          currency: "EUR",
+          duration: "35 min",
+          distance: 28,
+          pickup: { address: "Roma City Center", time: `${date}T10:00:00` },
+          dropoff: { address: "Fiumicino Airport", time: `${date}T10:35:00` },
+          features: ["Premium sedan", "Champagne", "WiFi"],
+          freeCancellation: true,
+        },
+        {
+          id: "transfer-r5",
+          type: "private",
+          provider: "Rome Airport Shuttle",
+          vehicleType: "Van (up to 8 passengers)",
+          price: 75,
+          currency: "EUR",
+          duration: "45 min",
+          distance: 32,
+          pickup: { address: "Hotel District", time: `${date}T10:15:00` },
+          dropoff: { address: "Fiumicino Airport", time: `${date}T11:00:00` },
+          features: ["Child seats available", "Large luggage"],
+          freeCancellation: true,
+        },
+      )
+    }
   } else {
     transfers.push({
       id: "transfer-generic-1",
@@ -175,7 +257,7 @@ export const TravelTransferSearchSkill: Skill = {
   async execute(input: unknown, context: SkillContext): Promise<TransferSearchOutput> {
     const startTime = Date.now()
     const errors: Array<{ provider: string; error: string; timestamp: string }> = []
-    const { from, to, date, time, passengers = 2, vehicleType = "standard" } = input as TransferSearchInput
+    const { from, to, date, time, passengers = 3, vehicleType = "standard" } = input as TransferSearchInput
 
     log.info("transfer search", { correlationId: context.correlationId, from, to, date, passengers })
 

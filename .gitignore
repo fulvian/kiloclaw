@@ -43,3 +43,19 @@ tsconfig.tsbuildinfo
 
 # Kiloclaw runtime data
 .kiloclaw-runtime/
+
+# Temp/debug scripts (root level)
+check-auth-status.ts
+check-db-tokens.ts
+check-refresh-token.ts
+delete-expired-token.ts
+migrate-mcp-tokens.ts
+oauth-login-v2.ts
+oauth-login.ts
+test-auth-status.ts
+test-full-sync.ts
+test-gworkspace-api.ts
+
+# Temp/debug scripts (packages level)
+packages/opencode/cleanup-and-reauth.ts
+packages/opencode/migrate-mcp-tokens.ts

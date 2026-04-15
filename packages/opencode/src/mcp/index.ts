@@ -3,6 +3,8 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js"
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
+import { TokenManager } from "@/kiloclaw/agency/auth/token-manager"
+import { CredentialSync } from "@/kiloclaw/agency/auth/credential-sync"
 // kilocode_change start
 // The MCP SDK only sets windowsHide:true in Electron (checks `'type' in process`).
 // When running inside the VS Code extension on Windows, set process.type so the SDK
@@ -395,10 +397,86 @@ export namespace MCP {
     let status: Status | undefined = undefined
 
     if (mcp.type === "remote") {
+      // For google-workspace, ensure credentials and local server are set up
+      if (key === "google-workspace" && mcp.type === "remote" && mcp.url?.includes("localhost")) {
+        try {
+          // Sync tokens to MCP auth file (ensures workspace-mcp has access to credentials)
+          await CredentialSync.ensureMcpCredentials()
+
+          const healthUrl = mcp.url.replace("/mcp", "/health")
+          const healthCheck = await fetch(healthUrl, { method: "GET" }).catch(() => null)
+          if (!healthCheck?.ok) {
+            log.warn("google-workspace mcp server not responding, attempting to start it", { url: healthUrl })
+            // Try to start the server
+            const { Process } = await import("@/util/process")
+            // Pass pre-authenticated Google API access token to workspace-mcp
+            // so it can call Google APIs without requiring a separate auth flow
+            let gwsAccessToken: string | undefined
+            try {
+              const { TokenManager } = await import("@/kiloclaw/agency/auth/token-manager")
+              gwsAccessToken =
+                (await TokenManager.getValidAccessToken("fulviold@gmail.com", "default").catch(() => undefined)) ??
+                undefined
+            } catch {
+              // TokenManager not available, proceed without
+            }
+            const env = { ...process.env }
+            env["WORKSPACE_MCP_PORT"] = "8000"
+            env["WORKSPACE_MCP_BASE_URI"] = "http://localhost"
+            env["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
+            env["MCP_ENABLE_OAUTH21"] = "true"
+            if (gwsAccessToken) {
+              env["GWORKSPACE_ACCESS_TOKEN"] = gwsAccessToken
+            }
+            Process.spawn(
+              ["bash", "-c", "uvx --from workspace-mcp workspace-mcp --transport streamable-http --tool-tier core"],
+              { stdin: "ignore", stdout: "ignore", stderr: "ignore", env },
+            )
+            // Wait for server to start
+            await new Promise((resolve) => setTimeout(resolve, 3000))
+            log.info("workspace-mcp server started in background")
+          }
+        } catch (error) {
+          log.debug("failed to ensure workspace-mcp server", { error })
+        }
+      }
+
       // OAuth is enabled by default for remote servers unless explicitly disabled with oauth: false
       const oauthDisabled = mcp.oauth === false
       const oauthConfig = typeof mcp.oauth === "object" ? mcp.oauth : undefined
       let authProvider: McpOAuthProvider | undefined
+
+      // For google-workspace, try to use pre-authenticated bearer token from database
+      let bearerToken: string | undefined
+      if (key === "google-workspace") {
+        try {
+          const clientId = oauthConfig?.clientId || process.env.GWORKSPACE_CLIENT_ID || ""
+          const clientSecret = oauthConfig?.clientSecret || process.env.GWORKSPACE_CLIENT_SECRET
+          bearerToken = await TokenManager.getValidAccessToken(
+            "fulviold@gmail.com",
+            "default",
+            async (refreshToken) => {
+              const { GWorkspaceOAuth } = await import("@/kiloclaw/agency/auth/gworkspace-oauth")
+              const fresh = await GWorkspaceOAuth.refreshTokens({ clientId, clientSecret, scopes: [] }, refreshToken)
+              // Keep McpAuth in sync after refresh
+              await McpAuth.updateTokens("google-workspace", {
+                accessToken: fresh.accessToken,
+                refreshToken: fresh.refreshToken,
+                expiresAt: fresh.expiresAt / 1000,
+              }).catch((e) => log.debug("failed to sync refreshed token to mcp auth", { error: e }))
+              return {
+                accessToken: fresh.accessToken,
+                refreshToken: fresh.refreshToken,
+                expiresIn: Math.max(60, Math.floor((fresh.expiresAt - Date.now()) / 1000)),
+                tokenType: "Bearer",
+              }
+            },
+          )
+          log.info("using bearer token from database for google-workspace", { tokenLength: bearerToken?.length })
+        } catch (error) {
+          log.debug("failed to get bearer token from database", { error })
+        }
+      }
 
       if (!oauthDisabled) {
         authProvider = new McpOAuthProvider(
@@ -412,10 +490,30 @@ export namespace MCP {
           {
             onRedirect: async (url) => {
               log.info("oauth redirect requested", { key, url: url.toString() })
-              // Store the URL - actual browser opening is handled by startAuth
+              // Try to open browser automatically
+              try {
+                await open(url.toString())
+                log.info("opened oauth url in browser", { key })
+              } catch (error) {
+                log.warn("failed to open browser automatically", { key, error })
+                // Publish event so TUI can show the URL to user
+                Bus.publish(MCP.BrowserOpenFailed, {
+                  mcpName: key,
+                  url: url.toString(),
+                }).catch((e) => log.debug("failed to publish browser open failed event", { error: e }))
+              }
             },
           },
         )
+      }
+
+      // Build headers including bearer token if available
+      const headers: Record<string, string> = {}
+      if (bearerToken) {
+        headers["Authorization"] = `Bearer ${bearerToken}`
+      }
+      if (mcp.headers) {
+        Object.assign(headers, mcp.headers)
       }
 
       const transports: Array<{ name: string; transport: TransportWithAuth }> = [
@@ -423,14 +521,14 @@ export namespace MCP {
           name: "StreamableHTTP",
           transport: new StreamableHTTPClientTransport(new URL(mcp.url), {
             authProvider,
-            requestInit: mcp.headers ? { headers: mcp.headers } : undefined,
+            requestInit: Object.keys(headers).length > 0 ? { headers } : undefined,
           }),
         },
         {
           name: "SSE",
           transport: new SSEClientTransport(new URL(mcp.url), {
             authProvider,
-            requestInit: mcp.headers ? { headers: mcp.headers } : undefined,
+            requestInit: Object.keys(headers).length > 0 ? { headers } : undefined,
           }),
         },
       ]
@@ -991,6 +1089,27 @@ export namespace MCP {
       // Clear the code verifier after successful auth
       await McpAuth.clearCodeVerifier(mcpName)
 
+      // Sync fresh MCP tokens → TokenManager so native tools are also authenticated
+      if (mcpName === "google-workspace") {
+        try {
+          const entry = await McpAuth.get(mcpName)
+          if (entry?.tokens?.accessToken) {
+            const { tokens } = entry
+            const nowSec = Date.now() / 1000
+            const expiresIn = tokens.expiresAt ? Math.max(60, Math.floor(tokens.expiresAt - nowSec)) : 3600
+            await TokenManager.store("fulviold@gmail.com", "default", {
+              accessToken: tokens.accessToken,
+              refreshToken: tokens.refreshToken,
+              expiresIn,
+              tokenType: "Bearer",
+            })
+            log.info("synced mcp oauth tokens to token manager after auth", { mcpName })
+          }
+        } catch (syncErr) {
+          log.warn("failed to sync mcp tokens to token manager", { mcpName, error: syncErr })
+        }
+      }
+
       // Now try to reconnect
       const cfg = await Config.get()
       const mcpConfig = cfg.mcp?.[mcpName]
@@ -1065,6 +1184,25 @@ export namespace MCP {
    * Called before the chat UI renders to verify/refresh auth.
    */
   export async function ensureAtSessionStart(): Promise<Record<string, EnsureResult>> {
+    // Ensure workspace-mcp server is running before connecting to any MCP servers
+    try {
+      const config = await Config.get()
+      const googleWorkspaceMcp = config.mcp?.["google-workspace"]
+      if (
+        googleWorkspaceMcp &&
+        typeof googleWorkspaceMcp === "object" &&
+        "type" in googleWorkspaceMcp &&
+        googleWorkspaceMcp.type === "remote"
+      ) {
+        // Import and call ensureGoogleWorkspaceMcpRunning from mcp command
+        log.debug("ensuring google-workspace mcp server is running at session start")
+        // This will be handled by the mcp command module
+        // For now, we just log that we attempted to ensure it
+      }
+    } catch (error) {
+      log.debug("failed to ensure workspace-mcp at session start", { error })
+    }
+
     await McpAuthCoordinator.initialize()
     return McpAuthCoordinator.ensureAtSessionStart()
   }

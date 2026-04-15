@@ -355,6 +355,28 @@ export class KeyManager {
     ])
     this.loadKeysFromEnv("POLYMARKET", { requestsPerMinute: 50, requestsPerDay: 20000, retryAfterMs: 60000 })
 
+    // Travel providers - Amadeus (Flight/Hotel/Activities)
+    this.loadKeysFromEnv("AMADEUS", { requestsPerMinute: 20, requestsPerDay: 5000, retryAfterMs: 60000 })
+
+    // Travel providers - Ticketmaster (Events)
+    this.loadKeysFromEnv("TICKETMASTER", { requestsPerMinute: 10, requestsPerDay: 5000, retryAfterMs: 60000 }, [
+      "TICKETMASTER_API",
+    ])
+
+    // Travel providers - Google Maps/Places/Geocoding
+    this.loadKeysFromEnv("GOOGLE", { requestsPerMinute: 60, requestsPerDay: 100000, retryAfterMs: 60000 }, [
+      "GOOGLE_MAPS",
+      "GOOGLE_PLACES",
+    ])
+
+    // Travel providers - OpenTripMap (POI fallback)
+    this.loadKeysFromEnv("OPENTRIPMAP", { requestsPerMinute: 30, requestsPerDay: 10000, retryAfterMs: 60000 })
+
+    // Travel providers - Aviationstack (Flight status)
+    this.loadKeysFromEnv("AVIATIONSTACK", { requestsPerMinute: 10, requestsPerDay: 5000, retryAfterMs: 60000 }, [
+      "AVIATIONSTACK_API",
+    ])
+
     this.log.info("key manager initialization complete", {
       providers: this.pools.size,
       stats: [...this.pools.entries()].map(([name, pool]) => [name, pool.getStats()]),

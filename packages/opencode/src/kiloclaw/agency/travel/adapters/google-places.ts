@@ -26,6 +26,7 @@ interface LocalRestaurantOffer {
   url?: string
   phone?: string
   coordinates: { lat: number; lng: number }
+  types?: string[]
 }
 
 interface LocalActivityOffer {
@@ -43,6 +44,7 @@ interface LocalActivityOffer {
   url?: string
   images: string[]
   openingHours?: string
+  types?: string[]
 }
 
 interface TravelAdapterError {
@@ -182,6 +184,7 @@ export class GooglePlacesAdapter extends TravelAdapter {
               )
           : [],
         openingHours: place.opening_hours?.weekday_text?.join(", "),
+        types: place.types || [],
       }))
 
       return {
@@ -274,6 +277,7 @@ export class GooglePlacesAdapter extends TravelAdapter {
           url: place.website,
           phone: place.formatted_phone_number,
           coordinates: place.geometry?.location || { lat: 0, lng: 0 },
+          types: place.types || [],
         }
       })
 
@@ -301,13 +305,30 @@ export class GooglePlacesAdapter extends TravelAdapter {
   // ==========================================================================
 
   private handleError<T>(error: unknown, startTime: number): AdapterResult<T> {
-    const code = error && typeof error === "object" && "code" in error ? (error as TravelAdapterError).code : "UNKNOWN"
+    // Handle thrown objects with { code, message } structure
+    if (error && typeof error === "object") {
+      const errObj = error as TravelAdapterError & { message?: unknown }
+      const code = errObj.code || "UNKNOWN"
+      // Ensure message is always a string
+      const message =
+        typeof errObj.message === "string" ? errObj.message : error instanceof Error ? error.message : String(error)
+      return {
+        success: false,
+        error: {
+          code,
+          message,
+          provider: this.name,
+        },
+        provider: this.name,
+        latencyMs: Date.now() - startTime,
+      }
+    }
+    // Handle Error instances
     const message = error instanceof Error ? error.message : String(error)
-
     return {
       success: false,
       error: {
-        code: code as TravelAdapterError["code"],
+        code: "UNKNOWN" as TravelAdapterError["code"],
         message,
         provider: this.name,
       },

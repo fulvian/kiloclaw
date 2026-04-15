@@ -8,14 +8,14 @@
 
 ## Current Implementation Status
 
-| API | Status | Requests | Errors | Median Latency | 95% Latency | Notes |
-|-----|--------|----------|--------|---|---|---|
-| Gmail API | ✅ Complete | 264 | 0% | 84ms | 459ms | Full read/search/draft/send |
-| Drive API | ✅ Partial | 127 | 3% | 342ms | 1,042ms | Read/search; write partially fixed |
-| Calendar API | ✅ Partial | 60 | 0% | 145ms | 522ms | List/read/create/update |
-| Docs API | ✅ Minimal | 1 | 0% | 786ms | 1,022ms | Read/export only |
-| Sheets API | ❌ Missing | - | - | - | - | Read skills only |
-| Slides API | ✅ Phase 4 | - | - | - | - | Complete (6 skills) |
+| API          | Status      | Requests | Errors | Median Latency | 95% Latency | Notes                              |
+| ------------ | ----------- | -------- | ------ | -------------- | ----------- | ---------------------------------- |
+| Gmail API    | ✅ Complete | 264      | 0%     | 84ms           | 459ms       | Full read/search/draft/send        |
+| Drive API    | ✅ Partial  | 127      | 3%     | 342ms          | 1,042ms     | Read/search; write partially fixed |
+| Calendar API | ✅ Partial  | 60       | 0%     | 145ms          | 522ms       | List/read/create/update            |
+| Docs API     | ✅ Minimal  | 1        | 0%     | 786ms          | 1,022ms     | Read/export only                   |
+| Sheets API   | ❌ Missing  | -        | -      | -              | -           | Read skills only                   |
+| Slides API   | ✅ Phase 4  | -        | -      | -              | -           | Complete (6 skills)                |
 
 ---
 
@@ -24,14 +24,17 @@
 ### TIER 1: CRITICAL (Complete Phase 4)
 
 #### Google Sheets API
+
 **Priority**: CRITICAL  
-**Reason**: 
+**Reason**:
+
 - Essential companion to Docs for office productivity
 - Shared scope with Sheets tasks: read, list, search, update, export
 - Users expect Sheets alongside Docs
 - Relatively simple integration (similar to Docs)
 
 **Proposed Skills**:
+
 1. `sheetsRead(spreadsheet_id)` — Get spreadsheet metadata
 2. `sheetsListSheets(spreadsheet_id)` — List all sheets in spreadsheet
 3. `sheetsGetValues(spreadsheet_id, range)` — Read cell values
@@ -47,14 +50,17 @@
 ---
 
 #### Google Tasks API
+
 **Priority**: HIGH  
 **Reason**:
+
 - Lightweight task management integrated with Gmail/Calendar
 - Complements calendar-based scheduling
 - Simple API (create, read, update, delete tasks)
 - Popular with Gmail users
 
 **Proposed Skills**:
+
 1. `tasksList(task_list_id)` — List tasks in a task list
 2. `tasksCreate(task_list_id, title, description, due_date)` — Create task
 3. `tasksUpdate(task_id, title, status)` — Update task
@@ -70,14 +76,17 @@
 ### TIER 2: HIGH VALUE (Advanced Office Integration)
 
 #### Google Forms API
+
 **Priority**: HIGH  
 **Reason**:
+
 - Essential for data collection workflows
 - Complements Sheets (forms feed into sheets)
 - Survey/feedback automation valuable for organizations
 - Growing user demand for form integration
 
 **Proposed Skills**:
+
 1. `formsRead(form_id)` — Get form structure/schema
 2. `formsList()` — List all user's forms
 3. `formsGetResponses(form_id, limit)` — Get form responses
@@ -91,14 +100,17 @@
 ---
 
 #### Contacts API
+
 **Priority**: HIGH  
 **Reason**:
+
 - Essential for email/calendar automation
 - Used in conjunction with Gmail (email addresses, contact lookup)
 - Support for contact groups (sharing circles)
 - Rich metadata (phone, address, organization)
 
 **Proposed Skills**:
+
 1. `contactsList()` — List all contacts
 2. `contactsSearch(query)` — Search contacts by name/email
 3. `contactsGet(contact_id)` — Get contact details
@@ -115,14 +127,17 @@
 ---
 
 #### Google Meet API
+
 **Priority**: MEDIUM-HIGH  
 **Reason**:
+
 - Growing demand for video conferencing automation
 - Integration with Calendar for meeting setup
 - Recording management and meeting controls
 - Post-COVID workplace standard
 
 **Proposed Skills**:
+
 1. `meetCreateConference(calendar_event_id)` — Add Meet link to event
 2. `meetGetConferenceData(event_id)` — Get meeting details
 3. `meetRecordingsList()` — List user's recordings
@@ -138,14 +153,17 @@
 ### TIER 3: SPECIALIZED (Domain-Specific Use Cases)
 
 #### Google Classroom API
+
 **Priority**: MEDIUM (Education-focused)  
 **Reason**:
+
 - Essential for education/training organizations
 - Integration with Drive for document distribution
 - Grade and assignment management
 - Growing adoption in corporate training
 
 **Proposed Skills**:
+
 1. `classroomListCourses()` — List all courses
 2. `classroomGetCourse(course_id)` — Get course details
 3. `classroomListStudents(course_id)` — List enrolled students
@@ -160,14 +178,17 @@
 ---
 
 #### Google Keep API
+
 **Priority**: LOW-MEDIUM  
 **Reason**:
+
 - Simple note-taking integration
 - Useful for quick note capture
 - Less structured than Docs
 - Lighter weight for users wanting simplicity
 
 **Proposed Skills**:
+
 1. `keepListNotes()` — List all notes
 2. `keepGetNote(note_id)` — Get note content
 3. `keepCreateNote(title, text)` — Create note
@@ -181,14 +202,17 @@
 ---
 
 #### Cloud Search API
+
 **Priority**: HIGH (Cross-service search)  
 **Reason**:
+
 - Unified search across all Google Workspace services
 - Replaces need for individual service search queries
 - Better relevance and ranking
 - Enterprise adoption growing
 
 **Proposed Skills**:
+
 1. `searchAll(query)` — Search everything (Docs, Sheets, Drive, Gmail, etc)
 2. `searchByType(query, type)` — Search specific content type
 3. `searchByOwner(owner_email)` — Search user's content
@@ -203,14 +227,17 @@
 ### TIER 4: INFRASTRUCTURE (Enabling Technologies)
 
 #### Gmail Postmaster Tools API
+
 **Priority**: MEDIUM (Email deliverability)  
 **Reason**:
+
 - Monitor email delivery metrics
 - Troubleshoot email issues
 - Track bounce/spam rates
 - Essential for bulk email workflows
 
 **Proposed Skills**:
+
 1. `postmasterGetMetrics(start_date, end_date)` — Get delivery metrics
 2. `postmasterGetThreads()` — List email feedback threads
 3. `postmasterReportIssues()` — Get known issues/problems
@@ -222,14 +249,17 @@
 ---
 
 #### BigQuery API
+
 **Priority**: MEDIUM (Advanced Analytics)  
 **Reason**:
+
 - Enable data analysis workflows
 - Connect to business intelligence tools
 - Create dashboards from workspace data
 - Enterprise data warehouse integration
 
 **Proposed Skills**:
+
 1. `bigqueryListDatasets()` — List available datasets
 2. `bigqueryCreateQuery(sql)` — Run SQL query
 3. `bigqueryListQueryResults(job_id)` — Get results
@@ -243,8 +273,10 @@
 ---
 
 #### Cloud Storage API
+
 **Priority**: LOW (Rarely used with Workspace)  
 **Reason**:
+
 - Overlaps with Drive for storage
 - Useful for large-scale data or technical workflows
 - Not typical Workspace user need
@@ -254,18 +286,19 @@
 
 ---
 
-### TIER 5: NOT RECOMMENDED (Out of Scope)
+### TIER 5: IN ALTRE AGENCIES E DOMINI
 
-**YouTube Data API**: Out of scope (content platform, not workspace)  
-**Maps Embed API**: Out of scope (location services, not workspace)  
-**Weather API**: Out of scope (information service, not workspace)  
-**Knowledge Graph API**: Out of scope (reference data, not workspace)
+**YouTube Data API**: Out of scope (content platform, not workspace) >>> già integrabile in knowledge agency e in futuro in una agenzia specializzata su l'entaritnainment
+**Maps Embed API**: Out of scope (location services, not workspace) >>>> da integrare immeditamente in travel agency
+**Weather API**: Out of scope (information service, not workspace) >>>> integrare immediatamente in travel e meteo agencies
+**Knowledge Graph API**: Out of scope (reference data, not workspace) >>>> da integrare in knowledge agency
 
 ---
 
 ## Recommended Implementation Roadmap
 
 ### Phase 5 (Weeks 1-2): Essential Companions
+
 1. ✅ **Google Sheets API** — Completes office trio (Docs/Sheets/Slides)
 2. ✅ **Google Tasks API** — Lightweight task management
 3. ✅ **Contacts API** — Enables contact-based workflows
@@ -278,6 +311,7 @@
 ---
 
 ### Phase 6 (Weeks 3-4): Advanced Integration
+
 1. ✅ **Google Forms API** — Data collection automation
 2. ✅ **Cloud Search API** — Unified cross-service search
 3. ✅ **Google Meet API** — Video conferencing integration
@@ -290,6 +324,7 @@
 ---
 
 ### Phase 7 (Weeks 5-6): Specialized/Optional
+
 1. ✅ **Google Classroom API** — If targeting education
 2. ✅ **Gmail Postmaster Tools** — If targeting bulk email
 3. ✅ **Google Keep API** — Lightweight alternative to Docs
@@ -307,6 +342,7 @@
 ### By Phase
 
 **Phase 4 (Current)**: Core Office Suite
+
 - ✅ Gmail (complete)
 - ✅ Calendar (partial)
 - ✅ Drive (fixing critical bugs)
@@ -315,6 +351,7 @@
 - ✅ Slides (complete)
 
 **Phase 5 (Recommended)**: Complete Foundation
+
 - ✅ Gmail (complete)
 - ✅ Calendar (enhanced)
 - ✅ Drive (complete)
@@ -325,6 +362,7 @@
 - ✅ Contacts (new)
 
 **Phase 6 (Recommended)**: Advanced Features
+
 - ✅ Forms (new)
 - ✅ Meet (new)
 - ✅ Cloud Search (new)
@@ -332,14 +370,14 @@
 
 ### Coverage by Workflow Type
 
-| Workflow | Current | Phase 5 | Phase 6 | Completeness |
-|----------|---------|---------|---------|---|
-| Email Management | Gmail, Calendar | + Tasks | + Postmaster | 95% |
-| Document Collaboration | Docs, Drive | + Sheets | + Forms | 95% |
-| Scheduling/Meetings | Calendar | + Tasks | + Meet | 90% |
-| Data Analysis | - | Sheets | + BigQuery | 80% |
-| Project Management | Drive | + Tasks | + Forms | 85% |
-| Team Communication | Gmail, Meet | + Contacts | + Classroom | 85% |
+| Workflow               | Current         | Phase 5    | Phase 6      | Completeness |
+| ---------------------- | --------------- | ---------- | ------------ | ------------ |
+| Email Management       | Gmail, Calendar | + Tasks    | + Postmaster | 95%          |
+| Document Collaboration | Docs, Drive     | + Sheets   | + Forms      | 95%          |
+| Scheduling/Meetings    | Calendar        | + Tasks    | + Meet       | 90%          |
+| Data Analysis          | -               | Sheets     | + BigQuery   | 80%          |
+| Project Management     | Drive           | + Tasks    | + Forms      | 85%          |
+| Team Communication     | Gmail, Meet     | + Contacts | + Classroom  | 85%          |
 
 ---
 
@@ -348,17 +386,20 @@
 ### Based on Your Current Metrics
 
 **Observations**:
+
 - Gmail API: Excellent latency (84ms median), 0% errors — baseline for reliability
 - Drive API: Higher latency (342ms median), 3% errors — needs investigation
 - Calendar API: Good latency (145ms median), 0% errors
 - Docs API: High latency (786ms median) but low volume — expected for export
 
 **Drive API 3% Error Rate**: Likely due to the bugs identified in debug investigation:
+
 - Encrypted token causing 401s
 - Missing validation causing 400s
 - Scope issues causing 403s
 
 **Post-Fix Expectations**:
+
 - Drive errors should drop to <1%
 - Latency should decrease with fewer retries
 
@@ -394,7 +435,7 @@
    - Sheets API (2-3h)
    - Tasks API (1-2h)
    - Contacts API (2-3h)
-   
+
    **Checkpoint**: Core office suite complete, system feels professional
 
 3. **Comprehensive Testing**
@@ -426,6 +467,7 @@
 **Definition: "Truly complete, deep, and professional"**
 
 ### Must Have (Phase 5)
+
 - [x] All 6 core services (Gmail, Calendar, Drive, Docs, Sheets, Slides)
 - [x] CRUD operations for each service
 - [x] Search capabilities across services
@@ -435,6 +477,7 @@
 - [x] Multi-user/workspace isolation
 
 ### Should Have (Phase 6)
+
 - [x] Task management integration
 - [x] Meeting/video conferencing
 - [x] Data collection (Forms)
@@ -443,6 +486,7 @@
 - [x] Unified search
 
 ### Nice to Have (Phase 7)
+
 - [x] Advanced analytics (BigQuery)
 - [x] Education features (Classroom)
 - [x] Email deliverability (Postmaster)
@@ -453,17 +497,20 @@
 ## Risk Assessment
 
 ### Implementation Risks
+
 - **Low**: Sheets, Tasks, Contacts, Keep (proven APIs)
 - **Medium**: Forms, Meet, Cloud Search (more complex)
 - **High**: BigQuery (requires SQL knowledge)
 
 ### Operational Risks
+
 - Scope creep (too many APIs)
 - Token management complexity (more services = more token refresh)
 - Testing burden (more services = more test cases)
 - Security implications (broader access = broader attack surface)
 
 ### Mitigation
+
 - Implement one API at a time (not in parallel)
 - Reuse existing token/auth infrastructure
 - Apply same policy/audit patterns to all new APIs
@@ -476,6 +523,7 @@
 **Recommended Path**: Implement Phase 5 APIs (Sheets, Tasks, Contacts)
 
 **Why**:
+
 1. **Sheets** is essential — users expect it with Docs
 2. **Tasks** is lightweight — quick win for productivity
 3. **Contacts** enables workflows — enables contact-based automation
@@ -484,6 +532,7 @@
 **Timeline**: 2 weeks (low risk, high value)
 
 **Next Steps**:
+
 1. Complete Phase 4 bug fixes
 2. Implement Sheets API with full CRUD
 3. Implement Tasks API

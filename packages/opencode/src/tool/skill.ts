@@ -6,7 +6,6 @@ import { Skill } from "../skill"
 import { PermissionNext } from "../permission/next"
 import { Ripgrep } from "../file/ripgrep"
 import { iife } from "@/util/iife"
-import { Log } from "@/util/log" // kilocode_change - for logging
 import {
   knowledgeSkills,
   developmentSkills,
@@ -24,7 +23,6 @@ import { Session } from "../session" // kilocode_change - to get user messages
 import { MessageV2 } from "../session/message-v2" // kilocode_change - to get message parts
 
 const BUILTIN = Skill.BUILTIN_LOCATION // kilocode_change
-const log = Log.create({ service: "skill-tool" })
 
 export const SkillTool = Tool.define("skill", async (ctx) => {
   const skills = await Skill.all()
@@ -153,12 +151,6 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
       .enum(["load", "execute"])
       .optional()
       .describe("Mode: 'load' returns skill content only (documental), 'execute' triggers actual skill execution"),
-    input: z
-      .record(z.string(), z.any())
-      .optional()
-      .describe(
-        "Input parameters for skill execution. For weather-* skills: { location: string, days: number }. For travel-*-search skills: extract relevant params from user query (e.g., { destination: 'Roma', cuisine: 'italian' }). For transfer search: { from: string, to: string, date: string }.",
-      ),
   })
 
   return {
@@ -285,299 +277,105 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
 
         // P1: If execute mode enabled, call the execution bridge
         if (isExecuteMode) {
-          // Use provided input if available, otherwise extract from user message
+          // Get user's message to extract skill input
           let userInput: unknown = {}
+          try {
+            const msgs = await Session.messages({ sessionID: ctx.sessionID })
+            const lastUserMsg = msgs.findLast((m: any) => m.info.role === "user")
+            if (lastUserMsg) {
+              const textParts = lastUserMsg.parts
+                .filter((p: any) => p.type === "text" && !p.ignored && !p.synthetic)
+                .map((p: any) => p.text)
+                .join(" ")
+                .trim()
 
-          // If input was explicitly provided in the tool call, use it
-          if (params.input && Object.keys(params.input).length > 0) {
-            userInput = params.input
-            log.info("using provided input params", { skill: agencySkill.id, input: params.input })
-          } else {
-            // Extract parameters from user message
-            try {
-              const msgs = await Session.messages({ sessionID: ctx.sessionID })
-              const lastUserMsg = msgs.findLast((m: any) => m.info.role === "user")
-              if (lastUserMsg) {
-                const textParts = lastUserMsg.parts
-                  .filter((p: any) => p.type === "text" && !p.ignored && !p.synthetic)
-                  .map((p: any) => p.text)
-                  .join(" ")
-                  .trim()
-
-                // For weather skills, extract location from query text
-                if (agencySkill.id.startsWith("weather-")) {
-                  userInput = extractWeatherParams(textParts)
+              // For weather skills, extract location from query text
+              // Pattern: "weather in/at/city_name" or "tempo a/in city_name"
+              if (agencySkill.id.startsWith("weather-")) {
+                // Extract location - look for patterns anywhere in the text
+                const locationPatterns = [
+                  // Match "a Roma", "ad Roma", "a Roma, Italia"
+                  /(?:a|ad)\s+([A-Za-zÀ-ÿ\s\.\-\']+?)(?:,|$|\s+[A-Z])/i,
+                  // Match "in Italia", "in Roma", "in Rome"
+                  /(?:in)\s+([A-Za-zÀ-ÿ\s\.\-\']+?)(?:,|$|\s+[A-Z])/i,
+                  // Match "tempo a Roma", "previsioni Roma", "meteo Roma"
+                  /(?:tempo|meteo|previsioni|forecast)\s+(?:a\s+)?([A-Za-zÀ-ÿ\s\.\-\']+?)(?:,|$|\s+[A-Z])/i,
+                  // Match "weather Rome", "weather Roma"
+                  /weather\s+(?:in\s+)?([A-Za-zÀ-ÿ\s\.\-\']+?)(?:,|$|\s+[A-Z])/i,
+                ]
+                let location = ""
+                for (const pattern of locationPatterns) {
+                  const match = textParts.match(pattern)
+                  if (match && match[1]) {
+                    location = match[1].trim()
+                    // Clean up - remove trailing prepositions or days
+                    location = location.replace(/\s+(da|del|della|dalle|dai|e|da|dei|degli|al|ai|alla|alle)\s+.*$/i, "")
+                    location = location.replace(/,\s*$/, "") // remove trailing comma
+                    break
+                  }
                 }
-                // For travel skills, extract relevant parameters
-                else if (agencySkill.id.startsWith("travel-")) {
-                  userInput = extractTravelParams(agencySkill.id, textParts)
+                // Try to find Italian city names in the text
+                const italianCities = [
+                  "Roma",
+                  "Milano",
+                  "Napoli",
+                  "Firenze",
+                  "Venezia",
+                  "Torino",
+                  "Bologna",
+                  "Genova",
+                  "Palermo",
+                  "Bari",
+                  "Catania",
+                  "Verona",
+                  "Trieste",
+                  "Brescia",
+                  "Reggio Calabria",
+                  "Modena",
+                  "Parma",
+                  "Reggio Emilia",
+                  "Perugia",
+                  "Salerno",
+                  "Foggia",
+                  "Rimini",
+                  "Siracusa",
+                  "Bergamo",
+                  "Pescara",
+                  "Trento",
+                  "Ferrara",
+                  "Catanzaro",
+                  "Arezzo",
+                  "Latina",
+                  "Piacenza",
+                  "Lucca",
+                  "Frosinone",
+                  "Salerno",
+                  "Turino",
+                ]
+                for (const city of italianCities) {
+                  if (textParts.toLowerCase().includes(city.toLowerCase())) {
+                    location = city
+                    break
+                  }
                 }
-                // For other skills, use query format
-                else {
-                  userInput = { query: textParts, sources: 5 }
-                }
-              }
-            } catch (err) {
-              log.warn("failed to extract params from user message", { err })
-            }
-          }
-
-          // Helper: extract weather params
-          function extractWeatherParams(text: string): { location: string; days: number } {
-            const locationPatterns = [
-              /(?:a|ad)\s+([A-Za-zÀ-ÿ\s\.\-\']+?)(?:,|$|\s+[A-Z])/i,
-              /(?:in)\s+([A-Za-zÀ-ÿ\s\.\-\']+?)(?:,|$|\s+[A-Z])/i,
-              /(?:tempo|meteo|previsioni|forecast)\s+(?:a\s+)?([A-Za-zÀ-ÿ\s\.\-\']+?)(?:,|$|\s+[A-Z])/i,
-              /weather\s+(?:in\s+)?([A-Za-zÀ-ÿ\s\.\-\']+?)(?:,|$|\s+[A-Z])/i,
-            ]
-            let location = ""
-            for (const pattern of locationPatterns) {
-              const match = text.match(pattern)
-              if (match && match[1]) {
-                location = match[1].trim()
-                location = location.replace(/\s+(da|del|della|dalle|dai|e|da|dei|degli|al|ai|alla|alle)\s+.*$/i, "")
-                location = location.replace(/,\s*$/, "")
-                break
-              }
-            }
-            // Check for Italian cities
-            const italianCities = [
-              "Roma",
-              "Milano",
-              "Napoli",
-              "Firenze",
-              "Venezia",
-              "Torino",
-              "Bologna",
-              "Genova",
-              "Palermo",
-              "Bari",
-              "Catania",
-              "Verona",
-              "Trieste",
-              "Brescia",
-              "Reggio Calabria",
-              "Modena",
-              "Parma",
-              "Reggio Emilia",
-              "Perugia",
-              "Salerno",
-              "Foggia",
-              "Rimini",
-              "Siracusa",
-              "Bergamo",
-              "Pescara",
-              "Trento",
-              "Ferrara",
-              "Catanzaro",
-              "Arezzo",
-              "Latina",
-              "Piacenza",
-              "Lucca",
-              "Frosinone",
-              "Rome",
-              "Milan",
-              "Naples",
-              "Florence",
-              "Venice",
-              "Turin",
-              "Genoa",
-            ]
-            for (const city of italianCities) {
-              if (text.toLowerCase().includes(city.toLowerCase())) {
-                location = city
-                break
-              }
-            }
-            if (!location) location = "Roma"
-
-            const daysMatch = text.match(/(\d+)\s*giorn[oi]|(\d+)\s*days?/i)
-            const days = daysMatch ? parseInt(daysMatch[1] || daysMatch[2]) : 7
-
-            return { location, days }
-          }
-
-          // Helper: extract travel params based on skill type
-          function extractTravelParams(skillId: string, text: string): unknown {
-            // Common Italian cities for destination extraction
-            const italianCities = [
-              { it: "Roma", en: "Rome" },
-              { it: "Milano", en: "Milan" },
-              { it: "Napoli", en: "Naples" },
-              { it: "Firenze", en: "Florence" },
-              { it: "Venezia", en: "Venice" },
-              { it: "Torino", en: "Turin" },
-              { it: "Bologna", en: "Bologna" },
-              { it: "Genova", en: "Genoa" },
-              { it: "Palermo", en: "Palermo" },
-              { it: "Bari", en: "Bari" },
-              { it: "Catania", en: "Catania" },
-            ]
-
-            // Helper to extract destination/city from text
-            const extractCity = (): string => {
-              for (const { it, en } of italianCities) {
-                if (text.toLowerCase().includes(it.toLowerCase())) return it
-                if (text.toLowerCase().includes(en.toLowerCase())) return it
-              }
-              // Default to Rome if Italian city found
-              if (text.toLowerCase().includes("roma") || text.toLowerCase().includes("rome")) return "Roma"
-              return "Roma" // Default
-            }
-
-            // Extract date patterns
-            const extractDate = (pattern: RegExp): string | undefined => {
-              const match = text.match(pattern)
-              return match ? match[1] : undefined
-            }
-
-            // Extract cuisine preferences
-            const extractCuisine = (): string | undefined => {
-              const cuisines = [
-                "italiana",
-                "italian",
-                "romana",
-                "romana cuisine",
-                "napoletana",
-                "pizza",
-                "toscana",
-                "tuscan",
-                "pesce",
-                "seafood",
-                "carne",
-                "meat",
-                "vegetariano",
-                "vegetarian",
-                "vegano",
-                "vegan",
-                "cinese",
-                "chinese",
-                "giapponese",
-                "japanese",
-                "messicano",
-                "mexican",
-                "indiano",
-                "indian",
-              ]
-              for (const c of cuisines) {
-                if (text.toLowerCase().includes(c)) return c
-              }
-              return undefined
-            }
-
-            // Extract party composition
-            const extractParty = (): { adults?: number; children?: number } => {
-              const party: { adults?: number; children?: number } = {}
-              // Look for "bambina di quasi 2 anni", "figlia di 2 anni", etc.
-              const childMatch = text.match(/bambin[ao]\s+di\s+quasi\s+(\d+)\s+ann|numero\s+figli/i)
-              if (childMatch) {
-                party.children = parseInt(childMatch[1])
-              }
-              // Default to 2 adults if not specified
-              if (!party.adults && !party.children) {
-                party.adults = 2
-                party.children = 1
-              }
-              return party
-            }
-
-            // Extract price range
-            const extractPriceRange = (): string | undefined => {
-              if (text.includes("economico") || text.includes("budget") || text.includes("€")) return "budget"
-              if (text.includes("luss") || text.includes("luxury") || text.includes("€€€")) return "luxury"
-              if (text.includes("medio") || text.includes("mid-range") || text.includes("€€")) return "mid-range"
-              return undefined
-            }
-
-            // Extract airport/location references
-            const extractAirport = (): { from?: string; to?: string } => {
-              const result: { from?: string; to?: string } = {}
-              if (text.toLowerCase().includes("aeroporto") || text.toLowerCase().includes("airport")) {
-                if (text.toLowerCase().includes("fiumicino")) {
-                  result.from =
-                    text.toLowerCase().includes("all'hotel") || text.toLowerCase().includes("allogg")
-                      ? "Fiumicino"
-                      : "Fiumicino Airport"
-                }
-                if (text.toLowerCase().includes("ciampino")) {
-                  result.from = "Ciampino Airport"
-                }
-              }
-              if (text.toLowerCase().includes("hotel") || text.toLowerCase().includes("vill")) {
-                // User is going to hotel
-              }
-              return result
-            }
-
-            // Route based on skill type
-            switch (skillId) {
-              case "travel-restaurant-search": {
-                const destination = extractCity()
-                const cuisine = extractCuisine()
-                const priceRange = extractPriceRange()
-                return { destination, cuisine, priceRange }
-              }
-
-              case "travel-transfer-search": {
-                const airports = extractAirport()
-                const dateMatch = text.match(/(?:giovedì|venerdì|sabato|domenica|lunedì|martedì|mercoledì)/i)
-                // Extract date from day name or use a date pattern
-                const dayMatch = text.match(/(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/)
-                let date = dayMatch ? dayMatch[1] : undefined
-
-                return {
-                  from: airports.from || "Fiumicino Airport",
-                  to:
-                    text.toLowerCase().includes("hotel") || text.toLowerCase().includes("vill")
-                      ? "Villa Pamphili"
-                      : "Roma",
-                  date: date || "2026-04-16",
-                  passengers: 3,
-                }
-              }
-
-              case "travel-activity-search": {
-                const destination = extractCity()
-                const party = extractParty()
-
-                // Extract category based on interests mentioned
-                let category: string | undefined
-                if (
-                  text.toLowerCase().includes("bambin") ||
-                  text.toLowerCase().includes("figlia") ||
-                  text.toLowerCase().includes("famiglia")
-                ) {
-                  category = "family"
-                } else if (text.toLowerCase().includes("cultura") || text.toLowerCase().includes("museo")) {
-                  category = "culture"
-                } else if (text.toLowerCase().includes("cibo") || text.toLowerCase().includes("gastronom")) {
-                  category = "food"
-                } else if (text.toLowerCase().includes("avventura")) {
-                  category = "adventure"
+                // Default to Rome if no location found (common default)
+                if (!location) {
+                  location = "Roma"
                 }
 
-                return { destination, category, ...party }
-              }
+                // Extract days if mentioned (temporal "da giovedi" or date references)
+                const daysMatch = textParts.match(/(\d+)\s*giorn[oi]|(\d+)\s*days?/i)
+                const days = daysMatch ? parseInt(daysMatch[1] || daysMatch[2]) : 7
 
-              case "travel-hotel-search": {
-                const destination = extractCity()
-                const priceRange = extractPriceRange()
-                return { destination, priceRange }
+                userInput = { location, days }
+              } else {
+                // Non-weather skills use query format
+                userInput = { query: textParts, sources: 5 }
               }
-
-              case "travel-flight-search": {
-                // For flight search, we need origin and destination
-                const destination = extractCity()
-                return {
-                  destination,
-                  departureDate: "2026-04-16",
-                  passengers: 3,
-                }
-              }
-
-              default:
-                return { query: text, sources: 5 }
             }
+          } catch (err) {
+            // If we can't get user message, use empty input
+            userInput = {}
           }
 
           // Call the execution bridge

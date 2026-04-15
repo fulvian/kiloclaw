@@ -102,9 +102,16 @@ export const NbaGamesTool = Tool.define("nba-games", async () => {
       // NBA games for "tonight" in local time may be scheduled on the next calendar day in UTC
       // (US evening games start ~11PM UTC). When no date specified, fetch both today and tomorrow
       // to capture all relevant games.
+      // When date IS provided, also fetch the next day because Italian "evening of April 14"
+      // = US games on April 15 UTC (games start around 23:00-03:00 UTC).
       let dates: string[]
       if (params.date) {
-        dates = [params.date]
+        // When user provides a date, fetch both that date AND the next day
+        // to capture games that span midnight in UTC
+        const provided = new Date(params.date + "T00:00:00Z")
+        const nextDay = new Date(provided)
+        nextDay.setDate(nextDay.getDate() + 1)
+        dates = [params.date, nextDay.toISOString().split("T")[0]]
       } else {
         const today = new Date()
         const tomorrow = new Date(today)

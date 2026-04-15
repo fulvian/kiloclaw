@@ -1,10 +1,11 @@
 // Travel Restaurant Search Skill
-// Searches for restaurants at destination
+// Searches for restaurants at destination using Google Places API
 
 import { Log } from "@/util/log"
 import type { Skill } from "../../skill"
 import type { SkillContext } from "../../skill"
 import { SkillId } from "../../types"
+import { googlePlacesAdapter } from "../../agency/travel/adapters/google-places"
 
 const log = Log.create({ service: "kiloclaw.skill.travel-restaurant-search" })
 
@@ -30,6 +31,9 @@ interface RestaurantOffer {
   openingHours: string
   familyFriendly: boolean
   reservationsRecommended: boolean
+  url?: string
+  phone?: string
+  coordinates?: { lat: number; lng: number }
 }
 
 interface RestaurantSearchOutput {
@@ -40,117 +44,83 @@ interface RestaurantSearchOutput {
   meta: { generationTimeMs: number; resultsCount: number }
 }
 
-const RESTAURANTS_DB: RestaurantOffer[] = [
-  {
-    id: "rest-1",
-    name: "Da Enzo al 29",
-    address: "Via dei Vascellari 29",
-    city: "Roma",
-    cuisine: ["Romana", "Italiana"],
-    priceLevel: 2,
-    priceRange: "€€",
-    rating: 4.7,
-    reviewCount: 3200,
-    features: ["Cucina tradizionale", "Ambiente familiare"],
-    openingHours: "12:30-15:00, 19:30-23:00",
-    familyFriendly: true,
-    reservationsRecommended: true,
-  },
-  {
-    id: "rest-2",
-    name: "Tonnarello",
-    address: "Via della Paglia 25",
-    city: "Roma",
-    cuisine: ["Romana", "Pasta"],
-    priceLevel: 2,
-    priceRange: "€€",
-    rating: 4.6,
-    reviewCount: 2800,
-    features: ["Pasta fatta in casa", "Specialità di mare"],
-    openingHours: "12:30-15:00, 19:30-23:00",
-    familyFriendly: true,
-    reservationsRecommended: true,
-  },
-  {
-    id: "rest-3",
-    name: "Pizzarium",
-    address: "Via della Meloria 43",
-    city: "Roma",
-    cuisine: ["Pizza", "Fast food"],
-    priceLevel: 1,
-    priceRange: "€",
-    rating: 4.5,
-    reviewCount: 4500,
-    features: ["Pizza al taglio", "Impasto alveolato"],
-    openingHours: "11:00-22:00",
-    familyFriendly: true,
-    reservationsRecommended: false,
-  },
-  {
-    id: "rest-4",
-    name: "Armando al Pantheon",
-    address: "Via dei Pantheon 54",
-    city: "Roma",
-    cuisine: ["Romana", "Italiana"],
-    priceLevel: 3,
-    priceRange: "€€€",
-    rating: 4.9,
-    reviewCount: 2200,
-    features: ["Vista Pantheon", "Cucina tradizionale"],
-    openingHours: "12:30-15:00, 19:30-23:00",
-    familyFriendly: true,
-    reservationsRecommended: true,
-  },
-  {
-    id: "rest-5",
-    name: "Trattoria Sergio",
-    address: "Via dei Neri 11",
-    city: "Firenze",
-    cuisine: ["Toscana"],
-    priceLevel: 2,
-    priceRange: "€€",
-    rating: 4.8,
-    reviewCount: 2600,
-    features: ["Bistecca alla fiorentina", "Ribollita"],
-    openingHours: "12:30-14:30, 19:30-22:30",
-    familyFriendly: true,
-    reservationsRecommended: true,
-  },
-  {
-    id: "rest-6",
-    name: "Di Matteo",
-    address: "Via dei Tribunali 94",
-    city: "Napoli",
-    cuisine: ["Pizza", "Napoletana"],
-    priceLevel: 1,
-    priceRange: "€",
-    rating: 4.7,
-    reviewCount: 5000,
-    features: ["Pizza margherita storica", "Antica pizzeria"],
-    openingHours: "09:00-23:00",
-    familyFriendly: true,
-    reservationsRecommended: false,
-  },
-  {
-    id: "rest-7",
-    name: "Langosteria",
-    address: "Via Carlo Tenca 5",
-    city: "Milano",
-    cuisine: ["Pesce", "Moderna"],
-    priceLevel: 4,
-    priceRange: "€€€€",
-    rating: 4.9,
-    reviewCount: 1900,
-    features: ["Pesce premium", "Chef stellato"],
-    openingHours: "12:30-14:30, 19:30-23:00",
-    familyFriendly: false,
-    reservationsRecommended: true,
-  },
-]
+// Map price level from Google Places (0-4) to our price range string
+function mapPriceRange(priceLevel: number): string {
+  if (priceLevel <= 1) return "€"
+  if (priceLevel === 2) return "€€"
+  if (priceLevel === 3) return "€€€"
+  return "€€€€"
+}
+
+// Map Google Places types to cuisine categories
+function extractCuisineFromTypes(types: string[]): string[] {
+  const cuisineMap: Record<string, string[]> = {
+    italian: ["Italian", "Italian cuisine"],
+    pizza: ["Pizza"],
+    sushi: ["Japanese", "Sushi"],
+    chinese: ["Chinese"],
+    mexican: ["Mexican"],
+    indian: ["Indian"],
+    french: ["French"],
+    thai: ["Thai"],
+    american: ["American"],
+    seafood: ["Seafood"],
+    steakhouse: ["Steakhouse"],
+    cafe: ["Cafe", "Coffee"],
+    bakery: ["Bakery"],
+    bar: ["Bar"],
+    fast_food: ["Fast Food"],
+    ice_cream: ["Ice Cream"],
+    mediterranean: ["Mediterranean"],
+    greek: ["Greek"],
+    spanish: ["Spanish", "Tapas"],
+    vietnamese: ["Vietnamese"],
+    korean: ["Korean"],
+    ethiopian: ["Ethiopian"],
+    german: ["German"],
+    british: ["British"],
+    pub: ["Pub"],
+    wine_bar: ["Wine Bar"],
+    cocktail_bar: ["Cocktail Bar"],
+    breakfast: ["Breakfast"],
+    brunch: ["Brunch"],
+  }
+
+  const cuisines: string[] = []
+  for (const type of types) {
+    if (cuisineMap[type]) {
+      cuisines.push(...cuisineMap[type])
+    }
+  }
+  return [...new Set(cuisines)]
+}
+
+// Infer features from place types
+function inferFeatures(types: string[]): string[] {
+  const features: string[] = []
+  const featureIndicators: Record<string, string[]> = {
+    "Outdoor seating": ["outdoor_seating"],
+    "Takes reservations": ["reservations"],
+    Delivery: ["delivery"],
+    Takeout: ["takeout"],
+    "Wheelchair accessible": ["wheelchair_accessible"],
+    "Good for kids": ["good_for_kids", "family Friendly"],
+    Groups: ["group"],
+    Romantic: ["romantic"],
+    Business: ["business_meeting"],
+  }
+
+  for (const [feature, indicators] of Object.entries(featureIndicators)) {
+    if (indicators.some((ind) => types.includes(ind))) {
+      features.push(feature)
+    }
+  }
+  return features
+}
 
 export const TravelRestaurantSearchSkill: Skill = {
   id: "travel-restaurant-search" as SkillId,
-  version: "1.0.0",
+  version: "1.1.0",
   name: "Travel Restaurant Search",
   inputSchema: {
     type: "object",
@@ -183,37 +153,92 @@ export const TravelRestaurantSearchSkill: Skill = {
     log.info("restaurant search", { correlationId: context.correlationId, destination, cuisine })
 
     try {
-      const destNormalized = destination.toLowerCase()
-      let results = RESTAURANTS_DB.filter(
-        (r) => r.city.toLowerCase().includes(destNormalized) || destNormalized.includes(r.city.toLowerCase()),
-      )
+      // Convert price range to Google Places price level (0-4)
+      const priceLevelMap: Record<string, number> = { budget: 1, "mid-range": 2, luxury: 3 }
+      const googlePriceLevel = priceRange ? priceLevelMap[priceRange] : undefined
 
-      if (results.length === 0) {
-        results = [...RESTAURANTS_DB].sort((a, b) => b.reviewCount - a.reviewCount).slice(0, 6)
-        errors.push({
-          provider: "fallback",
-          error: `No specific restaurants for ${destination}`,
-          timestamp: new Date().toISOString(),
+      // Call Google Places API
+      const result = await googlePlacesAdapter.searchRestaurants({
+        city: destination,
+        cuisine: cuisine,
+        priceLevel: googlePriceLevel,
+        limit: 20,
+      })
+
+      if (!result.success || !result.data || result.data.length === 0) {
+        // API failed or returned empty - log error and return empty
+        if (result.error) {
+          errors.push({
+            provider: result.provider,
+            error: `Google Places API error: ${result.error.message}`,
+            timestamp: new Date().toISOString(),
+          })
+        }
+
+        log.warn("Google Places returned no results", {
+          destination,
+          cuisine,
+          error: result.error?.message,
         })
+
+        return {
+          offers: [],
+          searchParams: { destination, cuisine, priceRange },
+          provider: { id: "google_places", name: "Google Places API" },
+          errors,
+          meta: { generationTimeMs: Date.now() - startTime, resultsCount: 0 },
+        }
       }
 
-      if (cuisine)
-        results = results.filter((r) => r.cuisine.some((c) => c.toLowerCase().includes(cuisine.toLowerCase())))
-      if (priceRange) {
-        const ranges: Record<string, number[]> = { budget: [1], "mid-range": [2, 3], luxury: [3, 4] }
-        const levels = ranges[priceRange]
-        if (levels) results = results.filter((r) => levels.includes(r.priceLevel))
-      }
-      if (rating) results = results.filter((r) => r.rating >= rating)
+      // Transform adapter response to our format
+      let offers: RestaurantOffer[] = result.data.map((place) => {
+        const types = place.types || []
+        const inferredCuisines = place.cuisine.length > 0 ? place.cuisine : extractCuisineFromTypes(types)
 
-      results.sort((a, b) => b.rating - a.rating)
+        return {
+          id: place.id,
+          name: place.name,
+          address: place.address,
+          city: destination, // Use the searched destination
+          cuisine: inferredCuisines,
+          priceLevel: place.priceLevel,
+          priceRange: mapPriceRange(place.priceLevel),
+          rating: place.rating || 0,
+          reviewCount: place.reviewCount || 0,
+          features: inferFeatures(types),
+          openingHours: place.openingHours || "Hours not available",
+          familyFriendly: types.includes("good_for_kids") || types.includes("family_friendly"),
+          reservationsRecommended: types.includes("reservations"),
+          url: place.url,
+          phone: place.phone,
+          coordinates: place.coordinates,
+        }
+      })
+
+      // Filter by rating if specified
+      if (rating) {
+        offers = offers.filter((o) => o.rating >= rating)
+      }
+
+      // Sort by rating
+      offers.sort((a, b) => b.rating - a.rating)
+
+      log.info("restaurant search completed", {
+        correlationId: context.correlationId,
+        results: offers.length,
+        provider: result.provider,
+        latencyMs: result.latencyMs,
+      })
 
       return {
-        offers: results.slice(0, 8),
+        offers: offers.slice(0, 8),
         searchParams: { destination, cuisine, priceRange },
-        provider: { id: "internal", name: "Restaurant Database" },
+        provider: { id: result.provider, name: "Google Places API" },
         errors,
-        meta: { generationTimeMs: Date.now() - startTime, resultsCount: results.length },
+        meta: {
+          generationTimeMs: Date.now() - startTime,
+          resultsCount: offers.length,
+        },
       }
     } catch (err) {
       log.error("restaurant search failed", { error: err instanceof Error ? err.message : String(err) })

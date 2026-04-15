@@ -6,6 +6,7 @@ import { amadeusAdapter } from "./adapters/amadeus"
 import { ticketmasterAdapter } from "./adapters/ticketmaster"
 import { openWeatherAdapter } from "./adapters/openweather"
 import { googlePlacesAdapter } from "./adapters/google-places"
+import { googleWeatherAdapter } from "./adapters/google-weather"
 
 const log = Log.create({ service: "travel.planner" })
 
@@ -354,25 +355,96 @@ export class TravelPlanningEngine {
     if (!this.config.includeWeatherRisk) return flags
 
     try {
-      const result = await openWeatherAdapter.getWeather({ city: query.destinations[0].city })
+      // Primary: Google Weather (uses Google Geocoding + Open-Meteo for actual weather)
+      let result = await googleWeatherAdapter.getWeather({ city: query.destinations[0].city })
+      let weatherData = result.data
+      let weatherProvider = "google_weather"
 
-      if (result.success && result.data) {
-        const assessment = openWeatherAdapter.assessWeatherRisk(result.data)
+      // Fallback to OpenWeather if Google Weather fails
+      if (!result.success || !result.data) {
+        result = await openWeatherAdapter.getWeather({ city: query.destinations[0].city })
+        weatherData = result.data
+        weatherProvider = "openweather"
 
-        if (assessment.level !== "low") {
-          flags.push({
-            type: "weather",
-            severity: assessment.level,
-            message: assessment.reasons.join("; "),
-            details: { weather: result.data },
+        if (!result.success || !result.data) {
+          log.warn("Both Google Weather and OpenWeather failed", {
+            destination: query.destinations[0].city,
+            googleError: result.error?.message,
           })
+          return flags
         }
+      }
+
+      // Use the appropriate adapter's assessWeatherRisk method
+      // weatherData is guaranteed to be defined here due to early return above
+      const assessment =
+        weatherProvider === "google_weather"
+          ? this.assessGoogleWeatherRisk(weatherData!)
+          : openWeatherAdapter.assessWeatherRisk(weatherData!)
+
+      if (assessment.level !== "low") {
+        flags.push({
+          type: "weather",
+          severity: assessment.level,
+          message: assessment.reasons.join("; "),
+          details: { weather: weatherData, provider: weatherProvider },
+        })
       }
     } catch (error) {
       log.warn("Weather risk assessment failed", { error: error instanceof Error ? error.message : String(error) })
     }
 
     return flags
+  }
+
+  // Assess weather risk for Google Weather data format
+  private assessGoogleWeatherRisk(data: any): { level: "low" | "medium" | "high"; reasons: string[] } {
+    const reasons: string[] = []
+    let riskLevel: "low" | "medium" | "high" = "low"
+
+    if (!data?.current) return { level: "low", reasons: [] }
+
+    const current = data.current
+
+    // Check temperature extremes
+    if (current.temperature < 0 || current.temperature > 38) {
+      reasons.push(`Extreme temperature: ${current.temperature}°C`)
+      riskLevel = "high"
+    } else if (current.temperature < 5 || current.temperature > 35) {
+      reasons.push(`Uncomfortable temperature: ${current.temperature}°C`)
+      riskLevel = riskLevel === "low" ? "medium" : riskLevel
+    }
+
+    // Check for rain/thunderstorm in forecast
+    const hasRain = data.forecast?.some((d: any) => d.rainProbability > 60)
+    if (hasRain) {
+      reasons.push("High rain probability forecast")
+      riskLevel = riskLevel === "low" ? "medium" : riskLevel
+    }
+
+    // Check wind speed
+    if (current.windSpeed > 50) {
+      reasons.push(`High wind speed: ${current.windSpeed} km/h`)
+      riskLevel = "high"
+    } else if (current.windSpeed > 30) {
+      reasons.push(`Strong wind: ${current.windSpeed} km/h`)
+      riskLevel = riskLevel === "low" ? "medium" : riskLevel
+    }
+
+    // Check description for severe weather
+    const desc = current.description?.toLowerCase() || ""
+    if (desc.includes("thunder") || desc.includes("storm")) {
+      reasons.push("Thunderstorm expected")
+      riskLevel = "high"
+    } else if (desc.includes("snow") || desc.includes("ice") || desc.includes("freezing")) {
+      reasons.push("Winter weather conditions")
+      riskLevel = "high"
+    } else if (desc.includes("fog") || desc.includes("mist")) {
+      reasons.push("Low visibility conditions")
+      riskLevel = riskLevel === "low" ? "medium" : riskLevel
+    }
+
+    return { level: riskLevel, reasons }
   }
 
   // ==========================================================================

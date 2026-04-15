@@ -40,46 +40,13 @@ interface TravelWeatherOutput {
   meta: { generationTimeMs: number; forecastDays: number }
 }
 
-// Italian city coordinates - bypass geocoding API for well-known Italian cities
-const ITALIAN_CITY_COORDS: Record<string, { lat: number; lon: number }> = {
-  Roma: { lat: 41.9028, lon: 12.4964 },
-  Rome: { lat: 41.9028, lon: 12.4964 },
-  Milano: { lat: 45.4642, lon: 9.19 },
-  Milan: { lat: 45.4642, lon: 9.19 },
-  Napoli: { lat: 40.8518, lon: 14.2681 },
-  Naples: { lat: 40.8518, lon: 14.2681 },
-  Firenze: { lat: 43.7696, lon: 11.2558 },
-  Florence: { lat: 43.7696, lon: 11.2558 },
-  Venezia: { lat: 45.4408, lon: 12.3155 },
-  Venice: { lat: 45.4408, lon: 12.3155 },
-  Bologna: { lat: 44.4949, lon: 11.3426 },
-  Torino: { lat: 45.0703, lon: 7.6869 },
-  Turin: { lat: 45.0703, lon: 7.6869 },
-  Genova: { lat: 44.4056, lon: 8.9463 },
-  Genoa: { lat: 44.4056, lon: 8.9463 },
-  Palermo: { lat: 38.1157, lon: 13.3615 },
-  Bari: { lat: 41.1258, lon: 16.862 },
-  Catania: { lat: 37.5079, lon: 15.083 },
-  Verona: { lat: 45.4384, lon: 10.9916 },
-}
-
 async function geocode(location: string): Promise<{ lat: number; lon: number; name: string } | null> {
-  // Check if it's a known Italian city first
-  const normalizedLocation = location.trim()
-  const italianMatch = ITALIAN_CITY_COORDS[normalizedLocation]
-  if (italianMatch) {
-    return { lat: italianMatch.lat, lon: italianMatch.lon, name: normalizedLocation }
-  }
-
   const response = await fetch(
-    `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(location)}&count=5&language=en&format=json`,
+    `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(location)}&count=1&language=en&format=json`,
   )
   const data = await response.json()
   if (!data.results?.length) return null
-
-  // Prefer Italian results for common Italian city names
-  const italianResult = data.results.find((r: any) => r.country?.toLowerCase() === "italy" || r.country === "Italia")
-  const r = italianResult || data.results[0]
+  const r = data.results[0]
   return { lat: r.latitude, lon: r.longitude, name: r.name }
 }
 

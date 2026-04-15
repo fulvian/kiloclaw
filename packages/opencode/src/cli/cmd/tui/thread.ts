@@ -189,6 +189,21 @@ function hasGoogleOauthConfig(): boolean {
   return !!process.env.GOOGLE_OAUTH_CLIENT_ID && !!process.env.GOOGLE_OAUTH_CLIENT_SECRET
 }
 
+/**
+ * Check if there are stored tokens in the database that can be used
+ * even without explicit OAuth env vars. This allows workspace-mcp to
+ * start with a pre-authenticated token via GWORKSPACE_ACCESS_TOKEN.
+ */
+async function hasStoredGoogleToken(): Promise<boolean> {
+  try {
+    const { TokenManager } = await import("@/kiloclaw/agency/auth/token-manager")
+    const token = await TokenManager.getValidAccessToken("fulviold@gmail.com", "default").catch(() => null)
+    return !!token
+  } catch {
+    return false
+  }
+}
+
 async function waitHealthy(healthUrl: string, timeoutMs = 30_000): Promise<boolean> {
   const start = Date.now()
   while (Date.now() - start < timeoutMs) {
@@ -217,10 +232,15 @@ async function startIntegratedGoogleWorkspaceMcp(): Promise<IntegratedGwsMcpRunt
   }
 
   if (!hasGoogleOauthConfig()) {
-    Log.Default.warn("google workspace MCP autostart skipped: missing OAuth env", {
-      required: ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET"],
-    })
-    return { started: false, spawned: false }
+    const hasToken = await hasStoredGoogleToken()
+    if (!hasToken) {
+      Log.Default.warn("google workspace MCP autostart skipped: missing OAuth env and no stored token", {
+        required: ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET"],
+      })
+      return { started: false, spawned: false }
+    }
+    // We have a stored token, proceed without explicit OAuth env vars
+    Log.Default.info("google workspace MCP autostart: using stored token (no OAuth env)", {})
   }
 
   const port = new URL(mcpUrl).port || "8000"
@@ -230,6 +250,21 @@ async function startIntegratedGoogleWorkspaceMcp(): Promise<IntegratedGwsMcpRunt
   setDefaultEnv("GOOGLE_OAUTH_REDIRECT_URI", `${hostBase}:${port}/oauth2callback`)
   setDefaultEnv("MCP_ENABLE_OAUTH21", "true")
   setDefaultEnv("OAUTHLIB_INSECURE_TRANSPORT", "1")
+
+  // Pass pre-authenticated Google API access token to workspace-mcp
+  // so it can call Google APIs without requiring a separate auth flow
+  try {
+    const { TokenManager } = await import("@/kiloclaw/agency/auth/token-manager")
+    const token = await TokenManager.getValidAccessToken("fulviold@gmail.com", "default").catch(() => null)
+    if (token) {
+      setDefaultEnv("GWORKSPACE_ACCESS_TOKEN", token)
+      Log.Default.info("set GWORKSPACE_ACCESS_TOKEN from token database", { tokenLength: token.length })
+    }
+  } catch (err) {
+    Log.Default.debug("could not set GWORKSPACE_ACCESS_TOKEN", {
+      error: err instanceof Error ? err.message : String(err),
+    })
+  }
 
   const cmd = [
     "uvx",
